@@ -8,6 +8,8 @@ dep-install:
     - script: Install Dep
       code: |
         go get -u github.com/golang/dep/cmd/dep
+    - wercker/add-ssh-key:
+      keyname: PUSHER_CI_SSH_KEY
     - script:
       name: Fetch dependencies
       code: |
