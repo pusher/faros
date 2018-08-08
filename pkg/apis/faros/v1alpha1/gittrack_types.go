@@ -1,7 +1,7 @@
 /*
-Copyright 2018 Pusher Ltd..
+Copyright 2018 Pusher Ltd.
 
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 3.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -17,22 +17,69 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // GitTrackSpec defines the desired state of GitTrack
 type GitTrackSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Reference contains the git reference this GitTrack tracks
+	Reference string `json:"reference"`
+
+	// Repository is the git repository URI to clone from
+	Repository string `json:"repository"`
+
+	// Path is the subpath within the repository underneath which files are considered
+	Path string `json:"path"`
 }
 
 // GitTrackStatus defines the observed state of GitTrack
 type GitTrackStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ObjectsDiscovered is the number of k8s objects found in the repository path
+	ObjectsDiscovered int64
+
+	// ObjectsApplied is the number of k8s objects for which a GitTrackObjects was created
+	ObjectsApplied int64
+
+	// ObjectsIgnored is the number of k8s objects found in the repository path for which no GitTrackObject was created
+	ObjectsIgnored int64
+
+	// ObjectsInSync is the number of GitTrackObjects that were successfully applied to the cluster
+	ObjectsInSync int64
+
+	// Conditions are the conditions on this GitTrack
+	Conditions []GitTrackCondition
+}
+
+// GitTrackConditionType is the type of a GitTrackCondition
+type GitTrackConditionType string
+
+const (
+	// ParseErrorType refers to errors encountered while parsing k8s object yaml
+	ParseErrorType GitTrackConditionType = "ParseError"
+
+	// GitErrorType refers to errors encountered during git interactions
+	GitErrorType GitTrackConditionType = "GitError"
+)
+
+type GitTrackCondition struct {
+	// Type of this condition
+	Type GitTrackConditionType `json:"type"`
+
+	// Status of this condition
+	Status v1.ConditionStatus `json:"status"`
+
+	// LastUpdateTime of this condition
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+
+	// LastTransitionTime of this condition
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+
+	// Reason for the current status of this condition
+	Reason string `json:"reason,omitempty"`
+
+	// Message associated with this condition
+	Message string `json:"message,omitempty"`
 }
 
 // +genclient
