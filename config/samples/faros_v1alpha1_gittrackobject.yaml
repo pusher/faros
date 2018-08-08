@@ -1,0 +1,9 @@
+apiVersion: faros.pusher.com/v1alpha1
+kind: GitTrackObject
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: gittrackobject-sample
+spec:
+  # Add fields here
+  foo: bar
