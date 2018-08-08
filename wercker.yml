@@ -1,0 +1,115 @@
+box:
+  id: golang:1.9
+
+dep-install:
+  steps:
+    - wercker/setup-go-workspace:
+        package-dir: github.com/pusher/faros
+    - script: Install Dep
+      code: |
+        go get -u github.com/golang/dep/cmd/dep
+    - script:
+      name: Fetch dependencies
+      code: |
+        dep ensure --vendor-only
+        shopt -s dotglob
+        mv ./* $WERCKER_OUTPUT_DIR
+
+kubebuilder-gen:
+  steps:
+    - wercker/setup-go-workspace:
+        package-dir: github.com/pusher/faros
+    - script:
+        name: Install Kubebuilder
+        code: |
+          curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v1.0.0/kubebuilder_1.0.0_linux_amd64.tar.gz
+          tar -zxvf kubebuilder_1.0.0_linux_amd64.tar.gz
+    - script:
+        name: Run Kubebuilder Generate
+        code: kubebuilder_1.0.0_linux_amd64/bin/kubebuilder generate
+    - script:
+        name: Check git tree is clean
+        code: |
+          rm -rf kubebuilder_1.0.0_linux_amd64*
+          if [[ ! -z $(git status -s) ]]; then git status; exit 1; fi
+
+lint:
+  steps:
+  - wercker/setup-go-workspace:
+      package-dir: github.com/pusher/faros
+  - script:
+      name: Install gometalinter
+      code: |
+        go get -u github.com/alecthomas/gometalinter
+        gometalinter --install
+  - script:
+      name: Run gometalinter
+      code: |
+       gometalinter --vendor --disable-all \
+       --enable=vet \
+       --enable=vetshadow \
+       --enable=golint \
+       --enable=ineffassign \
+       --enable=goconst \
+       --enable=deadcode \
+       --enable=gofmt \
+       --enable=goimports \
+       --tests $(go list ./... | grep -v /vendor/)
+
+test:
+  steps:
+  - wercker/setup-go-workspace:
+      package-dir: github.com/pusher/faros
+  - script:
+      name: Setup Test environment
+      code: |
+        export TEST_ASSET_DIR=/usr/local/bin
+        export TEST_ASSET_KUBECTL=$TEST_ASSET_DIR/kubectl
+        export TEST_ASSET_KUBE_APISERVER=$TEST_ASSET_DIR/kube-apiserver
+        export TEST_ASSET_ETCD=$TEST_ASSET_DIR/etcd
+
+        # Download test framework binaries
+        export TEST_ASSET_URL=https://storage.googleapis.com/k8s-c10s-test-binaries
+        curl $TEST_ASSET_URL/etcd-Linux-x86_64 --output $TEST_ASSET_ETCD
+        curl $TEST_ASSET_URL/kube-apiserver-Linux-x86_64 --output $TEST_ASSET_KUBE_APISERVER
+        curl https://storage.googleapis.com/kubernetes-release/release/v1.9.2/bin/linux/amd64/kubectl --output $TEST_ASSET_KUBECTL
+        chmod +x $TEST_ASSET_ETCD
+        chmod +x $TEST_ASSET_KUBE_APISERVER
+        chmod +x $TEST_ASSET_KUBECTL
+  - script:
+      name: go test
+      code: go test ./pkg/... ./cmd/...
+
+build:
+  steps:
+  - wercker/setup-go-workspace:
+      package-dir: github.com/pusher/faros
+  - script:
+      name: go build
+      code: GOPATH=/go GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o controller-manager github.com/pusher/faros/cmd/controller-manager
+  - script:
+      name: Copy to output directory
+      code: cp controller-manager "$WERCKER_OUTPUT_DIR"
+
+push-to-ecr:
+  box: alpine
+  steps:
+  - script:
+      name: Copy binary
+      code: cp controller-manager /bin/controller-manager
+  - script:
+      name: Install CA-Certificates
+      code: |
+        apk update
+        apk add ca-certificates
+  - script:
+      name: Remove Pipeline
+      code: rm -rf /pipeline
+  - internal/docker-push:
+      aws-access-key: $AWS_CI_ACCESS_KEY_ID
+      aws-secret-key: $AWS_CI_SECRET_ACCESS_KEY
+      aws-region: us-east-1
+      aws-registry-id: $AWS_CI_REGISTRY_ID
+      repository: pusher/faros
+      tag: $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH, latest
+      entrypoint: /bin/controller-manager
