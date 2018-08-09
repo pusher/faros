@@ -26,12 +26,11 @@ spec:
               type: string
             repository:
               type: string
-            subpath:
+            subPath:
               type: string
           required:
           - reference
           - repository
-          - subpath
           type: object
         status:
           type: object

@@ -30,7 +30,7 @@ type GitTrackSpec struct {
 	Repository string `json:"repository"`
 
 	// SubPath is the subpath within the repository underneath which files are considered
-	SubPath string `json:"subPath"`
+	SubPath string `json:"subPath,omitempty"`
 }
 
 // GitTrackStatus defines the observed state of GitTrack
