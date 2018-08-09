@@ -36,19 +36,19 @@ type GitTrackSpec struct {
 // GitTrackStatus defines the observed state of GitTrack
 type GitTrackStatus struct {
 	// ObjectsDiscovered is the number of k8s objects found in the repository path
-	ObjectsDiscovered int64
+	ObjectsDiscovered int64 `json:"objectsDiscovered"`
 
 	// ObjectsApplied is the number of k8s objects for which a GitTrackObjects was created
-	ObjectsApplied int64
+	ObjectsApplied int64 `json:"objectsApplied"`
 
 	// ObjectsIgnored is the number of k8s objects found in the repository path for which no GitTrackObject was created
-	ObjectsIgnored int64
+	ObjectsIgnored int64 `json:"ObjectsIgnored"`
 
 	// ObjectsInSync is the number of GitTrackObjects that were successfully applied to the cluster
-	ObjectsInSync int64
+	ObjectsInSync int64 `json:"objectsInSync"`
 
 	// Conditions are the conditions on this GitTrack
-	Conditions []GitTrackCondition
+	Conditions []GitTrackCondition `json:"conditions"`
 }
 
 // GitTrackConditionType is the type of a GitTrackCondition
