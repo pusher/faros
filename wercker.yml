@@ -85,7 +85,7 @@ build:
       package-dir: github.com/pusher/faros
   - script:
       name: go build
-      code: GOPATH=/go GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o controller-manager github.com/pusher/faros/cmd/controller-manager
+      code: GOPATH=/go GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o controller-manager github.com/pusher/faros/cmd/manager
   - script:
       name: Copy to output directory
       code: cp controller-manager "$WERCKER_OUTPUT_DIR"
