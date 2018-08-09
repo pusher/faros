@@ -32,7 +32,7 @@ kubebuilder-gen:
           tar -zxvf kubebuilder_1.0.0_linux_amd64.tar.gz
     - script:
         name: Run Kubebuilder Generate
-        code: make
+        code: make generate
     - script:
         name: Check git tree is clean
         code: |
