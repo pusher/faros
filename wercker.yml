@@ -98,9 +98,7 @@ push-to-ecr:
       code: cp controller-manager /bin/controller-manager
   - script:
       name: Install CA-Certificates
-      code: |
-        apk update
-        apk add ca-certificates
+      code: apk --no-cache add ca-certificates
   - script:
       name: Remove Pipeline
       code: rm -rf /pipeline
