@@ -22,16 +22,16 @@ spec:
           type: object
         spec:
           properties:
-            path:
-              type: string
             reference:
               type: string
             repository:
               type: string
+            subpath:
+              type: string
           required:
           - reference
           - repository
-          - path
+          - subpath
           type: object
         status:
           type: object

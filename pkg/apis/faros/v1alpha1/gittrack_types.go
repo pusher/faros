@@ -29,8 +29,8 @@ type GitTrackSpec struct {
 	// Repository is the git repository URI to clone from
 	Repository string `json:"repository"`
 
-	// Path is the subpath within the repository underneath which files are considered
-	Path string `json:"path"`
+	// Subpath is the subpath within the repository underneath which files are considered
+	Subpath string `json:"subpath"`
 }
 
 // GitTrackStatus defines the observed state of GitTrack
