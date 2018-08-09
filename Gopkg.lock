@@ -140,13 +140,27 @@
   version = "1.1.5"
 
 [[projects]]
+  branch = "controller-platform"
   name = "github.com/kubernetes-sigs/kubebuilder"
   packages = [
+    ".",
+    "pkg/client",
+    "pkg/config",
+    "pkg/ctrl",
+    "pkg/ctrl/common",
+    "pkg/ctrl/event",
+    "pkg/ctrl/eventhandler",
+    "pkg/ctrl/inject",
+    "pkg/ctrl/predicate",
+    "pkg/ctrl/reconcile",
+    "pkg/ctrl/source",
+    "pkg/ctrl/source/internal",
+    "pkg/informer",
     "pkg/install",
+    "pkg/log",
     "pkg/test"
   ]
-  revision = "9c4c6c213a8d17f8c21cf4f1aa9cefb99fbbf5ca"
-  version = "v1.0.0"
+  revision = "29bccabffb065deea1c4cb3273313b615996588a"
 
 [[projects]]
   name = "github.com/markbates/inflect"
@@ -229,6 +243,17 @@
   packages = ["."]
   revision = "583c0c0531f06d5278b7d917446061adc344b5cd"
   version = "v1.0.1"
+
+[[projects]]
+  branch = "features/structed"
+  name = "github.com/thockin/logr"
+  packages = [
+    ".",
+    "impls/zaplogr",
+    "testing"
+  ]
+  revision = "087cf386d618a79ac96d86ba65fa7d0c44fce2a3"
+  source = "https://github.com/directxman12/logr.git"
 
 [[projects]]
   name = "go.uber.org/atomic"
@@ -483,6 +508,46 @@
   packages = [
     "discovery",
     "dynamic",
+    "informers",
+    "informers/admissionregistration",
+    "informers/admissionregistration/v1alpha1",
+    "informers/admissionregistration/v1beta1",
+    "informers/apps",
+    "informers/apps/v1",
+    "informers/apps/v1beta1",
+    "informers/apps/v1beta2",
+    "informers/autoscaling",
+    "informers/autoscaling/v1",
+    "informers/autoscaling/v2beta1",
+    "informers/batch",
+    "informers/batch/v1",
+    "informers/batch/v1beta1",
+    "informers/batch/v2alpha1",
+    "informers/certificates",
+    "informers/certificates/v1beta1",
+    "informers/core",
+    "informers/core/v1",
+    "informers/events",
+    "informers/events/v1beta1",
+    "informers/extensions",
+    "informers/extensions/v1beta1",
+    "informers/internalinterfaces",
+    "informers/networking",
+    "informers/networking/v1",
+    "informers/policy",
+    "informers/policy/v1beta1",
+    "informers/rbac",
+    "informers/rbac/v1",
+    "informers/rbac/v1alpha1",
+    "informers/rbac/v1beta1",
+    "informers/scheduling",
+    "informers/scheduling/v1alpha1",
+    "informers/settings",
+    "informers/settings/v1alpha1",
+    "informers/storage",
+    "informers/storage/v1",
+    "informers/storage/v1alpha1",
+    "informers/storage/v1beta1",
     "kubernetes",
     "kubernetes/scheme",
     "kubernetes/typed/admissionregistration/v1alpha1",
@@ -513,6 +578,30 @@
     "kubernetes/typed/storage/v1",
     "kubernetes/typed/storage/v1alpha1",
     "kubernetes/typed/storage/v1beta1",
+    "listers/admissionregistration/v1alpha1",
+    "listers/admissionregistration/v1beta1",
+    "listers/apps/v1",
+    "listers/apps/v1beta1",
+    "listers/apps/v1beta2",
+    "listers/autoscaling/v1",
+    "listers/autoscaling/v2beta1",
+    "listers/batch/v1",
+    "listers/batch/v1beta1",
+    "listers/batch/v2alpha1",
+    "listers/certificates/v1beta1",
+    "listers/core/v1",
+    "listers/events/v1beta1",
+    "listers/extensions/v1beta1",
+    "listers/networking/v1",
+    "listers/policy/v1beta1",
+    "listers/rbac/v1",
+    "listers/rbac/v1alpha1",
+    "listers/rbac/v1beta1",
+    "listers/scheduling/v1alpha1",
+    "listers/settings/v1alpha1",
+    "listers/storage/v1",
+    "listers/storage/v1alpha1",
+    "listers/storage/v1beta1",
     "pkg/apis/clientauthentication",
     "pkg/apis/clientauthentication/v1alpha1",
     "pkg/version",
@@ -637,6 +726,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0312b9fcfd6e1abf0898f25c49ed4eb3c17c4d8d269c213f260d64820b2a2761"
+  inputs-digest = "6d13a78861de750e83473be152e9f47e3e8498a6e8193550304e7cb835da66d0"
   solver-name = "gps-cdcl"
   solver-version = 1
