@@ -18,29 +18,28 @@ package gittrack
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"reflect"
+	"strings"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	utils "github.com/pusher/faros/pkg/utils"
+	gitstore "github.com/pusher/git-store"
+	// corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	// "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
-
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
 
 // Add creates a new GitTrack Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -51,7 +50,8 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileGitTrack{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	clientSet := kubernetes.NewForConfigOrDie(mgr.GetConfig())
+	return &ReconcileGitTrack{Client: mgr.GetClient(), scheme: mgr.GetScheme(), store: gitstore.NewRepoStore(clientSet)}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -68,9 +68,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by GitTrack - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &farosv1alpha1.GitTrack{},
 	})
@@ -87,18 +85,56 @@ var _ reconcile.Reconciler = &ReconcileGitTrack{}
 type ReconcileGitTrack struct {
 	client.Client
 	scheme *runtime.Scheme
+	store  *gitstore.RepoStore
 }
 
-// Reconcile reads that state of the cluster for a GitTrack object and makes changes based on the state read
+func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo, error) {
+	log.Printf("Getting repository '%s'\n", url)
+	repo, err := r.store.Get(&gitstore.RepoRef{URL: url})
+	if err != nil {
+		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
+	}
+
+	log.Printf("Checking out '%s'\n", ref)
+	err = repo.Checkout(ref)
+	if err != nil {
+		return &gitstore.Repo{}, fmt.Errorf("failed to checkout '%s': %v", ref, err)
+	}
+
+	return repo, nil
+}
+
+func initGitTrackObject(path string, file *gitstore.File) (*farosv1alpha1.GitTrackObject, error) {
+	gto := &farosv1alpha1.GitTrackObject{}
+	data := []byte(file.Contents())
+	u, err := utils.YAMLToUnstructured(data)
+
+	if err != nil {
+		log.Printf("unable to parse '%s': %v\n", path, err)
+		return gto, err
+	}
+
+	if u.GetNamespace() == "" {
+		log.Printf("missing 'namespace' for '%s', ignoring\n", path)
+		return gto, err
+	}
+
+	name := strings.ToLower(fmt.Sprintf("%s-%s", u.GetKind(), u.GetName()))
+	gto.ObjectMeta = metav1.ObjectMeta{Name: name, Namespace: u.GetNamespace()}
+	gto.Spec = farosv1alpha1.GitTrackObjectSpec{Name: u.GetName(), Kind: u.GetKind(), Data: data}
+	return gto, nil
+}
+
+// Reconcile reads the state of the cluster for a GitTrack object and makes changes based on the state read
 // and what is in the GitTrack.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittracks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the GitTrack instance
 	instance := &farosv1alpha1.GitTrack{}
+	status := &farosv1alpha1.GitTrackStatus{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -110,56 +146,58 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this to be the object type created by your controller
-	// Define the desired Deployment object
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-deployment",
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"deployment": instance.Name + "-deployment"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"deployment": instance.Name + "-deployment"}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx",
-						},
-					},
-				},
-			},
-		},
-	}
-	if err = controllerutil.SetControllerReference(instance, deploy, r.scheme); err != nil {
+	repo, err := r.checkoutRepo(instance.Spec.Repository, instance.Spec.Reference)
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Check if the Deployment already exists
-	found := &appsv1.Deployment{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Create(context.TODO(), deploy)
+	files, err := repo.GetAllFiles(instance.Spec.SubPath)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to get all files for subpath '%s': %v", instance.Spec.SubPath, err)
+	}
+
+	// TODO: deal with files that contain multiple objects
+	status.ObjectsDiscovered = int64(len(files))
+
+	for path, file := range files {
+		gto, err := initGitTrackObject(path, file)
 		if err != nil {
-			return reconcile.Result{}, err
+			log.Printf("%v\n", err)
+			status.ObjectsIgnored++
 		}
-	} else if err != nil {
-		return reconcile.Result{}, err
-	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(deploy.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Update(context.TODO(), found)
+		found := &farosv1alpha1.GitTrackObject{}
+		err = r.Get(context.TODO(), types.NamespacedName{Name: gto.ObjectMeta.Name, Namespace: gto.ObjectMeta.Namespace}, found)
+		if err != nil && errors.IsNotFound(err) {
+			log.Printf("Creating GitTrackObject for '%s'\n", path)
+			err = r.Create(context.TODO(), gto)
+			if err != nil {
+				log.Printf("%v\n", err)
+				return reconcile.Result{}, fmt.Errorf("failed to create GitTrackObject for '%s': %v", path, err)
+			}
+			status.ObjectsApplied++
+		} else if err != nil {
+			log.Printf("%v\n", err)
+			return reconcile.Result{}, fmt.Errorf("failed to get GitTrackObject for '%s': %v", path, err)
+		} else {
+			if !reflect.DeepEqual(gto.Spec, found.Spec) {
+				found.Spec = gto.Spec
+				log.Printf("Updating GitTrackObject %s/%s\n", gto.Namespace, gto.Name)
+				err = r.Update(context.TODO(), found)
+				if err != nil {
+					log.Printf("%v\n", err)
+					return reconcile.Result{}, fmt.Errorf("failed to update GitTrackObject for '%s': %v", path, err)
+				}
+				status.ObjectsApplied++
+			}
+		}
+	}
+	if !reflect.DeepEqual(instance.Status, status) {
+		instance.Status = *(status)
+		err = r.Update(context.TODO(), instance)
 		if err != nil {
-			return reconcile.Result{}, err
+			// TODO: should we return an error here or nah?
+			log.Printf("%v\n", err)
 		}
 	}
 	return reconcile.Result{}, nil

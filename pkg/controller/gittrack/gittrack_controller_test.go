@@ -62,7 +62,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 	Describe("When a GitTrack resource is created", func() {
 		BeforeEach(func() {
-			instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}}
+			instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: "file://" + repositoryPath + "/fixtures", Reference: "master"}}
 			// Create the GitTrack object and expect the Reconcile and Deployment to be created
 			err := c.Create(context.TODO(), instance)
 			Expect(err).NotTo(HaveOccurred())
@@ -74,14 +74,14 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should update the status", func() {
+		It("should update its status", func() {
 			gt := &farosv1alpha1.GitTrack{}
 			Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 			status := farosv1alpha1.GitTrackStatus{ObjectsDiscovered: 2, ObjectsApplied: 2, ObjectsIgnored: 0, ObjectsInSync: 0}
 			Expect(gt.Status).To(Equal(status))
 		})
 
-		PIt("should update conditions", func() {
+		PIt("should update its conditions", func() {
 		})
 
 		PIt("should create GitTrackObjects", func() {

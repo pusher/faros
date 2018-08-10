@@ -45,9 +45,8 @@ func setupRepository() string {
 		log.Fatal(err)
 	}
 
-	cmd := exec.Command("tar", "-zxvf", fixturesRepoPath, "-C", dir, "--strip-components", "1")
-	out, err := cmd.CombinedOutput()
-	log.Printf("%s\n", out)
+	cmd := exec.Command("tar", "-zxf", fixturesRepoPath, "-C", dir, "--strip-components", "1")
+	err = cmd.Run()
 	if err != nil {
 		log.Fatal(err)
 	}

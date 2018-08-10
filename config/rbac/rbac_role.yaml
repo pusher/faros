@@ -29,6 +29,18 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - faros.pusher.com
+  resources:
+  - gittrackobjects
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - apps
   resources:
   - deployments
