@@ -39,3 +39,13 @@ var _ = Describe("YAMLToJSON", func() {
 		Expect(rolebindingJSON).Should(Equal([]byte(roleBindingExpect)))
 	})
 })
+
+var _ = Describe("YAMLToUnstructured", func() {
+	It("should convert the roleBinding to an unstructured roleBindung", func() {
+		obj, err := YAMLToUnstructured([]byte(roleBinding))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(obj.GetKind()).To(Equal("RoleBinding"))
+		Expect(obj.GetName()).To(Equal("kubernetes-dashboard-minimal"))
+		Expect(obj.GetNamespace()).To(Equal("kube-system"))
+	})
+})
