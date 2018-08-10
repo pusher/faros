@@ -114,7 +114,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	// Define the desired Deployment object
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-deployment",
+			Name:      "example",
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
