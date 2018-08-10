@@ -17,7 +17,10 @@ limitations under the License.
 package gittrack
 
 import (
+	"io/ioutil"
 	"log"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -33,6 +36,28 @@ import (
 )
 
 var cfg *rest.Config
+var repositoryPath string
+var fixturesRepoPath, _ = filepath.Abs("./fixtures/repo.tgz")
+
+func setupRepository() string {
+	dir, err := ioutil.TempDir("", "gittrack")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cmd := exec.Command("tar", "-zxvf", fixturesRepoPath, "-C", dir, "--strip-components", "1")
+	out, err := cmd.CombinedOutput()
+	log.Printf("%s\n", out)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return dir
+}
+
+func teardownRepository(dir string) {
+	os.RemoveAll(dir)
+}
 
 func TestBee(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -47,6 +72,8 @@ var _ = BeforeSuite(func() {
 	}
 	apis.AddToScheme(scheme.Scheme)
 
+	repositoryPath = setupRepository()
+
 	var err error
 	if cfg, err = t.Start(); err != nil {
 		log.Fatal(err)
@@ -55,6 +82,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	t.Stop()
+	teardownRepository(repositoryPath)
 })
 
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and

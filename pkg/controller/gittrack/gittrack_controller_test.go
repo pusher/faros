@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	"golang.org/x/net/context"
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,8 +32,8 @@ import (
 
 var c client.Client
 
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-var depKey = types.NamespacedName{Name: "foo-deployment", Namespace: "default"}
+var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "example", Namespace: "default"}}
+var gtKey = types.NamespacedName{Name: "example", Namespace: "default"}
 var mgr manager.Manager
 var instance *farosv1alpha1.GitTrack
 var requests chan reconcile.Request
@@ -61,27 +60,31 @@ var _ = Describe("GitTrack Suite", func() {
 		close(stop)
 	})
 
-	Describe("On reconcile", func() {
-		It("create an instance", func() {
-			instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	Describe("When a GitTrack resource is created", func() {
+		BeforeEach(func() {
+			instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}}
 			// Create the GitTrack object and expect the Reconcile and Deployment to be created
 			err := c.Create(context.TODO(), instance)
 			Expect(err).NotTo(HaveOccurred())
-			defer c.Delete(context.TODO(), instance)
 			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+		})
 
-			deploy := &appsv1.Deployment{}
-			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
-				Should(Succeed())
+		AfterEach(func() {
+			err := c.Delete(context.TODO(), instance)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
-			// Delete the Deployment and expect Reconcile to be called for Deployment deletion
-			Expect(c.Delete(context.TODO(), deploy)).NotTo(HaveOccurred())
-			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
-				Should(Succeed())
+		It("should update the status", func() {
+			gt := &farosv1alpha1.GitTrack{}
+			Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
+			status := farosv1alpha1.GitTrackStatus{ObjectsDiscovered: 2, ObjectsApplied: 2, ObjectsIgnored: 0, ObjectsInSync: 0}
+			Expect(gt.Status).To(Equal(status))
+		})
 
-			// Manually delete Deployment since GC isn't enabled in the test control plane
-			Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
+		PIt("should update conditions", func() {
+		})
+
+		PIt("should create GitTrackObjects", func() {
 		})
 	})
 })
