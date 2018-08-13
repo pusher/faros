@@ -169,7 +169,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 			Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 		})
 
-		PIt("should update the resource when the GTO is updated", func() {
+		It("should update the resource when the GTO is updated", func() {
 			deploy := &appsv1.Deployment{}
 			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
 				Should(Succeed())
@@ -199,7 +199,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 			Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 		})
 
-		PIt("should recreate the child if it is deleted", func() {
+		It("should recreate the child if it is deleted", func() {
 			deploy := &appsv1.Deployment{}
 			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
 				Should(Succeed())
@@ -214,7 +214,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 			Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 		})
 
-		PIt("should reset the child if it is modified", func() {
+		It("should reset the child if it is modified", func() {
 			deploy := &appsv1.Deployment{}
 			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
 				Should(Succeed())
