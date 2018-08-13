@@ -196,19 +196,19 @@ version="v2.2.1"
 
 [[override]]
 name="k8s.io/api"
-version="kubernetes-1.10.0"
+version="kubernetes-1.11.0"
 
 [[override]]
 name="k8s.io/apiextensions-apiserver"
-version="kubernetes-1.10.1"
+version="kubernetes-1.11.0"
 
 [[override]]
 name="k8s.io/apimachinery"
-version="kubernetes-1.10.0"
+version="kubernetes-1.11.0"
 
 [[override]]
 name="k8s.io/client-go"
-version="kubernetes-1.10.1"
+version="kubernetes-1.11.0"
 
 [[override]]
 name="k8s.io/code-generator"
@@ -224,7 +224,8 @@ revision="f08db293d3ef80052d6513ece19792642a289fea"
 
 [[override]]
 name="sigs.k8s.io/controller-runtime"
-branch="master"
+source="https://github.com/pusher/controller-runtime"
+branch="unstructured-1.11"
 
 [[override]]
 name="sigs.k8s.io/controller-tools"
