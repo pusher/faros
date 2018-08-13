@@ -43,10 +43,11 @@ type GitTrackObjectStatus struct {
 type GitTrackObjectConditionType string
 
 const (
-	// ObjectInSync whether the tracked object is in sync or not
+	// ObjectInSyncType whether the tracked object is in sync or not
 	ObjectInSyncType GitTrackObjectConditionType = "ObjectInSync"
 )
 
+// GitTrackObjectCondition is a status condition for a GitTrackObject
 type GitTrackObjectCondition struct {
 	// Type of this condition
 	Type GitTrackObjectConditionType `json:"type"`

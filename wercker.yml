@@ -53,7 +53,7 @@ lint:
        --enable=deadcode \
        --enable=gofmt \
        --enable=goimports \
-       --tests $(go list ./... | grep -v /vendor/)
+       --tests ./...
 
 test:
   steps:
