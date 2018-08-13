@@ -62,6 +62,7 @@ const (
 	GitErrorType GitTrackConditionType = "GitError"
 )
 
+// GitTrackCondition is a status condition for a GitTrack
 type GitTrackCondition struct {
 	// Type of this condition
 	Type GitTrackConditionType `json:"type"`
