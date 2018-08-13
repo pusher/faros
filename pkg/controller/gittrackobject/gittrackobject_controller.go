@@ -111,36 +111,50 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
-	child, err := utils.YAMLToUnstructured(instance.Spec.Data)
+	child := &unstructured.Unstructured{}
+	*child, err = utils.YAMLToUnstructured(instance.Spec.Data)
 	if err != nil {
+		log.Printf("unable to marshal data: %v", err)
 		return reconcile.Result{}, fmt.Errorf("unable to unmarshal data: %v", err)
 	}
 	if err = controllerutil.SetControllerReference(instance, child, r.scheme); err != nil {
+		log.Printf("unable to add owner reference: %v", err)
 		return reconcile.Result{}, fmt.Errorf("unable to add owner reference: %v", err)
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Check if the Deployment already exists
+	// Check if the Child already exists
 	found := &unstructured.Unstructured{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: child.Name, Namespace: child.Namespace}, found)
+	found.SetKind(child.GetKind())
+	found.SetAPIVersion(child.GetAPIVersion())
+
+	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating child %s %s/%s\n", child.GroupVersionKind().String(), child.Namespace, child.Name)
+		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Create(context.TODO(), child)
 		if err != nil {
-			return reconcile.Result{}, err
+			log.Printf("unable to create child: %v", err)
+			return reconcile.Result{}, fmt.Errorf("unable to create child: %v", err)
 		}
 		// Now that we have created the object, the version on the API should be
 		// the same as the child
 		found = child
 	} else if err != nil {
-		return reconcile.Result{}, err
+		log.Printf("unable to get child: %v", err)
+		return reconcile.Result{}, fmt.Errorf("unable to get child: %v", err)
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(child.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
+	// Update the object if the spec differs from the version running
+	var childSpec, foundSpec interface{}
+	var ok bool
+	if childSpec, ok = child.UnstructuredContent()["spec"]; !ok {
+		return reconcile.Result{}, fmt.Errorf("child has no spec")
+	}
+	if foundSpec, ok = found.UnstructuredContent()["spec"]; !ok {
+		return reconcile.Result{}, fmt.Errorf("found has no spec")
+	}
+	if !reflect.DeepEqual(childSpec, foundSpec) {
+		found.UnstructuredContent()["spec"] = childSpec
+		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Update(context.TODO(), found)
 		if err != nil {
 			return reconcile.Result{}, err
