@@ -18,14 +18,15 @@ package gittrackobject
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"reflect"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	"github.com/pusher/faros/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -110,51 +111,34 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this to be the object type created by your controller
-	// Define the desired Deployment object
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "example",
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"deployment": instance.Name + "-deployment"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"deployment": instance.Name + "-deployment"}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx",
-						},
-					},
-				},
-			},
-		},
+	child, err := utils.YAMLToUnstructured(instance.Spec.Data)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("unable to unmarshal data: %v", err)
 	}
-	if err = controllerutil.SetControllerReference(instance, deploy, r.scheme); err != nil {
-		return reconcile.Result{}, err
+	if err = controllerutil.SetControllerReference(instance, child, r.scheme); err != nil {
+		return reconcile.Result{}, fmt.Errorf("unable to add owner reference: %v", err)
 	}
 
 	// TODO(user): Change this for the object type created by your controller
 	// Check if the Deployment already exists
-	found := &appsv1.Deployment{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
+	found := &unstructured.Unstructured{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: child.Name, Namespace: child.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Create(context.TODO(), deploy)
+		log.Printf("Creating child %s %s/%s\n", child.GroupVersionKind().String(), child.Namespace, child.Name)
+		err = r.Create(context.TODO(), child)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
+		// Now that we have created the object, the version on the API should be
+		// the same as the child
+		found = child
 	} else if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// TODO(user): Change this for the object type created by your controller
 	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(deploy.Spec, found.Spec) {
+	if !reflect.DeepEqual(child.Spec, found.Spec) {
 		found.Spec = deploy.Spec
 		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
 		err = r.Update(context.TODO(), found)
