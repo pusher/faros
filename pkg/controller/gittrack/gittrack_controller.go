@@ -120,7 +120,7 @@ func (r *ReconcileGitTrack) getFilesForSpec(s farosv1alpha1.GitTrackSpec) (map[s
 	return files, nil
 }
 
-func initGitTrackObject(path string, file *gitstore.File) (*farosv1alpha1.GitTrackObject, error) {
+func (r *ReconcileGitTrack) initGitTrackObject(path string, file *gitstore.File, gt *farosv1alpha1.GitTrack) (*farosv1alpha1.GitTrackObject, error) {
 	gto := &farosv1alpha1.GitTrackObject{}
 	data := []byte(file.Contents())
 	u, err := utils.YAMLToUnstructured(data)
@@ -136,8 +136,20 @@ func initGitTrackObject(path string, file *gitstore.File) (*farosv1alpha1.GitTra
 	}
 
 	name := strings.ToLower(fmt.Sprintf("%s-%s", u.GetKind(), u.GetName()))
-	gto.ObjectMeta = metav1.ObjectMeta{Name: name, Namespace: u.GetNamespace()}
-	gto.Spec = farosv1alpha1.GitTrackObjectSpec{Name: u.GetName(), Kind: u.GetKind(), Data: data}
+	gto.ObjectMeta = metav1.ObjectMeta{
+		Name:      name,
+		Namespace: u.GetNamespace(),
+		Labels:    makeLabels(gt),
+	}
+	gto.Spec = farosv1alpha1.GitTrackObjectSpec{
+		Name: u.GetName(),
+		Kind: u.GetKind(),
+		Data: data,
+	}
+
+	if err = controllerutil.SetControllerReference(gt, gto, r.scheme); err != nil {
+		return gto, err
+	}
 
 	return gto, nil
 }
@@ -181,6 +193,31 @@ func failure(c farosv1alpha1.GitTrackCondition, m string) farosv1alpha1.GitTrack
 	return c
 }
 
+func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (map[string]farosv1alpha1.GitTrackObject, error) {
+	result := make(map[string]farosv1alpha1.GitTrackObject)
+	gtos := &farosv1alpha1.GitTrackObjectList{}
+	opts := client.InNamespace(owner.Namespace).MatchingLabels(makeLabels(owner))
+	err := r.List(context.TODO(), opts, gtos)
+	if err != nil {
+		return nil, err
+	}
+	for _, gto := range gtos.Items {
+		result[gto.Name] = gto
+	}
+	return result, nil
+}
+
+func makeLabels(g *farosv1alpha1.GitTrack) map[string]string {
+	return map[string]string{"faros.pusher.com/owned-by": g.Name}
+}
+
+func initCondition(t farosv1alpha1.GitTrackConditionType) farosv1alpha1.GitTrackCondition {
+	return farosv1alpha1.GitTrackCondition{
+		Type:   t,
+		Status: v1.ConditionUnknown,
+	}
+}
+
 // Reconcile reads the state of the cluster for a GitTrack object and makes changes based on the state read
 // and what is in the GitTrack.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
@@ -188,14 +225,9 @@ func failure(c farosv1alpha1.GitTrackCondition, m string) farosv1alpha1.GitTrack
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	status := &farosv1alpha1.GitTrackStatus{}
-	parseErrorCondition := farosv1alpha1.GitTrackCondition{
-		Type:   farosv1alpha1.ParseErrorType,
-		Status: v1.ConditionUnknown,
-	}
-	gitErrorCondition := farosv1alpha1.GitTrackCondition{
-		Type:   farosv1alpha1.GitErrorType,
-		Status: v1.ConditionUnknown,
-	}
+	parseErrorCondition := initCondition(farosv1alpha1.ParseErrorType)
+	gitErrorCondition := initCondition(farosv1alpha1.GitErrorType)
+
 	instance, err := r.fetchInstance(request)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -222,18 +254,22 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 
 	// TODO: deal with files that contain multiple objects
 	status.ObjectsDiscovered = int64(len(files))
+	objectsByName, err := r.listObjectsByName(instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	for path, file := range files {
+		var gto *farosv1alpha1.GitTrackObject
 		log.Printf("Processing '%s'\n", path)
-		gto, err := initGitTrackObject(path, file)
+		gto, err = r.initGitTrackObject(path, file, instance)
 		if err != nil {
 			status.ObjectsIgnored++
 			continue
 		}
 
-		if err = controllerutil.SetControllerReference(instance, gto, r.scheme); err != nil {
-			// TODO: ignore or requeue?
-			return reconcile.Result{}, err
+		if _, ok := objectsByName[gto.Name]; ok {
+			delete(objectsByName, gto.Name)
 		}
 
 		found := &farosv1alpha1.GitTrackObject{}
@@ -257,6 +293,14 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 			}
 			status.ObjectsApplied++
 		}
+	}
+
+	for k, v := range objectsByName {
+		log.Printf("Deleting GitTrackObject '%s'\n", k)
+		if err = r.Delete(context.TODO(), &v); err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to delete GitTrackObject for '%s': '%s'", k, err)
+		}
+		delete(objectsByName, k)
 	}
 
 	if status.ObjectsApplied == 0 {
