@@ -28,10 +28,13 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	"github.com/pusher/faros/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -66,6 +69,11 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		close(stop)
 	}()
 
+	restMapper, err := newRestMapper(mgr.GetConfig())
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest mapper: %v", err))
+	}
+
 	return &ReconcileGitTrackObject{
 		Client:      mgr.GetClient(),
 		scheme:      mgr.GetScheme(),
@@ -73,6 +81,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		informers:   make(map[string]cache.SharedIndexInformer),
 		config:      mgr.GetConfig(),
 		stop:        stop,
+		restMapper:  restMapper,
 	}
 }
 
@@ -111,6 +120,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
+// newRestMapper creates a restMapper from the discovery client
+func newRestMapper(config *rest.Config) (meta.RESTMapper, error) {
+	client, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create dynamic client: %v", err)
+	}
+
+	apiGroupResources, err := restmapper.GetAPIGroupResources(client)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch API Group Resources: %v", err)
+	}
+
+	return restmapper.NewDiscoveryRESTMapper(apiGroupResources), nil
+}
+
 // Reconciler allows the test suite to mock the required methods
 // for setting up the watch streams.
 type Reconciler interface {
@@ -128,6 +152,7 @@ type ReconcileGitTrackObject struct {
 	informers   map[string]cache.SharedIndexInformer
 	config      *rest.Config
 	stop        chan struct{}
+	restMapper  meta.RESTMapper
 }
 
 // EventStream returns a stream of generic event to trigger reconciles

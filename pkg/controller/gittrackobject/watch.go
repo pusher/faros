@@ -21,6 +21,7 @@ import (
 	"log"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +67,11 @@ func (r *ReconcileGitTrackObject) watch(obj unstructured.Unstructured) error {
 func (r *ReconcileGitTrackObject) newInformerFromObject(obj unstructured.Unstructured) (cache.SharedIndexInformer, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 
-	// TODO restmapping stuff
+	// Get API Resource and namespaced
+	gvr, namespaced, err := r.getAPIResource(gvk)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get API Resource: %v", err)
+	}
 
 	// Construct a resource client from the resource
 	config := configForGVK(r.config, gvk)
@@ -74,12 +79,7 @@ func (r *ReconcileGitTrackObject) newInformerFromObject(obj unstructured.Unstruc
 	if err != nil {
 		return nil, fmt.Errorf("unable to create dynamic client: %v", err)
 	}
-	// TODO get this GVR dynamically
-	resourceClient := client.Resource(schema.GroupVersionResource{
-		Group:    "apps",
-		Version:  "v1",
-		Resource: "deployments",
-	}).Namespace(obj.GetNamespace())
+	resourceClient := client.Resource(gvr).Namespace(resourceDefaultNamespace(namespaced, obj))
 
 	// Set up empty tweak options
 	tweakOptions := func(opts *metav1.ListOptions) {}
@@ -93,6 +93,17 @@ func (r *ReconcileGitTrackObject) newInformerFromObject(obj unstructured.Unstruc
 		},
 		tweakOptions,
 	), nil
+}
+
+// getAPIResource uses a rest mapper to get the GroupVersionResource and
+// determine whether an object is namespaced or not
+func (r *ReconcileGitTrackObject) getAPIResource(gvk schema.GroupVersionKind) (schema.GroupVersionResource, bool, error) {
+	fqKind := schema.FromAPIVersionAndKind(gvk.ToAPIVersionAndKind())
+	mapping, err := r.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
+	if err != nil {
+		return schema.GroupVersionResource{}, false, fmt.Errorf("unable to get REST mapping: %v", err)
+	}
+	return mapping.Resource, mapping.Scope == meta.RESTScopeNamespace, nil
 }
 
 // newSharedIndexInformer constructs a new SharedIndexInformer for the object.
@@ -139,4 +150,13 @@ func configForGVK(cfg *rest.Config, gvk schema.GroupVersionKind) *rest.Config {
 		c.APIPath = "/apis"
 	}
 	return c
+}
+
+// resourceDefaultNamespace defaults to the item's namespace
+// but clears it for cluster scoped resources
+func resourceDefaultNamespace(namespaced bool, obj unstructured.Unstructured) string {
+	if namespaced {
+		return obj.GetNamespace()
+	}
+	return ""
 }
