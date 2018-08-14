@@ -57,16 +57,26 @@ var _ = AfterSuite(func() {
 	t.Stop()
 })
 
+type testReconciler struct {
+	*ReconcileGitTrackObject
+	requests chan reconcile.Request
+}
+
+func (t *testReconciler) Reconcile(req reconcile.Request) (reconcile.Result, error) {
+	result, err := t.ReconcileGitTrackObject.Reconcile(req)
+	t.requests <- req
+	return result, err
+}
+
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and
 // writes the request to requests after Reconcile is finished.
 func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request) {
 	requests := make(chan reconcile.Request)
-	fn := reconcile.Func(func(req reconcile.Request) (reconcile.Result, error) {
-		result, err := inner.Reconcile(req)
-		requests <- req
-		return result, err
-	})
-	return fn, requests
+	reconciler := inner.(*ReconcileGitTrackObject)
+	return &testReconciler{
+		ReconcileGitTrackObject: reconciler,
+		requests:                requests,
+	}, requests
 }
 
 // StartTestManager adds recFn

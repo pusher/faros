@@ -20,11 +20,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"reflect"
+	"syscall"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	"github.com/pusher/faros/pkg/utils"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -52,7 +55,21 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileGitTrackObject{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	// Set up informer stop channel
+	stop := make(chan struct{})
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		close(stop)
+	}()
+
+	return &ReconcileGitTrackObject{
+		Client:      mgr.GetClient(),
+		scheme:      mgr.GetScheme(),
+		eventStream: make(chan event.GenericEvent),
+		stop:        stop,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -69,17 +86,32 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by GitTrackObject - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.GitTrackObject{},
-	})
-	if err != nil {
-		return err
+	if gtoReconciler, ok := r.(Reconciler); ok {
+		src := &source.Channel{
+			Source: gtoReconciler.EventStream(),
+		}
+		src.InjectStopChannel(gtoReconciler.StopChan())
+		err = c.Watch(src,
+			&handler.EnqueueRequestForOwner{
+				IsController: true,
+				OwnerType:    &farosv1alpha1.GitTrackObject{},
+			},
+		)
+		if err != nil {
+			msg := fmt.Sprintf("unable to watch channel: %v", err)
+			log.Printf(msg)
+			return fmt.Errorf(msg)
+		}
 	}
 
 	return nil
+}
+
+// Reconciler allows the test suite to mock the required methods
+// for setting up the watch streams.
+type Reconciler interface {
+	EventStream() chan event.GenericEvent
+	StopChan() chan struct{}
 }
 
 var _ reconcile.Reconciler = &ReconcileGitTrackObject{}
@@ -87,7 +119,19 @@ var _ reconcile.Reconciler = &ReconcileGitTrackObject{}
 // ReconcileGitTrackObject reconciles a GitTrackObject object
 type ReconcileGitTrackObject struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme      *runtime.Scheme
+	eventStream chan event.GenericEvent
+	stop        chan struct{}
+}
+
+// EventStream returns a stream of generic event to trigger reconciles
+func (r *ReconcileGitTrackObject) EventStream() chan event.GenericEvent {
+	return r.eventStream
+}
+
+// StopChan returns the object stop channel
+func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
+	return r.stop
 }
 
 // Reconcile reads that state of the cluster for a GitTrackObject object and makes changes based on the state read

@@ -83,6 +83,7 @@ var mgr manager.Manager
 var instance *farosv1alpha1.GitTrackObject
 var requests chan reconcile.Request
 var stop chan struct{}
+var stopInformers chan struct{}
 
 const timeout = time.Second * 5
 
@@ -96,13 +97,16 @@ var _ = Describe("GitTrackObject Suite", func() {
 		c = mgr.GetClient()
 
 		var recFn reconcile.Reconciler
-		recFn, requests = SetupTestReconcile(newReconciler(mgr))
+		testReconciler := newReconciler(mgr)
+		recFn, requests = SetupTestReconcile(testReconciler)
 		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
+		stopInformers = testReconciler.(Reconciler).StopChan()
 		stop = StartTestManager(mgr)
 	})
 
 	AfterEach(func() {
 		close(stop)
+		close(stopInformers)
 	})
 
 	Describe("When a GitTrackObject resource is created", func() {
