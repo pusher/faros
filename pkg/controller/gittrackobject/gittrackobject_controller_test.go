@@ -215,7 +215,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 				Should(Succeed())
 
 			// GC not enabled so manually delete the object
-			Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
+			Eventually(func() error { return c.Delete(context.TODO(), deploy) }, timeout).
+				Should(Succeed())
 		})
 
 		It("should reset the child if it is modified", func() {

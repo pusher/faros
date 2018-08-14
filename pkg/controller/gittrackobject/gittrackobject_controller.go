@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -68,6 +70,8 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:      mgr.GetClient(),
 		scheme:      mgr.GetScheme(),
 		eventStream: make(chan event.GenericEvent),
+		informers:   make(map[string]cache.SharedIndexInformer),
+		config:      mgr.GetConfig(),
 		stop:        stop,
 	}
 }
@@ -121,6 +125,8 @@ type ReconcileGitTrackObject struct {
 	client.Client
 	scheme      *runtime.Scheme
 	eventStream chan event.GenericEvent
+	informers   map[string]cache.SharedIndexInformer
+	config      *rest.Config
 	stop        chan struct{}
 }
 
@@ -170,6 +176,12 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	found := &unstructured.Unstructured{}
 	found.SetKind(child.GetKind())
 	found.SetAPIVersion(child.GetAPIVersion())
+
+	// Make sure to watch the child resource
+	err = r.watch(*child)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("unable to create watch: %v", err)
+	}
 
 	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
