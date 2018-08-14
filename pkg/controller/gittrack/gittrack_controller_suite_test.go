@@ -90,6 +90,9 @@ func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan 
 	requests := make(chan reconcile.Request)
 	fn := reconcile.Func(func(req reconcile.Request) (reconcile.Result, error) {
 		result, err := inner.Reconcile(req)
+		if err != nil {
+			log.Printf("error during reconcile: %v\n", err)
+		}
 		requests <- req
 		return result, err
 	})

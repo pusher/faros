@@ -26,7 +26,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	utils "github.com/pusher/faros/pkg/utils"
 	gitstore "github.com/pusher/git-store"
-	// corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	// "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -104,6 +104,22 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo
 	return repo, nil
 }
 
+func (r *ReconcileGitTrack) getFilesForSpec(s farosv1alpha1.GitTrackSpec) (map[string]*gitstore.File, error) {
+	repo, err := r.checkoutRepo(s.Repository, s.Reference)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := repo.GetAllFiles(s.SubPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all files for subpath '%s': %v", s.SubPath, err)
+	} else if len(files) == 0 {
+		return nil, fmt.Errorf("no files for subpath '%s'", s.SubPath)
+	}
+
+	return files, nil
+}
+
 func initGitTrackObject(path string, file *gitstore.File) (*farosv1alpha1.GitTrackObject, error) {
 	gto := &farosv1alpha1.GitTrackObject{}
 	data := []byte(file.Contents())
@@ -115,90 +131,150 @@ func initGitTrackObject(path string, file *gitstore.File) (*farosv1alpha1.GitTra
 	}
 
 	if u.GetNamespace() == "" {
-		log.Printf("missing 'namespace' for '%s', ignoring\n", path)
-		return gto, err
+		log.Printf("missing 'namespace' in '%s', ignoring\n", path)
+		return gto, fmt.Errorf("missing 'namespace' in %s", path)
 	}
 
 	name := strings.ToLower(fmt.Sprintf("%s-%s", u.GetKind(), u.GetName()))
 	gto.ObjectMeta = metav1.ObjectMeta{Name: name, Namespace: u.GetNamespace()}
 	gto.Spec = farosv1alpha1.GitTrackObjectSpec{Name: u.GetName(), Kind: u.GetKind(), Data: data}
+
 	return gto, nil
+}
+
+func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1.GitTrack, error) {
+	instance := &farosv1alpha1.GitTrack{}
+	err := r.Get(context.TODO(), req.NamespacedName, instance)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Object not found, return.  Created objects are automatically garbage collected.
+			// For additional cleanup logic use finalizers.
+			return nil, nil
+		}
+		// Error reading the object - requeue the request.
+		return nil, err
+	}
+	return instance, nil
+}
+
+func success(c farosv1alpha1.GitTrackCondition, m string) farosv1alpha1.GitTrackCondition {
+	now := metav1.Now()
+	c.Status = v1.ConditionFalse
+	c.LastUpdateTime = now
+	c.LastTransitionTime = now
+	if m != "" {
+		c.Reason = m
+		c.Message = m
+	}
+	return c
+}
+
+func failure(c farosv1alpha1.GitTrackCondition, m string) farosv1alpha1.GitTrackCondition {
+	now := metav1.Now()
+	c.Status = v1.ConditionTrue
+	c.LastUpdateTime = now
+	c.LastTransitionTime = now
+	if m != "" {
+		c.Reason = m
+		c.Message = m
+	}
+	return c
 }
 
 // Reconcile reads the state of the cluster for a GitTrack object and makes changes based on the state read
 // and what is in the GitTrack.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittracks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	// Fetch the GitTrack instance
-	instance := &farosv1alpha1.GitTrack{}
 	status := &farosv1alpha1.GitTrackStatus{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	parseErrorCondition := farosv1alpha1.GitTrackCondition{
+		Type:   farosv1alpha1.ParseErrorType,
+		Status: v1.ConditionUnknown,
+	}
+	gitErrorCondition := farosv1alpha1.GitTrackCondition{
+		Type:   farosv1alpha1.GitErrorType,
+		Status: v1.ConditionUnknown,
+	}
+	instance, err := r.fetchInstance(request)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
-			return reconcile.Result{}, nil
+		return reconcile.Result{}, err
+	} else if instance == nil {
+		return reconcile.Result{}, nil
+	}
+
+	files, err := r.getFilesForSpec(instance.Spec)
+	if err != nil {
+		status.Conditions = []farosv1alpha1.GitTrackCondition{
+			success(parseErrorCondition, ""),
+			failure(gitErrorCondition, fmt.Sprintf("%v", err)),
 		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
-	}
 
-	repo, err := r.checkoutRepo(instance.Spec.Repository, instance.Spec.Reference)
-	if err != nil {
+		if !reflect.DeepEqual(instance.Status, status) {
+			instance.Status = *(status)
+			updateErr := r.Update(context.TODO(), instance)
+			if updateErr != nil {
+				log.Printf("Unable to update status: '%v'\n", updateErr)
+			}
+		}
 		return reconcile.Result{}, err
-	}
-
-	files, err := repo.GetAllFiles(instance.Spec.SubPath)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to get all files for subpath '%s': %v", instance.Spec.SubPath, err)
 	}
 
 	// TODO: deal with files that contain multiple objects
 	status.ObjectsDiscovered = int64(len(files))
 
 	for path, file := range files {
+		log.Printf("Processing '%s'\n", path)
 		gto, err := initGitTrackObject(path, file)
 		if err != nil {
-			log.Printf("%v\n", err)
 			status.ObjectsIgnored++
+			continue
+		}
+
+		if err = controllerutil.SetControllerReference(instance, gto, r.scheme); err != nil {
+			// TODO: ignore or requeue?
+			return reconcile.Result{}, err
 		}
 
 		found := &farosv1alpha1.GitTrackObject{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: gto.ObjectMeta.Name, Namespace: gto.ObjectMeta.Namespace}, found)
+		err = r.Get(context.TODO(), types.NamespacedName{Name: gto.Name, Namespace: gto.Namespace}, found)
 		if err != nil && errors.IsNotFound(err) {
 			log.Printf("Creating GitTrackObject for '%s'\n", path)
-			err = r.Create(context.TODO(), gto)
-			if err != nil {
-				log.Printf("%v\n", err)
+			if err = r.Create(context.TODO(), gto); err != nil {
 				return reconcile.Result{}, fmt.Errorf("failed to create GitTrackObject for '%s': %v", path, err)
 			}
 			status.ObjectsApplied++
+			continue
 		} else if err != nil {
-			log.Printf("%v\n", err)
 			return reconcile.Result{}, fmt.Errorf("failed to get GitTrackObject for '%s': %v", path, err)
-		} else {
-			if !reflect.DeepEqual(gto.Spec, found.Spec) {
-				found.Spec = gto.Spec
-				log.Printf("Updating GitTrackObject %s/%s\n", gto.Namespace, gto.Name)
-				err = r.Update(context.TODO(), found)
-				if err != nil {
-					log.Printf("%v\n", err)
-					return reconcile.Result{}, fmt.Errorf("failed to update GitTrackObject for '%s': %v", path, err)
-				}
-				status.ObjectsApplied++
+		}
+
+		if !reflect.DeepEqual(gto.Spec, found.Spec) {
+			found.Spec = gto.Spec
+			log.Printf("Updating GitTrackObject %s/%s\n", gto.Namespace, gto.Name)
+			if err = r.Update(context.TODO(), found); err != nil {
+				return reconcile.Result{}, fmt.Errorf("failed to update GitTrackObject for '%s': %v", path, err)
 			}
+			status.ObjectsApplied++
 		}
 	}
+
+	if status.ObjectsApplied == 0 {
+		return reconcile.Result{}, nil
+	}
+
+	status.Conditions = []farosv1alpha1.GitTrackCondition{
+		success(parseErrorCondition, ""),
+		success(gitErrorCondition, ""),
+	}
+
 	if !reflect.DeepEqual(instance.Status, status) {
 		instance.Status = *(status)
 		err = r.Update(context.TODO(), instance)
 		if err != nil {
-			// TODO: should we return an error here or nah?
-			log.Printf("%v\n", err)
+			return reconcile.Result{}, fmt.Errorf("failed to update status: %v", err)
 		}
 	}
+
 	return reconcile.Result{}, nil
 }
