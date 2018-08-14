@@ -140,6 +140,15 @@
   version = "1.1.5"
 
 [[projects]]
+  name = "github.com/kubernetes-sigs/kubebuilder"
+  packages = [
+    "pkg/install",
+    "pkg/test"
+  ]
+  revision = "9c4c6c213a8d17f8c21cf4f1aa9cefb99fbbf5ca"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/markbates/inflect"
   packages = ["."]
   revision = "dd7de90c06bca70f18136e59dec2270c19a401e7"
@@ -413,7 +422,10 @@
   name = "k8s.io/apiextensions-apiserver"
   packages = [
     "pkg/apis/apiextensions",
-    "pkg/apis/apiextensions/v1beta1"
+    "pkg/apis/apiextensions/v1beta1",
+    "pkg/client/clientset/clientset",
+    "pkg/client/clientset/clientset/scheme",
+    "pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
   ]
   revision = "4347b330d0ff094db860f2f75fa725b4f4b53618"
   version = "kubernetes-1.10.1"
@@ -555,6 +567,18 @@
   revision = "906d99f89cd644eecf75ab547b29bf9f876f0b59"
 
 [[projects]]
+  name = "k8s.io/kube-aggregator"
+  packages = [
+    "pkg/apis/apiregistration",
+    "pkg/apis/apiregistration/v1",
+    "pkg/apis/apiregistration/v1beta1",
+    "pkg/client/clientset_generated/clientset/scheme",
+    "pkg/client/clientset_generated/clientset/typed/apiregistration/v1beta1"
+  ]
+  revision = "9ff2dd4f28cb99cf6bbc68cb2beb3e9cd7e8ee56"
+  version = "kubernetes-1.10.1"
+
+[[projects]]
   name = "k8s.io/kube-openapi"
   packages = ["pkg/util/proto"]
   revision = "f08db293d3ef80052d6513ece19792642a289fea"
@@ -569,6 +593,8 @@
     "pkg/client/apiutil",
     "pkg/client/config",
     "pkg/controller",
+    "pkg/controller/controllerutil",
+    "pkg/envtest",
     "pkg/event",
     "pkg/handler",
     "pkg/internal/controller",
@@ -579,6 +605,7 @@
     "pkg/recorder",
     "pkg/runtime/inject",
     "pkg/runtime/log",
+    "pkg/runtime/scheme",
     "pkg/runtime/signals",
     "pkg/source",
     "pkg/source/internal"
@@ -610,6 +637,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "bfdfdcd42937389241e9c76decc23658d29e0916f3e9fa2c6e4fac3bbd648ff5"
+  inputs-digest = "0312b9fcfd6e1abf0898f25c49ed4eb3c17c4d8d269c213f260d64820b2a2761"
   solver-name = "gps-cdcl"
   solver-version = 1
