@@ -225,16 +225,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Update the object if the spec differs from the version running
-	var childSpec, foundSpec interface{}
-	var ok bool
-	if childSpec, ok = child.UnstructuredContent()["spec"]; !ok {
-		return reconcile.Result{}, fmt.Errorf("child has no spec")
+	updated, err := updateChildResource(found, child)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("unable to update child: %v", err)
 	}
-	if foundSpec, ok = found.UnstructuredContent()["spec"]; !ok {
-		return reconcile.Result{}, fmt.Errorf("found has no spec")
-	}
-	if !reflect.DeepEqual(childSpec, foundSpec) {
-		found.UnstructuredContent()["spec"] = childSpec
+	if updated {
 		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Update(context.TODO(), found)
 		if err != nil {
@@ -242,4 +237,28 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		}
 	}
 	return reconcile.Result{}, nil
+}
+
+// updateChildResource compares the found object with the child object and
+// updates the found object if necessary.
+func updateChildResource(found, child *unstructured.Unstructured) (updated bool, err error) {
+	return updateField(found, child, "spec")
+}
+
+// updateField compares a field within two unstructured object's maps,
+// then updates the `found` resource to match the `child` if they do not match.
+func updateField(found, child *unstructured.Unstructured, field string) (updated bool, err error) {
+	var c, f interface{}
+	var ok bool
+	if c, ok = child.UnstructuredContent()[field]; !ok {
+		return false, fmt.Errorf("child has no field %s", field)
+	}
+	if f, ok = found.UnstructuredContent()[field]; !ok {
+		return false, fmt.Errorf("found has no field %s", field)
+	}
+	if !reflect.DeepEqual(c, f) {
+		found.UnstructuredContent()[field] = c
+		updated = true
+	}
+	return updated, nil
 }
