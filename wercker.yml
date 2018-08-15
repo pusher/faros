@@ -29,6 +29,9 @@ generate:
         name: Generate code
         code: make generate
     - script:
+        name: Generate manifests
+        code: make manifests
+    - script:
         name: Check git tree is clean
         code: if [[ ! -z $(git status -s) ]]; then git status; exit 1; fi
 
