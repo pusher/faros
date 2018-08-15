@@ -74,3 +74,13 @@ var _ = Describe("YAMLToUnstructured", func() {
 		Expect(pdb.GetKind()).To(Equal("PodDisruptionBudget"))
 	})
 })
+
+var _ = Describe("YAMLToUnstructuredSlice", func() {
+	It("should return a slice of Unstructured objects", func() {
+		s, err := YAMLToUnstructuredSlice([]byte(mixedList))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(len(s)).To(Equal(2))
+		Expect(s[0].GetKind()).To(Equal("RoleBinding"))
+		Expect(s[1].GetKind()).To(Equal("PodDisruptionBudget"))
+	})
+})
