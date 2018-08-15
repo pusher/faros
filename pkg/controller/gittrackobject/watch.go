@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers/internalinterfaces"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -73,9 +72,7 @@ func (r *ReconcileGitTrackObject) newInformerFromObject(obj unstructured.Unstruc
 		return nil, fmt.Errorf("unable to get API Resource: %v", err)
 	}
 
-	// Construct a resource client from the resource
-	config := configForGVK(r.config, gvk)
-	client, err := dynamic.NewForConfig(config)
+	client, err := dynamic.NewForConfig(r.config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create dynamic client: %v", err)
 	}
@@ -135,21 +132,6 @@ func newSharedIndexInformer(client dynamic.ResourceInterface, resyncPeriod time.
 // This can be used to uniquely identify informers.
 func informerKey(obj unstructured.Unstructured) string {
 	return fmt.Sprintf("%s:%s", obj.GetNamespace(), obj.GroupVersionKind().String())
-}
-
-// configForGVK constructs a rest configuration suitable for constructing a
-// dynamic client.
-func configForGVK(cfg *rest.Config, gvk schema.GroupVersionKind) *rest.Config {
-	c := rest.CopyConfig(cfg)
-	c.GroupVersion = &schema.GroupVersion{
-		Group:   gvk.Group,
-		Version: gvk.Version,
-	}
-	// Non core group requires API path override
-	if gvk.Group != "" {
-		c.APIPath = "/apis"
-	}
-	return c
 }
 
 // resourceDefaultNamespace defaults to the item's namespace
