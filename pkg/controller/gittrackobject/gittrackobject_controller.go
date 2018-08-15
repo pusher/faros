@@ -225,17 +225,32 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Update the object if the spec differs from the version running
-	updated, err := updateChildResource(found, child)
+	childUpdated, err := updateChildResource(found, child)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("unable to update child: %v", err)
 	}
-	if updated {
+	if childUpdated {
 		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Update(context.TODO(), found)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 	}
+
+	// Update the GitTrackObject's status
+	gto := instance.DeepCopy()
+	gtoUpdated, err := updateGitTrackObjectStatus(gto, childUpdated)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("unable to update GitTrackObject %s status: %v", gto.Name, err)
+	}
+	if gtoUpdated {
+		log.Printf("Updating GitTrackObject %s status", gto.Name)
+		err = r.Update(context.TODO(), gto)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("unable to update GitTrackObject %s: %v", gto.Name, err)
+		}
+	}
+
 	return reconcile.Result{}, nil
 }
 
@@ -243,6 +258,24 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 // updates the found object if necessary.
 func updateChildResource(found, child *unstructured.Unstructured) (updated bool, err error) {
 	return updateField(found, child, "spec")
+}
+
+func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, childUpdated bool) (updated bool, err error) {
+	// Keep original state for comparison
+	originalStatus := gto.DeepCopy().Status
+
+	// if child hasn't been updated, nothing to do
+	if !childUpdated {
+		return
+	}
+
+	status := farosv1alpha1.GitTrackObjectStatus{}
+
+	if !reflect.DeepEqual(originalStatus, status) {
+		gto.Status = status
+		updated = true
+	}
+	return
 }
 
 // updateField compares a field within two unstructured object's maps,

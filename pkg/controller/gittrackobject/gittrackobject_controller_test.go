@@ -157,7 +157,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 			Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 		})
 
-		PIt("should update the GTO status", func() {
+		It("should update the GTO status", func() {
 			deploy := &appsv1.Deployment{}
 			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
 				Should(Succeed())
