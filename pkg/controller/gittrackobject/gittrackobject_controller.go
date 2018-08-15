@@ -26,7 +26,9 @@ import (
 	"syscall"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -229,17 +231,16 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("unable to update child: %v", err)
 	}
+	var childUpdateErr error
 	if childUpdated {
 		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-		err = r.Update(context.TODO(), found)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
+		// Don't check this yet, will affect status of GitTrackObject
+		childUpdateErr = r.Update(context.TODO(), found)
 	}
 
 	// Update the GitTrackObject's status
 	gto := instance.DeepCopy()
-	gtoUpdated, err := updateGitTrackObjectStatus(gto, childUpdated)
+	gtoUpdated, err := updateGitTrackObjectStatus(gto, childUpdated, childUpdateErr)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("unable to update GitTrackObject %s status: %v", gto.Name, err)
 	}
@@ -251,6 +252,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		}
 	}
 
+	// Now that the status is up to date, we can check this error
+	if childUpdateErr != nil {
+		return reconcile.Result{}, fmt.Errorf("unable to udpate child resource: %v", err)
+	}
+
 	return reconcile.Result{}, nil
 }
 
@@ -260,7 +266,7 @@ func updateChildResource(found, child *unstructured.Unstructured) (updated bool,
 	return updateField(found, child, "spec")
 }
 
-func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, childUpdated bool) (updated bool, err error) {
+func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, childUpdated bool, childUpdateErr error) (updated bool, err error) {
 	// Keep original state for comparison
 	originalStatus := gto.DeepCopy().Status
 
@@ -270,6 +276,26 @@ func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, childUpdated 
 	}
 
 	status := farosv1alpha1.GitTrackObjectStatus{}
+
+	if childUpdateErr != nil {
+		// Error applying child, set condition appropriately
+		cond := gittrackobjectutils.NewGitTrackObjectCondition(
+			farosv1alpha1.ObjectInSyncType,
+			v1.ConditionFalse,
+			gittrackobjectutils.ChildAppliedError,
+			childUpdateErr.Error(),
+		)
+		gittrackobjectutils.SetGitTrackObjectCondition(&status, *cond)
+	} else {
+		// No error applying child, set condition appropriately
+		cond := gittrackobjectutils.NewGitTrackObjectCondition(
+			farosv1alpha1.ObjectInSyncType,
+			v1.ConditionTrue,
+			gittrackobjectutils.ChildAppliedSuccess,
+			"Child resource applied successfully.",
+		)
+		gittrackobjectutils.SetGitTrackObjectCondition(&status, *cond)
+	}
 
 	if !reflect.DeepEqual(originalStatus, status) {
 		gto.Status = status
