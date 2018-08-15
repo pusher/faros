@@ -211,14 +211,55 @@ var _ = Describe("GitTrack Suite", func() {
 
 	Context("When a GitTrack resource is updated", func() {
 		Context("and resources are added to the repository", func() {
-			PIt("creates the new resources", func() {
+			BeforeEach(func() {
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "28928ccaeb314b96293e18cc8889997f0f46b79b"}}
+				err := c.Create(context.TODO(), instance)
+				Expect(err).NotTo(HaveOccurred())
+				// wait for reconcile for creating the GitTrack resource
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// wait for reconcile for creating the GitTrackObject resources
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			})
 
-			PIt("doesn't update any of the existing resources", func() {
+			AfterEach(func() {
+				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				err := c.Delete(context.TODO(), instance)
+				Expect(err).NotTo(HaveOccurred())
+				// GC isn't run in the control-plane so guess we'll have to clean up manually
+				gtos := &farosv1alpha1.GitTrackObjectList{}
+				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
+				Expect(err).NotTo(HaveOccurred())
+				for _, gto := range gtos.Items {
+					err = c.Delete(context.TODO(), &gto)
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+
+			It("creates the new resources", func() {
+				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Expect(instance.Spec.Reference).To(Equal("28928ccaeb314b96293e18cc8889997f0f46b79b"))
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "ingress-example", Namespace: "default"}, before)
+				}, timeout).ShouldNot(Succeed())
+
+				instance.Spec.Reference = "09d24c51c191b4caacd35cda23bd44c86f16edc6"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "ingress-example", Namespace: "default"}, after)
+				}, timeout).Should(Succeed())
 			})
 		})
 
-		Context("and resources are deleted from the repository", func() {
+		Context("and resources are removed from the repository", func() {
 			BeforeEach(func() {
 				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "4532b487a5aaf651839f5401371556aa16732a6e"}}
 				err := c.Create(context.TODO(), instance)
