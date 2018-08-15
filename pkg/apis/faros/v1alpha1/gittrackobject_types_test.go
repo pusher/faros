@@ -27,7 +27,15 @@ import (
 
 func TestStorageGitTrackObject(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
-	created := &GitTrackObject{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	created := &GitTrackObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: GitTrackObjectSpec{
+			Data: []byte("test"),
+		},
+	}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create
