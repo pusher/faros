@@ -33,6 +33,46 @@ spec:
           - repository
           type: object
         status:
+          properties:
+            ObjectsIgnored:
+              format: int64
+              type: integer
+            conditions:
+              items:
+                properties:
+                  lastTransitionTime:
+                    format: date-time
+                    type: string
+                  lastUpdateTime:
+                    format: date-time
+                    type: string
+                  message:
+                    type: string
+                  reason:
+                    type: string
+                  status:
+                    type: string
+                  type:
+                    type: string
+                required:
+                - type
+                - status
+                type: object
+              type: array
+            objectsApplied:
+              format: int64
+              type: integer
+            objectsDiscovered:
+              format: int64
+              type: integer
+            objectsInSync:
+              format: int64
+              type: integer
+          required:
+          - objectsDiscovered
+          - objectsApplied
+          - ObjectsIgnored
+          - objectsInSync
           type: object
       type: object
   version: v1alpha1

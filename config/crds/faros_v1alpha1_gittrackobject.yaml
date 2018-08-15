@@ -21,8 +21,43 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            data:
+              format: byte
+              type: string
+            kind:
+              type: string
+            name:
+              type: string
+          required:
+          - name
+          - kind
+          - data
           type: object
         status:
+          properties:
+            conditions:
+              items:
+                properties:
+                  lastTransitionTime:
+                    format: date-time
+                    type: string
+                  lastUpdateTime:
+                    format: date-time
+                    type: string
+                  message:
+                    type: string
+                  reason:
+                    type: string
+                  status:
+                    type: string
+                  type:
+                    type: string
+                required:
+                - type
+                - status
+                type: object
+              type: array
           type: object
       type: object
   version: v1alpha1
