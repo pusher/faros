@@ -290,10 +290,8 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	parseErrorCondition := initCondition(farosv1alpha1.ParseErrorType)
 	gitErrorCondition := initCondition(farosv1alpha1.GitErrorType)
 	instance, err := r.fetchInstance(request)
-	if err != nil {
+	if err != nil || instance == nil {
 		return reconcile.Result{}, err
-	} else if instance == nil {
-		return reconcile.Result{}, nil
 	}
 	// Get a map of the files that are in the Spec
 	files, err := r.getFilesForSpec(instance.Spec)
