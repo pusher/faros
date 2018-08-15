@@ -146,6 +146,44 @@ var _ = Describe("GitTrack Suite", func() {
 			})
 		})
 
+		Context("with multi-document YAML", func() {
+			// 61940ab417e30cf81d3bf488b6e03cfe881e9557
+			BeforeEach(func() {
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "9bf412f0e893c8c1624bb1c523cfeca8243534bc"}}
+				// Create the GitTrack object and expect the Reconcile and Deployment to be created
+				err := c.Create(context.TODO(), instance)
+				Expect(err).NotTo(HaveOccurred())
+				// Wait for reconcile for creating the GitTrack resource
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for creating the GitTrackObject resources
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			})
+
+			AfterEach(func() {
+				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				err := c.Delete(context.TODO(), instance)
+				Expect(err).NotTo(HaveOccurred())
+				// GC isn't run in the control-plane so guess we'll have to clean up manually
+				gtos := &farosv1alpha1.GitTrackObjectList{}
+				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
+				Expect(err).NotTo(HaveOccurred())
+				for _, gto := range gtos.Items {
+					err = c.Delete(context.TODO(), &gto)
+					Expect(err).NotTo(HaveOccurred())
+				}
+			})
+
+			It("creates GitTrackObjects", func() {
+				dsGto, cmGto := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "daemonset-fluentd", Namespace: "default"}, dsGto)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-fluentd-config", Namespace: "default"}, cmGto)
+				}, timeout).Should(Succeed())
+			})
+		})
+
 		Context("with an invalid Reference", func() {
 			BeforeEach(func() {
 				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "does-not-exist"}}
