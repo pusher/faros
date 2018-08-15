@@ -36,7 +36,7 @@ type GitTrackObjectSpec struct {
 // GitTrackObjectStatus defines the observed state of GitTrackObject
 type GitTrackObjectStatus struct {
 	// Conditions of this object
-	Conditions []GitTrackObjectCondition `json:"conditions"`
+	Conditions []GitTrackObjectCondition `json:"conditions,omitempty"`
 }
 
 // GitTrackObjectConditionType is the type of a GitTrackObjectCondition

@@ -48,7 +48,7 @@ type GitTrackStatus struct {
 	ObjectsInSync int64 `json:"objectsInSync"`
 
 	// Conditions are the conditions on this GitTrack
-	Conditions []GitTrackCondition `json:"conditions"`
+	Conditions []GitTrackCondition `json:"conditions,omitempty"`
 }
 
 // GitTrackConditionType is the type of a GitTrackCondition
