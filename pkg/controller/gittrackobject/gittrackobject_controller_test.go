@@ -205,7 +205,12 @@ var (
 
 		It("should recreate the child if it is deleted", ShouldRecreateChildIfDeleted)
 
-		It("should reset the child if it is modified", ShouldResetChildIfModified)
+		Context("should reset the child if", func() {
+			It("the spec is modified", ShouldResetChildIfSpecModified)
+
+			It("the meta is modified", ShouldResetChildIfMetaModified)
+		})
+
 	}
 
 	invalidDataTest = func() {
@@ -331,7 +336,7 @@ var (
 			Should(Succeed())
 	}
 
-	ShouldResetChildIfModified = func() {
+	ShouldResetChildIfSpecModified = func() {
 		deploy := &appsv1.Deployment{}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
 			Should(Succeed())
@@ -348,6 +353,30 @@ var (
 			if len(deploy.Spec.Template.Spec.Containers) != 1 &&
 				deploy.Spec.Template.Spec.Containers[0].Image != "nginx" {
 				return errors.New("Image not updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+
+		// GC not enabled so manually delete the object
+		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
+	}
+
+	ShouldResetChildIfMetaModified = func() {
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+			Should(Succeed())
+
+		// Update the spec and expect it to be reset
+		deploy.ObjectMeta.Labels = make(map[string]string)
+		Expect(c.Update(context.TODO(), deploy)).To(Succeed())
+		Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+		Eventually(func() error {
+			err := c.Get(context.TODO(), depKey, deploy)
+			if err != nil {
+				return err
+			}
+			if len(deploy.ObjectMeta.Labels) == 0 {
+				return errors.New("Labels not updated")
 			}
 			return nil
 		}, timeout).Should(Succeed())

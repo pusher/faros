@@ -287,7 +287,15 @@ func (r *ReconcileGitTrackObject) updateStatus(original *farosv1alpha1.GitTrackO
 // updateChildResource compares the found object with the child object and
 // updates the found object if necessary.
 func updateChildResource(found, child *unstructured.Unstructured) (updated bool, err error) {
-	return updateField(found, child, "spec")
+	spec, err := updateField(found, child, "spec")
+	if err != nil {
+		return false, fmt.Errorf("unable to update spec: %v", err)
+	}
+	meta, err := updateField(found, child, "metadata")
+	if err != nil {
+		return false, fmt.Errorf("unable to update meta: %v", err)
+	}
+	return spec || meta, nil
 }
 
 func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, reconcileErr error, reason gittrackobjectutils.ConditionReason) (updated bool, err error) {
