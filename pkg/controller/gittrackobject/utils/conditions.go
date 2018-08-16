@@ -23,13 +23,33 @@ import (
 )
 
 const (
-	// ChildAppliedError represents the condition reason when an error occurs
-	// applying the child object
-	ChildAppliedError ConditionReason = "ChildAppliedError"
-
 	// ChildAppliedSuccess represents the condition reason when no error occurs
 	// applying the child object
 	ChildAppliedSuccess ConditionReason = "ChildAppliedSuccess"
+
+	// ErrorAddingOwnerReference represents the condition reason when the child's
+	// Owner reference cannot be set
+	ErrorAddingOwnerReference ConditionReason = "ErrorAddingOwnerReference"
+
+	// ErrorUnmarshallingYAML represents the condition reason when the object's
+	// data cannot be unmarshalled
+	ErrorUnmarshallingYAML ConditionReason = "ErrorUnmarshallingYAML"
+
+	// ErrorCreatingChild represents the condition reason when the controller
+	// hits an error trying to create the child
+	ErrorCreatingChild ConditionReason = "ErrorCreatingChild"
+
+	// ErrorGettingChild represents the condition reason when the controller
+	// hits an error trying to get the child
+	ErrorGettingChild ConditionReason = "ErrorGettingChild"
+
+	// ErrorUpdatingChild represents the condition reason when the controller
+	// hits an error trying to update the child
+	ErrorUpdatingChild ConditionReason = "ErrorUpdatingChild"
+
+	// ErrorWatchingChild represents the condition reason when the controller
+	// cannot create an informer for the child's kind
+	ErrorWatchingChild ConditionReason = "ErrorWatchingChild"
 )
 
 // ConditionReason represents a valid condition reason

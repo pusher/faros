@@ -200,11 +200,13 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result r
 	child := &unstructured.Unstructured{}
 	*child, err = utils.YAMLToUnstructured(instance.Spec.Data)
 	if err != nil {
+		reason = gittrackobjectutils.ErrorUnmarshallingYAML
 		err = fmt.Errorf("unable to unmarshal data: %v", err)
 		return reconcile.Result{}, err
 	}
 	err = controllerutil.SetControllerReference(instance, child, r.scheme)
 	if err != nil {
+		reason = gittrackobjectutils.ErrorAddingOwnerReference
 		err = fmt.Errorf("unable to add owner reference: %v", err)
 		return reconcile.Result{}, err
 	}
@@ -217,6 +219,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result r
 	// Make sure to watch the child resource
 	err = r.watch(*child)
 	if err != nil {
+		reason = gittrackobjectutils.ErrorWatchingChild
 		err = fmt.Errorf("unable to create watch: %v", err)
 		return reconcile.Result{}, err
 	}
@@ -226,6 +229,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result r
 		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Create(context.TODO(), child)
 		if err != nil {
+			reason = gittrackobjectutils.ErrorCreatingChild
 			err = fmt.Errorf("unable to create child: %v", err)
 			return reconcile.Result{}, err
 		}
@@ -233,6 +237,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result r
 		// the same as the child
 		found = child
 	} else if err != nil {
+		reason = gittrackobjectutils.ErrorGettingChild
 		err = fmt.Errorf("unable to get child: %v", err)
 		return reconcile.Result{}, err
 	}
@@ -240,6 +245,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result r
 	// Update the object if the spec differs from the version running
 	childUpdated, err := updateChildResource(found, child)
 	if err != nil {
+		reason = gittrackobjectutils.ErrorUpdatingChild
 		err = fmt.Errorf("unable to update child: %v", err)
 		return reconcile.Result{}, err
 	}
@@ -248,7 +254,8 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result r
 		// Don't check this yet, will affect status of GitTrackObject
 		err = r.Update(context.TODO(), found)
 		if err != nil {
-			err = fmt.Errorf("unable to udpate child resource: %v", err)
+			reason = gittrackobjectutils.ErrorUpdatingChild
+			err = fmt.Errorf("unable to update child resource: %v", err)
 			return reconcile.Result{}, err
 		}
 	}
