@@ -76,6 +76,27 @@ spec:
         image: nginx:latest
 `
 
+var invalidExample = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+name: example
+namespace: default
+labels:
+app: nginx
+spec:
+selector:
+matchLabels:
+app: nginx
+template:
+metadata:
+labels:
+app: nginx
+spec:
+containers:
+- name: nginx
+image: nginx:latest
+`
+
 var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "example", Namespace: "default"}}
@@ -127,7 +148,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 		It("should add an owner reference to the child", ShouldAddOwnerReference)
 
-		It("should update the GTO status", ShouldUpdateGTOStatus)
+		It("should update the GTO status", func() {
+			ShouldUpdateGTOStatus(v1.ConditionTrue)
+		})
 
 		It("should update the resource when the GTO is updated", func() {
 			ShouldUpdateChildOnGTOUpdate([]byte(exampleDeployment2))
@@ -146,7 +169,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 		It("should add an owner reference to the child", ShouldAddOwnerReference)
 
-		It("should update the GTO status", ShouldUpdateGTOStatus)
+		It("should update the GTO status", func() {
+			ShouldUpdateGTOStatus(v1.ConditionTrue)
+		})
 
 		It("should update the resource when the GTO is updated", func() {
 			ShouldUpdateChildOnGTOUpdate(exampleDeploymentJSON2)
@@ -155,6 +180,16 @@ var _ = Describe("GitTrackObject Suite", func() {
 		It("should recreate the child if it is deleted", ShouldRecreateChildIfDeleted)
 
 		It("should reset the child if it is modified", ShouldResetChildIfModified)
+	})
+
+	Describe("When a GitTrackObject resource is created (with invalid data)", func() {
+		BeforeEach(func() { CreateInstance([]byte(invalidExample)) })
+		AfterEach(DeleteInstance)
+
+		It("should set the status to failed", func() {
+			ShouldUpdateGTOStatus(v1.ConditionFalse)
+		})
+
 	})
 })
 
@@ -206,20 +241,23 @@ var (
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
 
-	ShouldUpdateGTOStatus = func() {
-		deploy := &appsv1.Deployment{}
-		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
-			Should(Succeed())
+	ShouldUpdateGTOStatus = func(expected v1.ConditionStatus) {
+		if expected == v1.ConditionTrue {
+			deploy := &appsv1.Deployment{}
+			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+				Should(Succeed())
+
+			// GC not enabled so manually delete the object
+			defer Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
+		}
 
 		err := c.Get(context.TODO(), depKey, instance)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(len(instance.Status.Conditions)).To(Equal(1))
 		condition := instance.Status.Conditions[0]
 		Expect(condition.Type).To(Equal(farosv1alpha1.ObjectInSyncType))
-		Expect(condition.Status).To(Equal(v1.ConditionTrue))
+		Expect(condition.Status).To(Equal(expected))
 
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
 
 	ShouldUpdateChildOnGTOUpdate = func(data []byte) {
