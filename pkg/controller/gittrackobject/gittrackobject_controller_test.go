@@ -138,6 +138,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 		})
 
 		Context("with JSON", func() {
+
+			// Convert the example deployment YAMLs to JSON
 			example, _ := utils.YAMLToUnstructured([]byte(exampleDeployment))
 			exampleDeploymentJSON, _ := example.MarshalJSON()
 			if exampleDeploymentJSON == nil {
@@ -159,6 +161,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 })
 
 var (
+	// CreateInstance creates the instance and waits for a reconcile to happen.
 	CreateInstance = func(data []byte) {
 		instance = &farosv1alpha1.GitTrackObject{
 			ObjectMeta: metav1.ObjectMeta{
@@ -177,11 +180,13 @@ var (
 		Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 	}
 
+	// DeleteInstance deletes the instance
 	DeleteInstance = func() {
 		err := c.Delete(context.TODO(), instance)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	// validDataTest runs the suite of tests for valid input data
 	validDataTest = func(initial, updated []byte) {
 		BeforeEach(func() { CreateInstance(initial) })
 		AfterEach(DeleteInstance)
@@ -213,6 +218,7 @@ var (
 
 	}
 
+	// invalidDataTest runs the suite of tests for an invalid input
 	invalidDataTest = func() {
 		BeforeEach(func() { CreateInstance([]byte(invalidExample)) })
 		AfterEach(DeleteInstance)
@@ -227,6 +233,7 @@ var (
 		})
 	}
 
+	// ShouldCreateChild checks the child object was created
 	ShouldCreateChild = func() {
 		deploy := &appsv1.Deployment{}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
@@ -236,6 +243,7 @@ var (
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
 
+	// ShouldAddOwnerReference checks the owner reference was set
 	ShouldAddOwnerReference = func() {
 		deploy := &appsv1.Deployment{}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
@@ -251,6 +259,7 @@ var (
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
 
+	// ShouldUpdateConditionStatus checks the condition status was set
 	ShouldUpdateConditionStatus = func(expected v1.ConditionStatus) {
 		if expected == v1.ConditionTrue {
 			deploy := &appsv1.Deployment{}
@@ -269,6 +278,7 @@ var (
 		Expect(condition.Status).To(Equal(expected))
 	}
 
+	// ShouldUpdateConditionReason checks the condition reason was set
 	ShouldUpdateConditionReason = func(expected gittrackobjectutils.ConditionReason, match bool) {
 		err := c.Get(context.TODO(), depKey, instance)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -290,6 +300,8 @@ var (
 		}
 	}
 
+	// ShouldUpdateChildOnGTOUpdate updates the GitTrackObject and checks the
+	// update propogates to the child
 	ShouldUpdateChildOnGTOUpdate = func(data []byte) {
 		deploy := &appsv1.Deployment{}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
@@ -320,6 +332,8 @@ var (
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
 
+	// ShouldRecreateChildIfDeleted deletes the child and expects it to be
+	// recreated
 	ShouldRecreateChildIfDeleted = func() {
 		deploy := &appsv1.Deployment{}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
@@ -336,6 +350,8 @@ var (
 			Should(Succeed())
 	}
 
+	// ShouldResetChildIfSpecModified modifies the child spec and checks that
+	// it is reset by the controller
 	ShouldResetChildIfSpecModified = func() {
 		deploy := &appsv1.Deployment{}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
@@ -361,6 +377,8 @@ var (
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
 
+	// ShouldResetChildIfMetaModified modifies the child metadata and checks that
+	// it is reset by the controller
 	ShouldResetChildIfMetaModified = func() {
 		deploy := &appsv1.Deployment{}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
