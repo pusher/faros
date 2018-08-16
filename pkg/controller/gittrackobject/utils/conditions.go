@@ -25,21 +25,24 @@ import (
 const (
 	// ChildAppliedError represents the condition reason when an error occurs
 	// applying the child object
-	ChildAppliedError = "ChildAppliedError"
+	ChildAppliedError ConditionReason = "ChildAppliedError"
 
 	// ChildAppliedSuccess represents the condition reason when no error occurs
 	// applying the child object
-	ChildAppliedSuccess = "ChildAppliedSuccess"
+	ChildAppliedSuccess ConditionReason = "ChildAppliedSuccess"
 )
 
+// ConditionReason represents a valid condition reason
+type ConditionReason string
+
 // NewGitTrackObjectCondition creates a new GitTrackObject condition.
-func NewGitTrackObjectCondition(condType farosv1alpha1.GitTrackObjectConditionType, status v1.ConditionStatus, reason, message string) *farosv1alpha1.GitTrackObjectCondition {
+func NewGitTrackObjectCondition(condType farosv1alpha1.GitTrackObjectConditionType, status v1.ConditionStatus, reason ConditionReason, message string) *farosv1alpha1.GitTrackObjectCondition {
 	return &farosv1alpha1.GitTrackObjectCondition{
 		Type:               condType,
 		Status:             status,
 		LastUpdateTime:     metav1.Now(),
 		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
+		Reason:             string(reason),
 		Message:            message,
 	}
 }

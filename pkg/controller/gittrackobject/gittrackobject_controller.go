@@ -174,10 +174,19 @@ func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
-func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result reconcile.Result, err error) {
 	// Fetch the GitTrackObject instance
 	instance := &farosv1alpha1.GitTrackObject{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	reason := gittrackobjectutils.ChildAppliedSuccess
+
+	defer func() {
+		err = r.updateStatus(instance, err, &reason)
+		if err != nil {
+			log.Printf(err.Error())
+		}
+	}()
+
+	err = r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -191,12 +200,13 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	child := &unstructured.Unstructured{}
 	*child, err = utils.YAMLToUnstructured(instance.Spec.Data)
 	if err != nil {
-		log.Printf("unable to marshal data: %v", err)
-		return reconcile.Result{}, fmt.Errorf("unable to unmarshal data: %v", err)
+		err = fmt.Errorf("unable to unmarshal data: %v", err)
+		return reconcile.Result{}, err
 	}
-	if err = controllerutil.SetControllerReference(instance, child, r.scheme); err != nil {
-		log.Printf("unable to add owner reference: %v", err)
-		return reconcile.Result{}, fmt.Errorf("unable to add owner reference: %v", err)
+	err = controllerutil.SetControllerReference(instance, child, r.scheme)
+	if err != nil {
+		err = fmt.Errorf("unable to add owner reference: %v", err)
+		return reconcile.Result{}, err
 	}
 
 	// Check if the Child already exists
@@ -207,7 +217,8 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	// Make sure to watch the child resource
 	err = r.watch(*child)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("unable to create watch: %v", err)
+		err = fmt.Errorf("unable to create watch: %v", err)
+		return reconcile.Result{}, err
 	}
 
 	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
@@ -215,49 +226,56 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Create(context.TODO(), child)
 		if err != nil {
-			log.Printf("unable to create child: %v", err)
-			return reconcile.Result{}, fmt.Errorf("unable to create child: %v", err)
+			err = fmt.Errorf("unable to create child: %v", err)
+			return reconcile.Result{}, err
 		}
 		// Now that we have created the object, the version on the API should be
 		// the same as the child
 		found = child
 	} else if err != nil {
-		log.Printf("unable to get child: %v", err)
-		return reconcile.Result{}, fmt.Errorf("unable to get child: %v", err)
+		err = fmt.Errorf("unable to get child: %v", err)
+		return reconcile.Result{}, err
 	}
 
 	// Update the object if the spec differs from the version running
 	childUpdated, err := updateChildResource(found, child)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("unable to update child: %v", err)
+		err = fmt.Errorf("unable to update child: %v", err)
+		return reconcile.Result{}, err
 	}
-	var childUpdateErr error
 	if childUpdated {
 		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		// Don't check this yet, will affect status of GitTrackObject
-		childUpdateErr = r.Update(context.TODO(), found)
+		err = r.Update(context.TODO(), found)
+		if err != nil {
+			err = fmt.Errorf("unable to udpate child resource: %v", err)
+			return reconcile.Result{}, err
+		}
 	}
 
+	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileGitTrackObject) updateStatus(original *farosv1alpha1.GitTrackObject, reconcileErr error, reason *gittrackobjectutils.ConditionReason) error {
 	// Update the GitTrackObject's status
-	gto := instance.DeepCopy()
-	gtoUpdated, err := updateGitTrackObjectStatus(gto, childUpdated, childUpdateErr)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("unable to update GitTrackObject %s status: %v", gto.Name, err)
+	gto := original.DeepCopy()
+	gtoUpdated, err := updateGitTrackObjectStatus(gto, reconcileErr, *reason)
+	if err != nil && reconcileErr != nil {
+		// Don't overwrite the reconcileErr
+		return reconcileErr
+	} else if err != nil {
+		return fmt.Errorf("unable to calculate update GitTrackObject status: %v", err)
 	}
 	if gtoUpdated {
 		log.Printf("Updating GitTrackObject %s status", gto.Name)
 		err = r.Update(context.TODO(), gto)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("unable to update GitTrackObject %s: %v", gto.Name, err)
+		if err != nil && reconcileErr != nil {
+			return reconcileErr
+		} else if err != nil {
+			return fmt.Errorf("unable to update GitTrackObject: %v", err)
 		}
 	}
-
-	// Now that the status is up to date, we can check this error
-	if childUpdateErr != nil {
-		return reconcile.Result{}, fmt.Errorf("unable to udpate child resource: %v", err)
-	}
-
-	return reconcile.Result{}, nil
+	return nil
 }
 
 // updateChildResource compares the found object with the child object and
@@ -266,24 +284,18 @@ func updateChildResource(found, child *unstructured.Unstructured) (updated bool,
 	return updateField(found, child, "spec")
 }
 
-func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, childUpdated bool, childUpdateErr error) (updated bool, err error) {
+func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, reconcileErr error, reason gittrackobjectutils.ConditionReason) (updated bool, err error) {
 	// Keep original state for comparison
 	originalStatus := gto.DeepCopy().Status
-
-	// if child hasn't been updated, nothing to do
-	if !childUpdated {
-		return
-	}
-
 	status := farosv1alpha1.GitTrackObjectStatus{}
 
-	if childUpdateErr != nil {
+	if reconcileErr != nil {
 		// Error applying child, set condition appropriately
 		cond := gittrackobjectutils.NewGitTrackObjectCondition(
 			farosv1alpha1.ObjectInSyncType,
 			v1.ConditionFalse,
-			gittrackobjectutils.ChildAppliedError,
-			childUpdateErr.Error(),
+			reason,
+			reconcileErr.Error(),
 		)
 		gittrackobjectutils.SetGitTrackObjectCondition(&status, *cond)
 	} else {
@@ -291,7 +303,7 @@ func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, childUpdated 
 		cond := gittrackobjectutils.NewGitTrackObjectCondition(
 			farosv1alpha1.ObjectInSyncType,
 			v1.ConditionTrue,
-			gittrackobjectutils.ChildAppliedSuccess,
+			reason,
 			"Child resource applied successfully.",
 		)
 		gittrackobjectutils.SetGitTrackObjectCondition(&status, *cond)

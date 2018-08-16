@@ -149,7 +149,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		It("should add an owner reference to the child", ShouldAddOwnerReference)
 
 		It("should update the GTO status", func() {
-			ShouldUpdateGTOStatus(v1.ConditionTrue)
+			ShouldUpdateConditionStatus(v1.ConditionTrue)
 		})
 
 		It("should update the resource when the GTO is updated", func() {
@@ -170,7 +170,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		It("should add an owner reference to the child", ShouldAddOwnerReference)
 
 		It("should update the GTO status", func() {
-			ShouldUpdateGTOStatus(v1.ConditionTrue)
+			ShouldUpdateConditionStatus(v1.ConditionTrue)
 		})
 
 		It("should update the resource when the GTO is updated", func() {
@@ -187,7 +187,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		AfterEach(DeleteInstance)
 
 		It("should set the status to failed", func() {
-			ShouldUpdateGTOStatus(v1.ConditionFalse)
+			ShouldUpdateConditionStatus(v1.ConditionFalse)
 		})
 
 	})
@@ -241,7 +241,7 @@ var (
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
 
-	ShouldUpdateGTOStatus = func(expected v1.ConditionStatus) {
+	ShouldUpdateConditionStatus = func(expected v1.ConditionStatus) {
 		if expected == v1.ConditionTrue {
 			deploy := &appsv1.Deployment{}
 			Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
