@@ -22,7 +22,11 @@ required = [
 
 [[constraint]]
 name="github.com/pusher/git-store"
-version="v0.1.0"
+branch="privatekey"
+
+[[override]]
+name = "github.com/Azure/go-autorest"
+version = "10.15.2"
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
