@@ -233,9 +233,8 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (result r
 			err = fmt.Errorf("unable to create child: %v", err)
 			return reconcile.Result{}, err
 		}
-		// Now that we have created the object, the version on the API should be
-		// the same as the child
-		found = child
+		// Just created the object from the child, no need to check for update
+		return reconcile.Result{}, nil
 	} else if err != nil {
 		reason = gittrackobjectutils.ErrorGettingChild
 		err = fmt.Errorf("unable to get child: %v", err)
