@@ -28,20 +28,26 @@ import (
 )
 
 type statusOpts struct {
-	applied     int64
-	discovered  int64
-	ignored     int64
-	inSync      int64
-	parseError  error
-	parseReason gittrackutils.ConditionReason
-	gitError    error
-	gitReason   gittrackutils.ConditionReason
+	applied        int64
+	discovered     int64
+	ignored        int64
+	inSync         int64
+	parseError     error
+	parseReason    gittrackutils.ConditionReason
+	gitError       error
+	gitReason      gittrackutils.ConditionReason
+	gcError        error
+	gcReason       gittrackutils.ConditionReason
+	upToDateError  error
+	upToDateReason gittrackutils.ConditionReason
 }
 
 func newStatusOpts() *statusOpts {
 	return &statusOpts{
-		parseReason: gittrackutils.StatusUnknown,
-		gitReason:   gittrackutils.StatusUnknown,
+		parseReason:    gittrackutils.StatusUnknown,
+		gitReason:      gittrackutils.StatusUnknown,
+		gcReason:       gittrackutils.StatusUnknown,
+		upToDateReason: gittrackutils.StatusUnknown,
 	}
 }
 
@@ -58,6 +64,8 @@ func updateGitTrackStatus(gt *farosv1alpha1.GitTrack, opts *statusOpts) (updated
 	status.ObjectsInSync = opts.inSync
 	setCondition(&status, farosv1alpha1.FilesParsedType, opts.parseError, opts.parseReason)
 	setCondition(&status, farosv1alpha1.FilesFetchedType, opts.gitError, opts.gitReason)
+	setCondition(&status, farosv1alpha1.ChildrenGarbageCollectedType, opts.gcError, opts.gcReason)
+	setCondition(&status, farosv1alpha1.ChildrenUpToDateType, opts.upToDateError, opts.upToDateReason)
 
 	if !reflect.DeepEqual(gt.Status, status) {
 		gt.Status = status

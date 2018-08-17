@@ -41,6 +41,22 @@ const (
 	// FileParseSuccess represents the condition reason when no error occurs
 	// parsing files from the repository
 	FileParseSuccess ConditionReason = "FileParseSuccess"
+
+	// ErrorUpdatingChildren represents the condition reason when an error occurs
+	// updating the child objects
+	ErrorUpdatingChildren ConditionReason = "ErrorUpdatingChildren"
+
+	// ChildrenUpdateSuccess represents the condition reason when no error occurs
+	// updating the child objects
+	ChildrenUpdateSuccess ConditionReason = "ChildUpdateSuccess"
+
+	// ErrorDeletingChildren represents the condition reason when an error occurs
+	// removing orphaned children
+	ErrorDeletingChildren ConditionReason = "ErrorDeletingChildren"
+
+	// GCSuccess represents the condition reason when no error occurs
+	// removing orphaned children
+	GCSuccess ConditionReason = "GCSuccess"
 )
 
 // ConditionReason represents a valid condition reason

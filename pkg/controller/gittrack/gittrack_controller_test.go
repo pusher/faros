@@ -104,11 +104,15 @@ var _ = Describe("GitTrack Suite", func() {
 				gt := &farosv1alpha1.GitTrack{}
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				conditions := gt.Status.Conditions
-				Expect(len(conditions)).To(Equal(2))
+				Expect(len(conditions)).To(Equal(4))
 				parseErrorCondition := conditions[0]
 				gitErrorCondition := conditions[1]
+				gcErrorCondition := conditions[2]
+				upToDateCondiiton := conditions[3]
 				Expect(parseErrorCondition.Type).To(Equal(farosv1alpha1.FilesParsedType))
 				Expect(gitErrorCondition.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(gcErrorCondition.Type).To(Equal(farosv1alpha1.ChildrenGarbageCollectedType))
+				Expect(upToDateCondiiton.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
 			})
 
 			It("creates GitTrackObjects", func() {
@@ -201,7 +205,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("updates the GitError condition", func() {
+			It("updates the FilesFetched condition", func() {
 				gt := &farosv1alpha1.GitTrack{}
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
@@ -232,7 +236,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("updates the GitError condition", func() {
+			It("updates the FilesFetched condition", func() {
 				gt := &farosv1alpha1.GitTrack{}
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering

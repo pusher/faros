@@ -278,6 +278,8 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 			err,
 			opts.gitError,
 			opts.parseError,
+			opts.gcError,
+			opts.upToDateError,
 		} {
 			if e != nil {
 				log.Printf("%v", e)
@@ -304,7 +306,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	// Attempt to parse k8s objects from files
 	objects, errors := objectsFrom(files)
 	if len(errors) > 0 {
-		opts.parseError = fmt.Errorf(strings.Join(errors, ","))
+		opts.parseError = fmt.Errorf(strings.Join(errors, ",\n"))
 		opts.parseReason = gittrackutils.ErrorParsingFiles
 	} else {
 		opts.parseReason = gittrackutils.FileParseSuccess
@@ -324,6 +326,8 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 			resultsChan <- r.handleObject(obj, instance)
 		}(obj)
 	}
+
+	handlerErrors := []string{}
 	// Iterate through results and update status accordingly
 	for range objects {
 		res := <-resultsChan
@@ -333,11 +337,27 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 			opts.applied++
 		}
 		delete(objectsByName, res.Name)
+		if res.Error != nil {
+			handlerErrors = append(handlerErrors, res.Error.Error())
+		}
 	}
+
+	// If there were errors updating the child objects, set the ChildrenUpToDate
+	// condition appropriately
+	if len(handlerErrors) > 0 {
+		opts.upToDateError = fmt.Errorf(strings.Join(handlerErrors, ",\n"))
+		opts.upToDateReason = gittrackutils.ErrorUpdatingChildren
+	} else {
+		opts.upToDateReason = gittrackutils.ChildrenUpdateSuccess
+	}
+
 	// Cleanup potentially leftover resources
 	if err = r.deleteResources(objectsByName); err != nil {
+		opts.gcError = err
+		opts.gcReason = gittrackutils.ErrorDeletingChildren
 		return reconcile.Result{}, fmt.Errorf("failed to cleanup tracked objects: %v", err)
 	}
+	opts.gcReason = gittrackutils.GCSuccess
 
 	return reconcile.Result{}, nil
 }

@@ -61,6 +61,14 @@ const (
 	// FilesFetchedType refers to whether all files where fetched from git
 	// successfully
 	FilesFetchedType GitTrackConditionType = "FilesFetched"
+
+	// ChildrenUpToDateType referes to whether all children were created/updated
+	// successfully
+	ChildrenUpToDateType GitTrackConditionType = "ChildrenUpToDate"
+
+	// ChildrenGarbageCollectedType referes to whether all children that were meant to
+	// be GC'd have been GC'
+	ChildrenGarbageCollectedType GitTrackConditionType = "ChildrenGarbageCollected"
 )
 
 // GitTrackCondition is a status condition for a GitTrack
