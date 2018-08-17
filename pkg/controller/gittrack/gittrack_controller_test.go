@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,7 +211,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
-				Expect(c.Reason).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
 			})
 		})
@@ -241,7 +242,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
-				Expect(c.Reason).To(Equal("no files for subpath 'does-not-exist'"))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("no files for subpath 'does-not-exist'"))
 			})
 		})
