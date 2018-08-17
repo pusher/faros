@@ -56,8 +56,8 @@ func updateGitTrackStatus(gt *farosv1alpha1.GitTrack, opts *statusOpts) (updated
 	status.ObjectsDiscovered = opts.discovered
 	status.ObjectsIgnored = opts.ignored
 	status.ObjectsInSync = opts.inSync
-	setCondition(&status, farosv1alpha1.ParseErrorType, opts.parseError, opts.parseReason)
-	setCondition(&status, farosv1alpha1.GitErrorType, opts.gitError, opts.gitReason)
+	setCondition(&status, farosv1alpha1.FilesParsedType, opts.parseError, opts.parseReason)
+	setCondition(&status, farosv1alpha1.FilesFetchedType, opts.gitError, opts.gitReason)
 
 	if !reflect.DeepEqual(gt.Status, status) {
 		gt.Status = status
@@ -71,7 +71,7 @@ func setCondition(status *farosv1alpha1.GitTrackStatus, condType farosv1alpha1.G
 		// Error for condition , set condition appropriately
 		cond := gittrackutils.NewGitTrackCondition(
 			condType,
-			v1.ConditionTrue,
+			v1.ConditionFalse,
 			reason,
 			condErr.Error(),
 		)
@@ -82,7 +82,7 @@ func setCondition(status *farosv1alpha1.GitTrackStatus, condType farosv1alpha1.G
 	// No error for condition, set condition appropriately
 	cond := gittrackutils.NewGitTrackCondition(
 		condType,
-		v1.ConditionFalse,
+		v1.ConditionTrue,
 		reason,
 		"",
 	)

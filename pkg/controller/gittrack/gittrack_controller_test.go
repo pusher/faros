@@ -107,8 +107,8 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(len(conditions)).To(Equal(2))
 				parseErrorCondition := conditions[0]
 				gitErrorCondition := conditions[1]
-				Expect(parseErrorCondition.Type).To(Equal(farosv1alpha1.ParseErrorType))
-				Expect(gitErrorCondition.Type).To(Equal(farosv1alpha1.GitErrorType))
+				Expect(parseErrorCondition.Type).To(Equal(farosv1alpha1.FilesParsedType))
+				Expect(gitErrorCondition.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 			})
 
 			It("creates GitTrackObjects", func() {
@@ -206,8 +206,8 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
 				c := gt.Status.Conditions[1]
-				Expect(c.Type).To(Equal(farosv1alpha1.GitErrorType))
-				Expect(c.Status).To(Equal(v1.ConditionTrue))
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
@@ -237,8 +237,8 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
 				c := gt.Status.Conditions[1]
-				Expect(c.Type).To(Equal(farosv1alpha1.GitErrorType))
-				Expect(c.Status).To(Equal(v1.ConditionTrue))
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))

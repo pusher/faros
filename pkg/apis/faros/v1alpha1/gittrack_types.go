@@ -55,11 +55,12 @@ type GitTrackStatus struct {
 type GitTrackConditionType string
 
 const (
-	// ParseErrorType refers to errors encountered while parsing k8s object yaml
-	ParseErrorType GitTrackConditionType = "ParseError"
+	// FilesParsedType referes to whether all files parsed successfully
+	FilesParsedType GitTrackConditionType = "FilesParsed"
 
-	// GitErrorType refers to errors encountered during git interactions
-	GitErrorType GitTrackConditionType = "GitError"
+	// FilesFetchedType refers to whether all files where fetched from git
+	// successfully
+	FilesFetchedType GitTrackConditionType = "FilesFetched"
 )
 
 // GitTrackCondition is a status condition for a GitTrack
