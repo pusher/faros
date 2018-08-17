@@ -19,6 +19,7 @@ package gittrack
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"reflect"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	utils "github.com/pusher/faros/pkg/utils"
 	gitstore "github.com/pusher/git-store"
+	flag "github.com/spf13/pflag"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var privateKeyPath = flag.String("private-key", "", "Path to default private key to use for Git checkouts")
 
 // Add creates a new GitTrack Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -90,8 +94,17 @@ type ReconcileGitTrack struct {
 }
 
 func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo, error) {
+	privateKey := []byte{}
+	var err error
+	if *privateKeyPath != "" {
+		privateKey, err = ioutil.ReadFile(*privateKeyPath)
+		if err != nil {
+			return &gitstore.Repo{}, fmt.Errorf("failed to load private key: %v", err)
+		}
+	}
+
 	log.Printf("Getting repository '%s'\n", url)
-	repo, err := r.store.Get(&gitstore.RepoRef{URL: url})
+	repo, err := r.store.Get(&gitstore.RepoRef{URL: url, PrivateKey: privateKey})
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
 	}
