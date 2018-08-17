@@ -22,9 +22,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"reflect"
 	"syscall"
 
+	mergepatch "github.com/evanphx/json-patch"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
@@ -281,32 +281,38 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 // updateChildResource compares the found object with the child object and
 // updates the found object if necessary.
-func updateChildResource(found, child *unstructured.Unstructured) (updated bool, err error) {
-	spec, err := updateField(found, child, "spec")
+func updateChildResource(found, child *unstructured.Unstructured) (bool, error) {
+	patchBytes, err := utils.CreateThreeWayMergePatch(found, child)
 	if err != nil {
-		return false, fmt.Errorf("unable to update spec: %v", err)
+		return false, fmt.Errorf("error calculating patch: %v", err)
 	}
-	meta, err := updateField(found, child, "metadata")
+	if string(patchBytes) == "[]" {
+		// nothing to do
+		return false, nil
+	}
+
+	err = patchUnstructured(found, patchBytes)
 	if err != nil {
-		return false, fmt.Errorf("unable to update metadata: %v", err)
+		return false, fmt.Errorf("unable to patch unstructured object: %v", err)
 	}
-	return spec || meta, nil
+	return true, nil
 }
 
-// updateField compares a field within two unstructured object's maps,
-// then updates the `found` resource to match the `child` if they do not match.
-func updateField(found, child *unstructured.Unstructured, field string) (updated bool, err error) {
-	var c, f interface{}
-	var ok bool
-	if c, ok = child.UnstructuredContent()[field]; !ok {
-		return false, fmt.Errorf("child has no field %s", field)
+func patchUnstructured(obj *unstructured.Unstructured, patchBytes []byte) error {
+	objJSON, err := obj.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("unable to marshal JSON: %v", err)
 	}
-	if f, ok = found.UnstructuredContent()[field]; !ok {
-		return false, fmt.Errorf("found has no field %s", field)
+
+	updatedJSON, err := mergepatch.MergePatch(objJSON, patchBytes)
+	if err != nil {
+		return fmt.Errorf("unable to apply patch: %v", err)
 	}
-	if !reflect.DeepEqual(c, f) {
-		found.UnstructuredContent()[field] = c
-		updated = true
+
+	*obj, err = utils.JSONToUnstructured(updatedJSON)
+	if err != nil {
+		return fmt.Errorf("error converting JSON to unstructured: %v", err)
 	}
-	return updated, nil
+
+	return nil
 }
