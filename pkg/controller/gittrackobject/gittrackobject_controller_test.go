@@ -210,6 +210,8 @@ var (
 			ShouldUpdateChildOnGTOUpdate(updated)
 		})
 
+		It("should no update the resource if the GTO's metadata is updated", ShouldNotUpdateChildOnGTOUpdate)
+
 		It("should recreate the child if it is deleted", ShouldRecreateChildIfDeleted)
 
 		Context("should reset the child if", func() {
@@ -344,6 +346,36 @@ var (
 			}
 			return nil
 		}, timeout).Should(Succeed())
+		// GC not enabled so manually delete the object
+		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
+	}
+
+	// ShouldNotUpdateChildOnGTOUpdate updates the GitTrackObject and checks the
+	// child which should not have been updated
+	ShouldNotUpdateChildOnGTOUpdate = func() {
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+			Should(Succeed())
+
+		originalVersion := deploy.ObjectMeta.ResourceVersion
+
+		// Fetch the instance and update it
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).
+			Should(Succeed())
+		if instance.ObjectMeta.Labels == nil {
+			instance.ObjectMeta.Labels = make(map[string]string)
+		}
+		instance.ObjectMeta.Labels["newLabel"] = "newLabel"
+		err := c.Update(context.TODO(), instance)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		// Wait for a reconcile to happen
+		Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+
+		err = c.Get(context.TODO(), depKey, deploy)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(deploy.ObjectMeta.ResourceVersion).To(Equal(originalVersion))
+
 		// GC not enabled so manually delete the object
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
 	}
