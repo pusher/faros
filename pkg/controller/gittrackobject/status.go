@@ -40,9 +40,9 @@ func newStatusOpts() *statusOpts {
 
 // updateGitTrackObjectStatus updates the GitTrackObject's status field if
 // any condition has changed.
-func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, opts *statusOpts) (updated bool) {
+func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, opts *statusOpts) bool {
 	if gto == nil {
-		return
+		return false
 	}
 	status := farosv1alpha1.GitTrackObjectStatus{}
 
@@ -50,9 +50,9 @@ func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, opts *statusO
 
 	if !reflect.DeepEqual(gto.Status, status) {
 		gto.Status = status
-		updated = true
+		return true
 	}
-	return
+	return false
 }
 
 func setCondition(status *farosv1alpha1.GitTrackObjectStatus, condType farosv1alpha1.GitTrackObjectConditionType, condErr error, reason gittrackobjectutils.ConditionReason) {
