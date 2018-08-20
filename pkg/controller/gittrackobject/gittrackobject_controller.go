@@ -235,9 +235,17 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	// Check if the Child already exists
 	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
+		found = child.DeepCopy()
+		err = utils.SetLastAppliedAnnotation(found, child)
+		if err != nil {
+			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
+			opts.inSyncError = fmt.Errorf("unable to set annotation: %v", err)
+			return reconcile.Result{}, opts.inSyncError
+		}
+
 		// Not found, so create child
 		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-		err = r.Create(context.TODO(), child)
+		err = r.Create(context.TODO(), found)
 		if err != nil {
 			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
 			opts.inSyncError = fmt.Errorf("unable to create child: %v", err)
