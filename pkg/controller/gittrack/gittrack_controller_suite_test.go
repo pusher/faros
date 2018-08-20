@@ -17,6 +17,7 @@ limitations under the License.
 package gittrack
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -37,6 +38,7 @@ import (
 
 var cfg *rest.Config
 var repositoryPath string
+var repositoryURL string
 var fixturesRepoPath, _ = filepath.Abs("./fixtures/repo.tgz")
 
 func setupRepository() string {
@@ -72,6 +74,7 @@ var _ = BeforeSuite(func() {
 	apis.AddToScheme(scheme.Scheme)
 
 	repositoryPath = setupRepository()
+	repositoryURL = fmt.Sprintf("file://%s", repositoryPath)
 
 	var err error
 	if cfg, err = t.Start(); err != nil {

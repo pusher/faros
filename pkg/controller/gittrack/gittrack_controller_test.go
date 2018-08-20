@@ -17,7 +17,6 @@ limitations under the License.
 package gittrack
 
 import (
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -66,7 +65,7 @@ var _ = Describe("GitTrack Suite", func() {
 	Context("When a GitTrack resource is created", func() {
 		Context("with a valid Spec", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s", repositoryPath), Reference: "a14443638218c782b84cae56a14f1090ee9e5c9c"}}
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL, Reference: "a14443638218c782b84cae56a14f1090ee9e5c9c"}}
 				// Create the GitTrack object and expect the Reconcile and Deployment to be created
 				err := c.Create(context.TODO(), instance)
 				Expect(err).NotTo(HaveOccurred())
@@ -154,7 +153,7 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("with multi-document YAML", func() {
 			// 61940ab417e30cf81d3bf488b6e03cfe881e9557
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s", repositoryPath), Reference: "9bf412f0e893c8c1624bb1c523cfeca8243534bc"}}
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL, Reference: "9bf412f0e893c8c1624bb1c523cfeca8243534bc"}}
 				// Create the GitTrack object and expect the Reconcile and Deployment to be created
 				err := c.Create(context.TODO(), instance)
 				Expect(err).NotTo(HaveOccurred())
@@ -191,7 +190,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with an invalid Reference", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s", repositoryPath), Reference: "does-not-exist"}}
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL, Reference: "does-not-exist"}}
 				err := c.Create(context.TODO(), instance)
 				Expect(err).NotTo(HaveOccurred())
 				// Wait for reconcile for creating the GitTrack resource
@@ -222,7 +221,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with an invalid SubPath", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s", repositoryPath), Reference: "master", SubPath: "does-not-exist"}}
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL, Reference: "master", SubPath: "does-not-exist"}}
 				err := c.Create(context.TODO(), instance)
 				Expect(err).NotTo(HaveOccurred())
 				// Wait for reconcile for creating the GitTrack resource
@@ -255,7 +254,7 @@ var _ = Describe("GitTrack Suite", func() {
 	Context("When a GitTrack resource is updated", func() {
 		Context("and resources are added to the repository", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s", repositoryPath), Reference: "28928ccaeb314b96293e18cc8889997f0f46b79b"}}
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL, Reference: "28928ccaeb314b96293e18cc8889997f0f46b79b"}}
 				err := c.Create(context.TODO(), instance)
 				Expect(err).NotTo(HaveOccurred())
 				// wait for reconcile for creating the GitTrack resource
@@ -304,7 +303,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("and resources are removed from the repository", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s", repositoryPath), Reference: "4532b487a5aaf651839f5401371556aa16732a6e"}}
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL, Reference: "4532b487a5aaf651839f5401371556aa16732a6e"}}
 				err := c.Create(context.TODO(), instance)
 				Expect(err).NotTo(HaveOccurred())
 				// wait for reconcile for creating the GitTrack resource
@@ -380,7 +379,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("and resources in the repository are updated", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s", repositoryPath), Reference: "a14443638218c782b84cae56a14f1090ee9e5c9c"}}
+				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL, Reference: "a14443638218c782b84cae56a14f1090ee9e5c9c"}}
 				err := c.Create(context.TODO(), instance)
 				Expect(err).NotTo(HaveOccurred())
 				// wait for reconcile for creating the GitTrack resource
