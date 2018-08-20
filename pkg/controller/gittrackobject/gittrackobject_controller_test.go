@@ -195,6 +195,8 @@ var (
 
 		It("should add an owner reference to the child", ShouldAddOwnerReference)
 
+		It("should add an last applied annotation to the child", ShouldAddLastApplied)
+
 		Context("should update the status", func() {
 			It("condition status should be true", func() {
 				ShouldUpdateConditionStatus(v1.ConditionTrue)
@@ -254,6 +256,20 @@ var (
 		Expect(oRef.APIVersion).To(Equal("faros.pusher.com/v1alpha1"))
 		Expect(oRef.Kind).To(Equal("GitTrackObject"))
 		Expect(oRef.Name).To(Equal(instance.Name))
+
+		// GC not enabled so manually delete the object
+		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
+	}
+
+	// ShouldAddLastApplied checks that the last applied annotation was set
+	ShouldAddLastApplied = func() {
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+			Should(Succeed())
+
+		annotations := deploy.ObjectMeta.Annotations
+		_, ok := annotations[utils.LastAppliedAnnotation]
+		Expect(ok).To(BeTrue())
 
 		// GC not enabled so manually delete the object
 		Expect(c.Delete(context.TODO(), deploy)).To(Succeed())
