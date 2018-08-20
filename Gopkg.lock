@@ -259,6 +259,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/mattbaird/jsonpatch"
+  packages = ["."]
+  revision = "81af80346b1a01caae0cbc27fd3c1ba5b11e189f"
+
+[[projects]]
+  branch = "master"
   name = "github.com/mitchellh/go-homedir"
   packages = ["."]
   revision = "58046073cbffe2f25d425fe1331102f55cf719de"
@@ -964,6 +970,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "bd109e471f53952e380198802a26f6a12ebcfc91b314a6f818ba99a042e4116d"
+  inputs-digest = "a0f320f997c19492c70d98eba4cf3cc38f12ecc6afff39d08c56db101dc4c954"
   solver-name = "gps-cdcl"
   solver-version = 1
