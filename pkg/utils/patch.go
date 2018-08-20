@@ -21,9 +21,49 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
+
+	mergepatch "github.com/evanphx/json-patch"
 )
 
-func CreateThreeWayMergePatch(found, child *unstructured.Unstructured) ([]byte, error) {
+// UpdateChildResource compares the found object with the child object and
+// updates the found object if necessary.
+func UpdateChildResource(found, child *unstructured.Unstructured) (bool, error) {
+	patchBytes, err := createThreeWayMergePatch(found, child)
+	if err != nil {
+		return false, fmt.Errorf("error calculating patch: %v", err)
+	}
+	if string(patchBytes) == "[]" {
+		// nothing to do
+		return false, nil
+	}
+
+	err = patchUnstructured(found, patchBytes)
+	if err != nil {
+		return false, fmt.Errorf("unable to patch unstructured object: %v", err)
+	}
+	return true, nil
+}
+
+func patchUnstructured(obj *unstructured.Unstructured, patchBytes []byte) error {
+	objJSON, err := obj.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("unable to marshal JSON: %v", err)
+	}
+
+	updatedJSON, err := mergepatch.MergePatch(objJSON, patchBytes)
+	if err != nil {
+		return fmt.Errorf("unable to apply patch: %v", err)
+	}
+
+	*obj, err = JSONToUnstructured(updatedJSON)
+	if err != nil {
+		return fmt.Errorf("error converting JSON to unstructured: %v", err)
+	}
+
+	return nil
+}
+
+func createThreeWayMergePatch(found, child *unstructured.Unstructured) ([]byte, error) {
 	original, err := getLastAppliedObject(found)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get last applied object: %v", err)

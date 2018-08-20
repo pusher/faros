@@ -24,7 +24,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	mergepatch "github.com/evanphx/json-patch"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
@@ -253,7 +252,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Update the object if the spec differs from the version running
-	childUpdated, err := updateChildResource(found, child)
+	childUpdated, err := utils.UpdateChildResource(found, child)
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
 		opts.inSyncError = fmt.Errorf("unable to update child: %v", err)
@@ -277,42 +276,4 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	return reconcile.Result{}, nil
-}
-
-// updateChildResource compares the found object with the child object and
-// updates the found object if necessary.
-func updateChildResource(found, child *unstructured.Unstructured) (bool, error) {
-	patchBytes, err := utils.CreateThreeWayMergePatch(found, child)
-	if err != nil {
-		return false, fmt.Errorf("error calculating patch: %v", err)
-	}
-	if string(patchBytes) == "[]" {
-		// nothing to do
-		return false, nil
-	}
-
-	err = patchUnstructured(found, patchBytes)
-	if err != nil {
-		return false, fmt.Errorf("unable to patch unstructured object: %v", err)
-	}
-	return true, nil
-}
-
-func patchUnstructured(obj *unstructured.Unstructured, patchBytes []byte) error {
-	objJSON, err := obj.MarshalJSON()
-	if err != nil {
-		return fmt.Errorf("unable to marshal JSON: %v", err)
-	}
-
-	updatedJSON, err := mergepatch.MergePatch(objJSON, patchBytes)
-	if err != nil {
-		return fmt.Errorf("unable to apply patch: %v", err)
-	}
-
-	*obj, err = utils.JSONToUnstructured(updatedJSON)
-	if err != nil {
-		return fmt.Errorf("error converting JSON to unstructured: %v", err)
-	}
-
-	return nil
 }
