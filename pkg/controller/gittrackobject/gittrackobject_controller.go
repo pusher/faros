@@ -260,6 +260,12 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, opts.inSyncError
 	}
 	if childUpdated {
+		err := utils.SetLastAppliedAnnotation(found, child)
+		if err != nil {
+			opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
+			opts.inSyncError = fmt.Errorf("error setting last applied annotation: %v", err)
+			return reconcile.Result{}, opts.inSyncError
+		}
 		// Update the child resource on the API
 		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Update(context.TODO(), found)
