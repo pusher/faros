@@ -193,6 +193,9 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
+
+			// Set instance to nil so we don't update the status
+			instance = nil
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
