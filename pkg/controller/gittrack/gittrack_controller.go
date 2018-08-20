@@ -93,6 +93,7 @@ type ReconcileGitTrack struct {
 	store  *gitstore.RepoStore
 }
 
+// checkoutRepo checks out the repository at reference and returns a pointer to said repository
 func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo, error) {
 	privateKey := []byte{}
 	var err error
@@ -118,6 +119,8 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo
 	return repo, nil
 }
 
+// getFilesForSpec checks out the Spec.Repository at Spec.Reference and returns a map of filename to
+// gitstore.File pointers
 func (r *ReconcileGitTrack) getFilesForSpec(s farosv1alpha1.GitTrackSpec) (map[string]*gitstore.File, error) {
 	repo, err := r.checkoutRepo(s.Repository, s.Reference)
 	if err != nil {
@@ -134,6 +137,7 @@ func (r *ReconcileGitTrack) getFilesForSpec(s farosv1alpha1.GitTrackSpec) (map[s
 	return files, nil
 }
 
+// fetchInstance attempts to fetch the GitTrack resource by the name in the given Request
 func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1.GitTrack, error) {
 	instance := &farosv1alpha1.GitTrack{}
 	err := r.Get(context.TODO(), req.NamespacedName, instance)
@@ -149,6 +153,8 @@ func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1
 	return instance, nil
 }
 
+// listObjectsByName lists and filters GitTrackObjects by the `faros.pusher.com/owned-by` label,
+// and returns a map of names to GitTrackObject mappings
 func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (map[string]farosv1alpha1.GitTrackObject, error) {
 	result := make(map[string]farosv1alpha1.GitTrackObject)
 	gtos := &farosv1alpha1.GitTrackObjectList{}
@@ -163,6 +169,9 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 	return result, nil
 }
 
+// makeLabels returns a map of labels that are used for tracking ownership
+// without having to list all of the GitTrackObjects every time (but rather
+// filter by labels)
 func makeLabels(g *farosv1alpha1.GitTrack) map[string]string {
 	return map[string]string{"faros.pusher.com/owned-by": g.Name}
 }
