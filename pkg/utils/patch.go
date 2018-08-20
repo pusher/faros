@@ -32,6 +32,7 @@ func UpdateChildResource(found, child *unstructured.Unstructured) (bool, error) 
 	if err != nil {
 		return false, fmt.Errorf("error calculating patch: %v", err)
 	}
+
 	// If no patching to do return now
 	if string(patchBytes) == "[]" {
 		// nothing to do
@@ -46,6 +47,7 @@ func UpdateChildResource(found, child *unstructured.Unstructured) (bool, error) 
 	return true, nil
 }
 
+// patchUnstructured applies a JSON patch document to the unstructured object
 func patchUnstructured(obj *unstructured.Unstructured, patchBytes []byte) error {
 	objJSON, err := obj.MarshalJSON()
 	if err != nil {
@@ -70,6 +72,9 @@ func patchUnstructured(obj *unstructured.Unstructured, patchBytes []byte) error 
 	return nil
 }
 
+// createThreeWayMergePatch creates a JSON merge patch document from the
+// found and child unstructured objects, getting the original document from the
+// last-applied annotation on the found object.
 func createThreeWayMergePatch(found, child *unstructured.Unstructured) ([]byte, error) {
 	original, err := getLastAppliedObject(found)
 	if err != nil {
@@ -87,6 +92,7 @@ func createThreeWayMergePatch(found, child *unstructured.Unstructured) ([]byte, 
 	return patch, nil
 }
 
+// getJSON converts three unstructured objects into three JSON documents
 func getJSON(found, child, original *unstructured.Unstructured) ([]byte, []byte, []byte, error) {
 	foundJSON, err := found.MarshalJSON()
 	if err != nil {

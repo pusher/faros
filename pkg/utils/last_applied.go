@@ -22,8 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// LastAppliedAnnotation is the annotation name used by faros for the last
+// applied config
 const LastAppliedAnnotation = "faros.pusher.com/last-applied-configuration"
 
+// SetLastAppliedAnnotation sets the last applied configuration annotation on
+// the found object
 func SetLastAppliedAnnotation(found, child *unstructured.Unstructured) error {
 	config, err := child.MarshalJSON()
 	if err != nil {
@@ -39,6 +43,7 @@ func SetLastAppliedAnnotation(found, child *unstructured.Unstructured) error {
 	return nil
 }
 
+// getLastAppliedObject creates an unstructured from the last applied annotation
 func getLastAppliedObject(found *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	data := getLastAppliedAnnotation(found)
 	if data == nil {
@@ -52,6 +57,7 @@ func getLastAppliedObject(found *unstructured.Unstructured) (*unstructured.Unstr
 	return &obj, nil
 }
 
+// getLastAppliedAnnotation reads the last applied annotation data
 func getLastAppliedAnnotation(obj *unstructured.Unstructured) []byte {
 	annotations := obj.GetAnnotations()
 	if data, ok := annotations[LastAppliedAnnotation]; ok {

@@ -24,6 +24,9 @@ import (
 	"github.com/mattbaird/jsonpatch"
 )
 
+// createThreeWayJSONMergePatch takes three JSON documents and compares them.
+// It retures a JSON patch document which will merge changes to the modified
+// document into the current document.
 func createThreeWayJSONMergePatch(original, modified, current []byte) ([]byte, error) {
 	if len(original) == 0 {
 		original = []byte(`{}`)
