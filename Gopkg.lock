@@ -21,6 +21,12 @@
   version = "v10.15.2"
 
 [[projects]]
+  name = "github.com/benjamintf1/unmarshalledmatchers"
+  packages = ["."]
+  revision = "f49d1795d752929500b8ed2289f1e21f10414667"
+  version = "1.0.0"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -718,7 +724,6 @@
     "pkg/util/framer",
     "pkg/util/intstr",
     "pkg/util/json",
-    "pkg/util/jsonmergepatch",
     "pkg/util/mergepatch",
     "pkg/util/net",
     "pkg/util/runtime",
@@ -970,6 +975,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a0f320f997c19492c70d98eba4cf3cc38f12ecc6afff39d08c56db101dc4c954"
+  inputs-digest = "fcfe7503f96587bed355a4ba60da9ed9cfec4f91aba61a87137c723bb0190a79"
   solver-name = "gps-cdcl"
   solver-version = 1

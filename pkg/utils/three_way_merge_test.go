@@ -3,6 +3,7 @@ package utils
 import (
 	"testing"
 
+	. "github.com/benjamintf1/unmarshalledmatchers"
 	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,7 +79,7 @@ var testCreateThreeWayJSONMergePatch = func(original, modified, current, expect 
 		[]byte(current),
 	)
 	Expect(err).ToNot(HaveOccurred())
-	Expect(patchBytes).To(Equal([]byte(expect)))
+	Expect(patchBytes).To(MatchUnorderedJSON(expect, WithOrderedListKeys("path")))
 }
 
 var testCreateThreeWayJSONMergePatchError = func(original, modified, current string) {
