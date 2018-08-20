@@ -46,6 +46,8 @@ import (
 
 var privateKeyPath = flag.String("private-key", "", "Path to default private key to use for Git checkouts")
 
+const ownedByLabel = "faros.pusher.com/owned-by"
+
 // Add creates a new GitTrack Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 // USER ACTION REQUIRED: update cmd/manager/main.go to call this faros.Add(mgr) to install this Controller
@@ -173,7 +175,7 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 // without having to list all of the GitTrackObjects every time (but rather
 // filter by labels)
 func makeLabels(g *farosv1alpha1.GitTrack) map[string]string {
-	return map[string]string{"faros.pusher.com/owned-by": g.Name}
+	return map[string]string{ownedByLabel: g.Name}
 }
 
 // result represents the result of creating or updating a GitTrackObject
