@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	merge "github.com/evanphx/json-patch"
 	"github.com/mattbaird/jsonpatch"
 )
 
@@ -52,25 +51,7 @@ func createThreeWayJSONMergePatch(original, modified, current []byte) ([]byte, e
 	// Only keep deletion
 	del = keepOrDeleteRemoveInPatch(del, true)
 
-	addAndChangeJSON, err := json.Marshal(addAndChange)
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling JSON: %v", err)
-	}
-	delJSON, err := json.Marshal(del)
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling JSON: %v", err)
-	}
-
-	// TODO: handle conflicts
-	// hasConflicts, err := mergepatch.HasConflicts(addAndChange, del)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("error checking conflicts: %v", err)
-	// }
-	// if hasConflicts {
-	// 	return nil, mergepatch.NewErrConflict(mergepatch.ToYAMLOrError(addAndChange), mergepatch.ToYAMLOrError(del))
-	// }
-
-	patch, err := merge.MergePatch(delJSON, addAndChangeJSON)
+	patch, err := mergePatchToJSON(del, addAndChange)
 	if err != nil {
 		return nil, fmt.Errorf("error merging patches: %v", err)
 	}
@@ -95,4 +76,19 @@ func keepOrDeleteRemoveInPatch(patch []jsonpatch.JsonPatchOperation, keepRemove 
 	}
 
 	return filteredPatch
+}
+
+// mergePatchToJSON adds creates a JSON patch document with all paths from
+// both a and b, b taking precedent over a
+func mergePatchToJSON(a, b []jsonpatch.JsonPatchOperation) ([]byte, error) {
+	paths := make(map[string]struct{})
+	for _, p := range b {
+		paths[p.Path] = struct{}{}
+	}
+	for _, p := range a {
+		if _, ok := paths[p.Path]; !ok {
+			b = append(b, p)
+		}
+	}
+	return json.Marshal(b)
 }
