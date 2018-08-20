@@ -382,9 +382,127 @@ var _ = Describe("GitTrack Suite", func() {
 		})
 
 		Context("and the reference is invalid", func() {
+			BeforeEach(func() {
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				// wait for reconcile for creating the GitTrack resource
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// wait for reconcile for creating the GitTrackObject resources
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			})
+
+			It("does not update any of the resources", func() {
+				deployBefore, deployAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				serviceBefore, serviceAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+				instance.Spec.Reference = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployAfter)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceAfter)
+				}, timeout).Should(Succeed())
+
+				Expect(deployBefore).To(Equal(deployAfter))
+				Expect(serviceBefore).To(Equal(serviceAfter))
+			})
+
+			It("updates the FilesFetched condition", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				instance.Spec.Reference = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				// TODO: don't rely on ordering
+				c := instance.Status.Conditions[1]
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
+				Expect(c.Message).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
+			})
 		})
 
 		Context("and the subPath is invalid", func() {
+			BeforeEach(func() {
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				// wait for reconcile for creating the GitTrack resource
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// wait for reconcile for creating the GitTrackObject resources
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			})
+
+			It("does not update any of the resources", func() {
+				deployBefore, deployAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				serviceBefore, serviceAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+				instance.Spec.SubPath = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployAfter)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceAfter)
+				}, timeout).Should(Succeed())
+
+				Expect(deployBefore).To(Equal(deployAfter))
+				Expect(serviceBefore).To(Equal(serviceAfter))
+			})
+
+			It("updates the FilesFetched condition", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				instance.Spec.SubPath = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				// TODO: don't rely on ordering
+				c := instance.Status.Conditions[1]
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
+				Expect(c.Message).To(Equal("no files for subpath 'does-not-exist'"))
+			})
 		})
 	})
 
