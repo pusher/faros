@@ -7,6 +7,7 @@ import (
 	goyaml "gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -63,6 +64,31 @@ func YAMLToUnstructured(in []byte) (u unstructured.Unstructured, err error) {
 		return u, fmt.Errorf("unable to convert YAML to JSON: %v", err)
 	}
 	return JSONToUnstructured(json)
+}
+
+// YAMLToUnstructuredSlice converts a raw yaml document into a slice of pointers to Unstructured objects
+func YAMLToUnstructuredSlice(in []byte) ([]*unstructured.Unstructured, error) {
+	u, err := YAMLToUnstructured(in)
+	if err != nil {
+		return []*unstructured.Unstructured{}, err
+	}
+	if u.IsList() {
+		result := []*unstructured.Unstructured{}
+		err = u.EachListItem(func(obj runtime.Object) error {
+			o, ok := obj.(*unstructured.Unstructured)
+			if !ok {
+				kind := obj.GetObjectKind().GroupVersionKind().Kind
+				return fmt.Errorf("invalid resource of Kind %s", kind)
+			}
+			result = append(result, o)
+			return nil
+		})
+		if err != nil {
+			return []*unstructured.Unstructured{}, err
+		}
+		return result, nil
+	}
+	return []*unstructured.Unstructured{&u}, nil
 }
 
 // splitYAML will take raw yaml from a file and split yaml documents on the

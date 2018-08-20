@@ -5,9 +5,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps
+  - faros.pusher.com
   resources:
-  - deployments
+  - gittracks
   verbs:
   - get
   - list
@@ -19,7 +19,7 @@ rules:
 - apiGroups:
   - faros.pusher.com
   resources:
-  - gittracks
+  - gittrackobjects
   verbs:
   - get
   - list

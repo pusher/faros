@@ -17,12 +17,16 @@ limitations under the License.
 package gittrack
 
 import (
+	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
-	"github.com/onsi/gomega"
+	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/pkg/apis"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -32,22 +36,53 @@ import (
 )
 
 var cfg *rest.Config
+var repositoryPath string
+var fixturesRepoPath, _ = filepath.Abs("./fixtures/repo.tgz")
 
-func TestMain(m *testing.M) {
-	t := &envtest.Environment{
+func setupRepository() string {
+	dir, err := ioutil.TempDir("", "gittrack")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cmd := exec.Command("tar", "-zxf", fixturesRepoPath, "-C", dir, "--strip-components", "1")
+	err = cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return dir
+}
+
+func teardownRepository(dir string) {
+	os.RemoveAll(dir)
+}
+
+func TestBee(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecsWithDefaultAndCustomReporters(t, "GitTrack Suite", []Reporter{test.NewlineReporter{}})
+}
+
+var t *envtest.Environment
+
+var _ = BeforeSuite(func() {
+	t = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
 	}
 	apis.AddToScheme(scheme.Scheme)
+
+	repositoryPath = setupRepository()
 
 	var err error
 	if cfg, err = t.Start(); err != nil {
 		log.Fatal(err)
 	}
+})
 
-	code := m.Run()
+var _ = AfterSuite(func() {
 	t.Stop()
-	os.Exit(code)
-}
+	teardownRepository(repositoryPath)
+})
 
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and
 // writes the request to requests after Reconcile is finished.
@@ -55,6 +90,9 @@ func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan 
 	requests := make(chan reconcile.Request)
 	fn := reconcile.Func(func(req reconcile.Request) (reconcile.Result, error) {
 		result, err := inner.Reconcile(req)
+		if err != nil {
+			log.Printf("error during reconcile: %v\n", err)
+		}
 		requests <- req
 		return result, err
 	})
@@ -62,10 +100,10 @@ func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan 
 }
 
 // StartTestManager adds recFn
-func StartTestManager(mgr manager.Manager, g *gomega.GomegaWithT) chan struct{} {
+func StartTestManager(mgr manager.Manager) chan struct{} {
 	stop := make(chan struct{})
 	go func() {
-		g.Expect(mgr.Start(stop)).NotTo(gomega.HaveOccurred())
+		Expect(mgr.Start(stop)).NotTo(HaveOccurred())
 	}()
 	return stop
 }

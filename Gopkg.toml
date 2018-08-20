@@ -2,7 +2,8 @@ required = [
     "github.com/emicklei/go-restful",
     "github.com/onsi/ginkgo", # for test framework
     "github.com/onsi/gomega", # for test matchers
-    "github.com/kubernetes-sigs/kubebuilder/pkg/test", # for tests
+    "github.com/kubernetes-sigs/kubebuilder", # For tests
+    "github.com/pusher/git-store",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
     "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
@@ -13,12 +14,15 @@ required = [
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/testing_frameworks/integration", # for integration testing
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
-    ]
+    "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
+]
 
 [prune]
   go-tests = true
 
+[[constraint]]
+name="github.com/pusher/git-store"
+version="v0.1.0"
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
