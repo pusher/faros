@@ -31,9 +31,9 @@ const (
 	// Owner reference cannot be set
 	ErrorAddingOwnerReference ConditionReason = "ErrorAddingOwnerReference"
 
-	// ErrorUnmarshallingYAML represents the condition reason when the object's
+	// ErrorUnmarshallingData represents the condition reason when the object's
 	// data cannot be unmarshalled
-	ErrorUnmarshallingYAML ConditionReason = "ErrorUnmarshallingYAML"
+	ErrorUnmarshallingData ConditionReason = "ErrorUnmarshallingData"
 
 	// ErrorCreatingChild represents the condition reason when the controller
 	// hits an error trying to create the child

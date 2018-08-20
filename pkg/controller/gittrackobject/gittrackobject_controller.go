@@ -203,7 +203,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	child := &unstructured.Unstructured{}
 	*child, err = utils.YAMLToUnstructured(instance.Spec.Data)
 	if err != nil {
-		opts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingYAML
+		opts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
 		opts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
 		return reconcile.Result{}, opts.inSyncError
 	}
