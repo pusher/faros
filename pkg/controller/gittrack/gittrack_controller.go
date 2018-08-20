@@ -19,14 +19,16 @@ package gittrack
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"reflect"
 	"strings"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	utils "github.com/pusher/faros/pkg/utils"
 	gitstore "github.com/pusher/git-store"
-	"k8s.io/api/core/v1"
+	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,6 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var privateKeyPath = flag.String("private-key", "", "Path to default private key to use for Git checkouts")
 
 // Add creates a new GitTrack Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -90,8 +94,17 @@ type ReconcileGitTrack struct {
 }
 
 func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo, error) {
+	privateKey := []byte{}
+	var err error
+	if *privateKeyPath != "" {
+		privateKey, err = ioutil.ReadFile(*privateKeyPath)
+		if err != nil {
+			return &gitstore.Repo{}, fmt.Errorf("failed to load private key: %v", err)
+		}
+	}
+
 	log.Printf("Getting repository '%s'\n", url)
-	repo, err := r.store.Get(&gitstore.RepoRef{URL: url})
+	repo, err := r.store.Get(&gitstore.RepoRef{URL: url, PrivateKey: privateKey})
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
 	}
@@ -136,30 +149,6 @@ func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1
 	return instance, nil
 }
 
-func success(c farosv1alpha1.GitTrackCondition, m string) farosv1alpha1.GitTrackCondition {
-	now := metav1.Now()
-	c.Status = v1.ConditionFalse
-	c.LastUpdateTime = now
-	c.LastTransitionTime = now
-	if m != "" {
-		c.Reason = m
-		c.Message = m
-	}
-	return c
-}
-
-func failure(c farosv1alpha1.GitTrackCondition, m string) farosv1alpha1.GitTrackCondition {
-	now := metav1.Now()
-	c.Status = v1.ConditionTrue
-	c.LastUpdateTime = now
-	c.LastTransitionTime = now
-	if m != "" {
-		c.Reason = m
-		c.Message = m
-	}
-	return c
-}
-
 func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (map[string]farosv1alpha1.GitTrackObject, error) {
 	result := make(map[string]farosv1alpha1.GitTrackObject)
 	gtos := &farosv1alpha1.GitTrackObjectList{}
@@ -176,13 +165,6 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 
 func makeLabels(g *farosv1alpha1.GitTrack) map[string]string {
 	return map[string]string{"faros.pusher.com/owned-by": g.Name}
-}
-
-func initCondition(t farosv1alpha1.GitTrackConditionType) farosv1alpha1.GitTrackCondition {
-	return farosv1alpha1.GitTrackCondition{
-		Type:   t,
-		Status: v1.ConditionUnknown,
-	}
 }
 
 // result represents the result of creating or updating a GitTrackObject
@@ -265,18 +247,18 @@ func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.G
 }
 
 // objectsFrom iterates through all the files given and attempts to create Unstructured objects
-func objectsFrom(files map[string]*gitstore.File) []*unstructured.Unstructured {
+func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured, []string) {
 	objects := []*unstructured.Unstructured{}
+	errors := []string{}
 	for path, file := range files {
 		us, err := utils.YAMLToUnstructuredSlice([]byte(file.Contents()))
 		if err != nil {
-			// TODO: this should probably be handled somehow
-			log.Printf("unable to parse '%s': %v\n", path, err)
+			errors = append(errors, fmt.Sprintf("unable to parse '%s': %v\n", path, err))
 			continue
 		}
 		objects = append(objects, us...)
 	}
-	return objects
+	return objects, errors
 }
 
 // Reconcile reads the state of the cluster for a GitTrack object and makes changes based on the state read
@@ -285,36 +267,53 @@ func objectsFrom(files map[string]*gitstore.File) []*unstructured.Unstructured {
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittracks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	status := &farosv1alpha1.GitTrackStatus{}
-	// TODO: these should be based on the current status
-	parseErrorCondition := initCondition(farosv1alpha1.ParseErrorType)
-	gitErrorCondition := initCondition(farosv1alpha1.GitErrorType)
-	instance, err := r.fetchInstance(request)
+	instance := &farosv1alpha1.GitTrack{}
+	opts := newStatusOpts()
+
+	// Update the GitTrackObject status when we leave this function
+	defer func() {
+		err := r.updateStatus(instance, opts)
+		// Print out any errors that may have occurred
+		for _, e := range []error{
+			err,
+			opts.gitError,
+			opts.parseError,
+			opts.gcError,
+			opts.upToDateError,
+		} {
+			if e != nil {
+				log.Printf("%v", e)
+			}
+		}
+	}()
+
+	var err error
+	instance, err = r.fetchInstance(request)
 	if err != nil || instance == nil {
 		return reconcile.Result{}, err
 	}
+
 	// Get a map of the files that are in the Spec
 	files, err := r.getFilesForSpec(instance.Spec)
 	if err != nil {
-		// TODO: move to separate function
-		status.Conditions = []farosv1alpha1.GitTrackCondition{
-			success(parseErrorCondition, ""),
-			failure(gitErrorCondition, fmt.Sprintf("%v", err)),
-		}
-
-		if !reflect.DeepEqual(instance.Status, status) {
-			instance.Status = *status
-			updateErr := r.Update(context.TODO(), instance)
-			if updateErr != nil {
-				log.Printf("Unable to update status: '%v'\n", updateErr)
-			}
-		}
+		opts.gitError = err
+		opts.gitReason = gittrackutils.ErrorFetchingFiles
 		return reconcile.Result{}, err
 	}
+	// Git successful, set condition
+	opts.gitReason = gittrackutils.GitFetchSuccess
+
 	// Attempt to parse k8s objects from files
-	objects := objectsFrom(files)
+	objects, errors := objectsFrom(files)
+	if len(errors) > 0 {
+		opts.parseError = fmt.Errorf(strings.Join(errors, ",\n"))
+		opts.parseReason = gittrackutils.ErrorParsingFiles
+	} else {
+		opts.parseReason = gittrackutils.FileParseSuccess
+	}
+
 	// Update status with the number of objects discovered
-	status.ObjectsDiscovered = int64(len(objects))
+	opts.discovered = int64(len(objects))
 	// Get a list of the GitTrackObjects that currently exist, by name
 	objectsByName, err := r.listObjectsByName(instance)
 	if err != nil {
@@ -327,33 +326,38 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 			resultsChan <- r.handleObject(obj, instance)
 		}(obj)
 	}
+
+	handlerErrors := []string{}
 	// Iterate through results and update status accordingly
 	for range objects {
 		res := <-resultsChan
 		if res.Ignored {
-			status.ObjectsIgnored++
+			opts.ignored++
 		} else {
-			status.ObjectsApplied++
+			opts.applied++
 		}
 		delete(objectsByName, res.Name)
-	}
-	// Cleanup potentially leftover resources
-	if err = r.deleteResources(objectsByName); err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to cleanup tracked objects: %v", err)
-	}
-	// TODO: move to separate function
-	status.Conditions = []farosv1alpha1.GitTrackCondition{
-		success(parseErrorCondition, ""),
-		success(gitErrorCondition, ""),
-	}
-
-	if !reflect.DeepEqual(instance.Status, status) {
-		instance.Status = *status
-		err = r.Update(context.TODO(), instance)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to update status: %v", err)
+		if res.Error != nil {
+			handlerErrors = append(handlerErrors, res.Error.Error())
 		}
 	}
+
+	// If there were errors updating the child objects, set the ChildrenUpToDate
+	// condition appropriately
+	if len(handlerErrors) > 0 {
+		opts.upToDateError = fmt.Errorf(strings.Join(handlerErrors, ",\n"))
+		opts.upToDateReason = gittrackutils.ErrorUpdatingChildren
+	} else {
+		opts.upToDateReason = gittrackutils.ChildrenUpdateSuccess
+	}
+
+	// Cleanup potentially leftover resources
+	if err = r.deleteResources(objectsByName); err != nil {
+		opts.gcError = err
+		opts.gcReason = gittrackutils.ErrorDeletingChildren
+		return reconcile.Result{}, fmt.Errorf("failed to cleanup tracked objects: %v", err)
+	}
+	opts.gcReason = gittrackutils.GCSuccess
 
 	return reconcile.Result{}, nil
 }

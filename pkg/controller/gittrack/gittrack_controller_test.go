@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,11 +104,15 @@ var _ = Describe("GitTrack Suite", func() {
 				gt := &farosv1alpha1.GitTrack{}
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				conditions := gt.Status.Conditions
-				Expect(len(conditions)).To(Equal(2))
+				Expect(len(conditions)).To(Equal(4))
 				parseErrorCondition := conditions[0]
 				gitErrorCondition := conditions[1]
-				Expect(parseErrorCondition.Type).To(Equal(farosv1alpha1.ParseErrorType))
-				Expect(gitErrorCondition.Type).To(Equal(farosv1alpha1.GitErrorType))
+				gcErrorCondition := conditions[2]
+				upToDateCondiiton := conditions[3]
+				Expect(parseErrorCondition.Type).To(Equal(farosv1alpha1.FilesParsedType))
+				Expect(gitErrorCondition.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(gcErrorCondition.Type).To(Equal(farosv1alpha1.ChildrenGarbageCollectedType))
+				Expect(upToDateCondiiton.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
 			})
 
 			It("creates GitTrackObjects", func() {
@@ -200,17 +205,17 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("updates the GitError condition", func() {
+			It("updates the FilesFetched condition", func() {
 				gt := &farosv1alpha1.GitTrack{}
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
 				c := gt.Status.Conditions[1]
-				Expect(c.Type).To(Equal(farosv1alpha1.GitErrorType))
-				Expect(c.Status).To(Equal(v1.ConditionTrue))
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
-				Expect(c.Reason).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
 			})
 		})
@@ -231,17 +236,17 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("updates the GitError condition", func() {
+			It("updates the FilesFetched condition", func() {
 				gt := &farosv1alpha1.GitTrack{}
 				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
 				c := gt.Status.Conditions[1]
-				Expect(c.Type).To(Equal(farosv1alpha1.GitErrorType))
-				Expect(c.Status).To(Equal(v1.ConditionTrue))
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
-				Expect(c.Reason).To(Equal("no files for subpath 'does-not-exist'"))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("no files for subpath 'does-not-exist'"))
 			})
 		})

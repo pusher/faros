@@ -8,16 +8,29 @@
   version = "v0.21.0"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/bmizerany/assert"
-  packages = ["."]
-  revision = "b7ed37b82869576c289d7d97fb2bbd8b64a0cb28"
+  name = "github.com/Azure/go-autorest"
+  packages = [
+    "autorest",
+    "autorest/adal",
+    "autorest/azure",
+    "autorest/date",
+    "logger",
+    "version"
+  ]
+  revision = "39013ecb48eaf6ced3f4e3e1d95515140ce6b3cf"
+  version = "v10.15.2"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
+
+[[projects]]
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
+  version = "v3.2.0"
 
 [[projects]]
   name = "github.com/emicklei/go-restful"
@@ -132,6 +145,20 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/gophercloud/gophercloud"
+  packages = [
+    ".",
+    "openstack",
+    "openstack/identity/v2/tenants",
+    "openstack/identity/v2/tokens",
+    "openstack/identity/v3/tokens",
+    "openstack/utils",
+    "pagination"
+  ]
+  revision = "185230dfbd12fc178f22e1e2a5c4cf0e3ef5ae45"
+
+[[projects]]
+  branch = "master"
   name = "github.com/gregjones/httpcache"
   packages = [
     ".",
@@ -194,18 +221,6 @@
   packages = ["."]
   revision = "9fc7bb800b555d63157c65a904c86a2cc7b4e795"
   version = "0.4"
-
-[[projects]]
-  name = "github.com/kr/pretty"
-  packages = ["."]
-  revision = "73f6ac0b30a98e433b289500d779f50c1a6f0712"
-  version = "v0.1.0"
-
-[[projects]]
-  name = "github.com/kr/text"
-  packages = ["."]
-  revision = "e2ffdb16a802fe2bb95e2e35ff34f0e53aeef34f"
-  version = "v0.1.0"
 
 [[projects]]
   branch = "controller-platform"
@@ -325,10 +340,10 @@
   version = "v0.8.0"
 
 [[projects]]
+  branch = "privatekey"
   name = "github.com/pusher/git-store"
   packages = ["."]
-  revision = "c07570f30e75df6370a67de169205ae07a2e6892"
-  version = "v0.1.0"
+  revision = "470beb7c188f7060c49403c5f0dfe165d86420e4"
 
 [[projects]]
   name = "github.com/sergi/go-diff"
@@ -814,8 +829,12 @@
     "pkg/apis/clientauthentication/v1alpha1",
     "pkg/apis/clientauthentication/v1beta1",
     "pkg/version",
+    "plugin/pkg/client/auth",
+    "plugin/pkg/client/auth/azure",
     "plugin/pkg/client/auth/exec",
     "plugin/pkg/client/auth/gcp",
+    "plugin/pkg/client/auth/oidc",
+    "plugin/pkg/client/auth/openstack",
     "rest",
     "rest/watch",
     "restmapper",
@@ -938,6 +957,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "27307cd9ca3724d124c6169e17e34e89f234bbac54806270362380b3540cbb0b"
+  inputs-digest = "feb3e3caa410f8e246939789208549f9d34c3f6129546d32243643e27e130910"
   solver-name = "gps-cdcl"
   solver-version = 1

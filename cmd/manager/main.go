@@ -19,15 +19,23 @@ package main
 import (
 	"log"
 
+	goflag "flag"
+
 	"github.com/pusher/faros/pkg/apis"
 	"github.com/pusher/faros/pkg/controller"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	flag "github.com/spf13/pflag"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 func main() {
+	// Setup flags
+	goflag.Lookup("logtostderr").Value.Set("true")
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	flag.Parse()
+
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
