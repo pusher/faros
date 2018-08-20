@@ -9,11 +9,18 @@ work_dir="$(mktemp -d)"
 fixtures_tgz="$script_dir/pkg/controller/gittrack/fixtures/repo.tgz"
 
 if [[ -e $fixtures_tgz ]]; then
-  tar -zxvf "$fixtures_tgz" -C "$work_dir"
+  tar -zxf "$fixtures_tgz" -C "$work_dir" --strip-components 1
 fi
 
-pushd "$work_dir"
-echo "dropping you in a shell session in $work_dir"
+pushd "$work_dir" > /dev/null
+cat <<-EOL
+************************************************************************
+* dropping you in a shell session in $work_dir
+* when you're done updating the repo exit the session with a zero exit
+* code (i.e. 'exit 0') to update the archive, or with a non-zero exit
+* code (i.e. 'exit 1') to discard your changes
+************************************************************************
+EOL
 if $SHELL; then
   tar -zcvf "$fixtures_tgz" -C "$work_dir" .
   echo "updated $fixtures_tgz"
