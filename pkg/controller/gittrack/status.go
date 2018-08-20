@@ -56,7 +56,7 @@ func updateGitTrackStatus(gt *farosv1alpha1.GitTrack, opts *statusOpts) (updated
 		return
 	}
 
-	status := farosv1alpha1.GitTrackStatus{}
+	status := gt.Status
 
 	status.ObjectsApplied = opts.applied
 	status.ObjectsDiscovered = opts.discovered

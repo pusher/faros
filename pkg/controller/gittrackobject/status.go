@@ -44,7 +44,7 @@ func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, opts *statusO
 	if gto == nil {
 		return false
 	}
-	status := farosv1alpha1.GitTrackObjectStatus{}
+	status := gto.Status
 
 	setCondition(&status, farosv1alpha1.ObjectInSyncType, opts.inSyncError, opts.inSyncReason)
 
