@@ -248,10 +248,17 @@ func objectName(u *unstructured.Unstructured) string {
 
 // handleObject either creates or updates a GitTrackObject
 func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
-	if u.GetNamespace() == "" {
-		return r.handleNonNamespacedObject(u, owner)
+	// Determine whether the resource is namespaced or not
+	_, namespaced, err := utils.GetAPIResource(r.restMapper, u.GetObjectKind().GroupVersionKind())
+	if err != nil {
+		return errorResult(objectName(u), fmt.Errorf("unable to determine whether resource is namespaced: %v", err))
 	}
-	return r.handleNamespacedObject(u, owner)
+
+	// Handle namespaced and non-namespaced resources accordingly
+	if namespaced {
+		return r.handleNamespacedObject(u, owner)
+	}
+	return r.handleNonNamespacedObject(u, owner)
 }
 
 func (r *ReconcileGitTrack) handleNamespacedObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
