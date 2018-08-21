@@ -27,7 +27,16 @@ import (
 
 func TestStorageClusterGitTrackObject(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
-	created := &ClusterGitTrackObject{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	created := &ClusterGitTrackObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: GitTrackObjectSpec{
+			Data: []byte("test"),
+		},
+	}
+
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create
