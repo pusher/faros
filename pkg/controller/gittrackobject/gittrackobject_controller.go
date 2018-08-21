@@ -32,9 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -65,7 +63,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}()
 
 	// Create a restMapper (used by informer to look up resource kinds)
-	restMapper, err := newRestMapper(mgr.GetConfig())
+	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
 	if err != nil {
 		panic(fmt.Errorf("unable to create rest mapper: %v", err))
 	}
@@ -116,21 +114,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	return nil
-}
-
-// newRestMapper creates a restMapper from the discovery client
-func newRestMapper(config *rest.Config) (meta.RESTMapper, error) {
-	client, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create dynamic client: %v", err)
-	}
-
-	apiGroupResources, err := restmapper.GetAPIGroupResources(client)
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch API Group Resources: %v", err)
-	}
-
-	return restmapper.NewDiscoveryRESTMapper(apiGroupResources), nil
 }
 
 // Reconciler allows the test suite to mock the required methods
