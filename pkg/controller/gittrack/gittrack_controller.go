@@ -29,6 +29,7 @@ import (
 	gitstore "github.com/pusher/git-store"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +58,19 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	clientSet := kubernetes.NewForConfigOrDie(mgr.GetConfig())
-	return &ReconcileGitTrack{Client: mgr.GetClient(), scheme: mgr.GetScheme(), store: gitstore.NewRepoStore(clientSet)}
+
+	// Create a restMapper (used by informer to look up resource kinds)
+	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest mapper: %v", err))
+	}
+
+	return &ReconcileGitTrack{
+		Client:     mgr.GetClient(),
+		scheme:     mgr.GetScheme(),
+		store:      gitstore.NewRepoStore(clientSet),
+		restMapper: restMapper,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -90,8 +103,9 @@ var _ reconcile.Reconciler = &ReconcileGitTrack{}
 // ReconcileGitTrack reconciles a GitTrack object
 type ReconcileGitTrack struct {
 	client.Client
-	scheme *runtime.Scheme
-	store  *gitstore.RepoStore
+	scheme     *runtime.Scheme
+	store      *gitstore.RepoStore
+	restMapper meta.RESTMapper
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
