@@ -178,6 +178,23 @@ var _ = Describe("GitTrack Suite", func() {
 			})
 		})
 
+		Context("with a cluster scoped resource", func() {
+			BeforeEach(func() {
+				createInstance(instance, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42")
+				// Wait for reconcile for creating the GitTrack resource
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for creating the GitTrackObject resources
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			})
+
+			It("creates ClusterGitTrackObject", func() {
+				nsCGto := &farosv1alpha1.ClusterGitTrackObject{}
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "namespace-test", Namespace: ""}, nsCGto)
+				}, timeout).Should(Succeed())
+			})
+		})
+
 		Context("with an invalid Reference", func() {
 			BeforeEach(func() {
 				createInstance(instance, "does-not-exist")
