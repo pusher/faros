@@ -211,6 +211,22 @@ func newGitTrackObject(name string, u *unstructured.Unstructured, labels map[str
 	}
 }
 
+// newClusterGitTrackObject initializes a ClusterGitTrackObject from a name and an Unstructured
+func newClusterGitTrackObject(name string, u *unstructured.Unstructured, labels map[string]string) *farosv1alpha1.ClusterGitTrackObject {
+	data, _ := u.MarshalJSON()
+	return &farosv1alpha1.ClusterGitTrackObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: farosv1alpha1.GitTrackObjectSpec{
+			Name: u.GetName(),
+			Kind: u.GetKind(),
+			Data: data,
+		},
+	}
+}
+
 // objectName constructs a name from an Unstructured object
 func objectName(u *unstructured.Unstructured) string {
 	return strings.ToLower(fmt.Sprintf("%s-%s", u.GetKind(), u.GetName()))
@@ -218,6 +234,13 @@ func objectName(u *unstructured.Unstructured) string {
 
 // handleObject either creates or updates a GitTrackObject
 func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
+	if u.GetNamespace() == "" {
+		return r.handleNonNamespacedObject(u, owner)
+	}
+	return r.handleNamespacedObject(u, owner)
+}
+
+func (r *ReconcileGitTrack) handleNamespacedObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
 	name := objectName(u)
 	gto := newGitTrackObject(name, u, makeLabels(owner))
 	if err := controllerutil.SetControllerReference(owner, gto, r.scheme); err != nil {
@@ -248,9 +271,40 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	return successResult(name)
 }
 
+func (r *ReconcileGitTrack) handleNonNamespacedObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
+	name := objectName(u)
+	gto := newClusterGitTrackObject(name, u, makeLabels(owner))
+	if err := controllerutil.SetControllerReference(owner, gto, r.scheme); err != nil {
+		return errorResult(name, err)
+	}
+	found := &farosv1alpha1.ClusterGitTrackObject{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: gto.Name}, found)
+	if err != nil && errors.IsNotFound(err) {
+		log.Printf("Creating ClusterGitTrackObject for '%s'\n", name)
+		if err = r.Create(context.TODO(), gto); err != nil {
+			return errorResult(name, fmt.Errorf("failed to create ClusterGitTrackObject for '%s': %v", name, err))
+		}
+		return successResult(name)
+	} else if err != nil {
+		return errorResult(name, fmt.Errorf("failed to get ClusterGitTrackObject for '%s': %v", name, err))
+	}
+
+	childUpdated, err := r.updateChild(found, gto)
+	if err != nil {
+		return errorResult(name, fmt.Errorf("failed to update child resource: %v", err))
+	}
+	if childUpdated {
+		log.Printf("Updating ClusterGitTrackObject for '%s'\n", name)
+		if err = r.Update(context.TODO(), found); err != nil {
+			return errorResult(name, fmt.Errorf("failed to update ClusterGitTrackObject for '%s': %v", name, err))
+		}
+	}
+	return successResult(name)
+}
+
 // UpdateChild compares the two GitTrackObjects and updates the foundGTO if the
 // childGTO
-func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO *farosv1alpha1.GitTrackObject) (bool, error) {
+func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) (bool, error) {
 	// Convert the GitTrackObjects to unstructured
 	found := &unstructured.Unstructured{}
 	err := r.scheme.Convert(foundGTO, found, nil)
