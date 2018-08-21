@@ -17,7 +17,6 @@ limitations under the License.
 package gittrack
 
 import (
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -39,8 +38,28 @@ var instance *farosv1alpha1.GitTrack
 var requests chan reconcile.Request
 var stop chan struct{}
 
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "example", Namespace: "default"}}
-var gtKey = types.NamespacedName{Name: "example", Namespace: "default"}
+var key = types.NamespacedName{Name: "example", Namespace: "default"}
+var expectedRequest = reconcile.Request{NamespacedName: key}
+var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
+	gt.Spec.Reference = ref
+	err := c.Create(context.TODO(), gt)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+var gcInstance = func(key types.NamespacedName) {
+	gt := &farosv1alpha1.GitTrack{}
+	Eventually(func() error { return c.Get(context.TODO(), key, gt) }, timeout).Should(Succeed())
+	err := c.Delete(context.TODO(), gt)
+	Expect(err).NotTo(HaveOccurred())
+	// GC isn't run in the control-plane so guess we'll have to clean up manually
+	gtos := &farosv1alpha1.GitTrackObjectList{}
+	err = c.List(context.TODO(), client.InNamespace(gt.Namespace), gtos)
+	Expect(err).NotTo(HaveOccurred())
+	for _, gto := range gtos.Items {
+		err = c.Delete(context.TODO(), &gto)
+		Expect(err).NotTo(HaveOccurred())
+	}
+}
 
 const timeout = time.Second * 5
 
@@ -57,53 +76,41 @@ var _ = Describe("GitTrack Suite", func() {
 		recFn, requests = SetupTestReconcile(newReconciler(mgr))
 		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
 		stop = StartTestManager(mgr)
+		instance = &farosv1alpha1.GitTrack{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example",
+				Namespace: "default",
+			},
+			Spec: farosv1alpha1.GitTrackSpec{Repository: repositoryURL}}
 	})
 
 	AfterEach(func() {
+		gcInstance(key)
 		close(stop)
 	})
 
 	Context("When a GitTrack resource is created", func() {
 		Context("with a valid Spec", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "a14443638218c782b84cae56a14f1090ee9e5c9c"}}
-				// Create the GitTrack object and expect the Reconcile and Deployment to be created
-				err := c.Create(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 				// Wait for reconcile for creating the GitTrack resource
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for creating the GitTrackObject resources
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			})
 
-			AfterEach(func() {
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
-				err := c.Delete(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
-				// GC isn't run in the control-plane so guess we'll have to clean up manually
-				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
-				Expect(err).NotTo(HaveOccurred())
-				for _, gto := range gtos.Items {
-					err = c.Delete(context.TODO(), &gto)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-
 			It("updates its status", func() {
-				gt := &farosv1alpha1.GitTrack{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				two, zero := int64(2), int64(0)
-				Expect(gt.Status.ObjectsDiscovered).To(Equal(two))
-				Expect(gt.Status.ObjectsApplied).To(Equal(two))
-				Expect(gt.Status.ObjectsIgnored).To(Equal(zero))
-				Expect(gt.Status.ObjectsInSync).To(Equal(zero))
+				Expect(instance.Status.ObjectsDiscovered).To(Equal(two))
+				Expect(instance.Status.ObjectsApplied).To(Equal(two))
+				Expect(instance.Status.ObjectsIgnored).To(Equal(zero))
+				Expect(instance.Status.ObjectsInSync).To(Equal(zero))
 			})
 
 			It("sets the status conditions", func() {
-				gt := &farosv1alpha1.GitTrack{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
-				conditions := gt.Status.Conditions
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				conditions := instance.Status.Conditions
 				Expect(len(conditions)).To(Equal(4))
 				parseErrorCondition := conditions[0]
 				gitErrorCondition := conditions[1]
@@ -152,30 +159,12 @@ var _ = Describe("GitTrack Suite", func() {
 		})
 
 		Context("with multi-document YAML", func() {
-			// 61940ab417e30cf81d3bf488b6e03cfe881e9557
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "9bf412f0e893c8c1624bb1c523cfeca8243534bc"}}
-				// Create the GitTrack object and expect the Reconcile and Deployment to be created
-				err := c.Create(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
+				createInstance(instance, "9bf412f0e893c8c1624bb1c523cfeca8243534bc")
 				// Wait for reconcile for creating the GitTrack resource
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for creating the GitTrackObject resources
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-			})
-
-			AfterEach(func() {
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
-				err := c.Delete(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
-				// GC isn't run in the control-plane so guess we'll have to clean up manually
-				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
-				Expect(err).NotTo(HaveOccurred())
-				for _, gto := range gtos.Items {
-					err = c.Delete(context.TODO(), &gto)
-					Expect(err).NotTo(HaveOccurred())
-				}
 			})
 
 			It("creates GitTrackObjects", func() {
@@ -191,25 +180,17 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with an invalid Reference", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "does-not-exist"}}
-				err := c.Create(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
+				createInstance(instance, "does-not-exist")
 				// Wait for reconcile for creating the GitTrack resource
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for updating status
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			})
 
-			AfterEach(func() {
-				err := c.Delete(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
 			It("updates the FilesFetched condition", func() {
-				gt := &farosv1alpha1.GitTrack{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
-				c := gt.Status.Conditions[1]
+				c := instance.Status.Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
@@ -222,25 +203,18 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with an invalid SubPath", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "master", SubPath: "does-not-exist"}}
-				err := c.Create(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
+				instance.Spec.SubPath = "does-not-exist"
+				createInstance(instance, "master")
 				// Wait for reconcile for creating the GitTrack resource
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for updating status
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			})
 
-			AfterEach(func() {
-				err := c.Delete(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
 			It("updates the FilesFetched condition", func() {
-				gt := &farosv1alpha1.GitTrack{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, gt) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
-				c := gt.Status.Conditions[1]
+				c := instance.Status.Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
@@ -255,32 +229,16 @@ var _ = Describe("GitTrack Suite", func() {
 	Context("When a GitTrack resource is updated", func() {
 		Context("and resources are added to the repository", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "28928ccaeb314b96293e18cc8889997f0f46b79b"}}
-				err := c.Create(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
+				createInstance(instance, "28928ccaeb314b96293e18cc8889997f0f46b79b")
 				// wait for reconcile for creating the GitTrack resource
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// wait for reconcile for creating the GitTrackObject resources
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			})
 
-			AfterEach(func() {
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
-				err := c.Delete(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
-				// GC isn't run in the control-plane so guess we'll have to clean up manually
-				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
-				Expect(err).NotTo(HaveOccurred())
-				for _, gto := range gtos.Items {
-					err = c.Delete(context.TODO(), &gto)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-
 			It("creates the new resources", func() {
 				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("28928ccaeb314b96293e18cc8889997f0f46b79b"))
 
 				Eventually(func() error {
@@ -294,7 +252,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "ingress-example", Namespace: "default"}, after)
@@ -304,32 +262,16 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("and resources are removed from the repository", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "4532b487a5aaf651839f5401371556aa16732a6e"}}
-				err := c.Create(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
+				createInstance(instance, "4532b487a5aaf651839f5401371556aa16732a6e")
 				// wait for reconcile for creating the GitTrack resource
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// wait for reconcile for creating the GitTrackObject resources
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			})
 
-			AfterEach(func() {
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
-				err := c.Delete(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
-				// GC isn't run in the control-plane so guess we'll have to clean up manually
-				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
-				Expect(err).NotTo(HaveOccurred())
-				for _, gto := range gtos.Items {
-					err = c.Delete(context.TODO(), &gto)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-
 			It("deletes the removed resources", func() {
 				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
 
 				Eventually(func() error {
@@ -343,7 +285,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, after)
@@ -351,7 +293,7 @@ var _ = Describe("GitTrack Suite", func() {
 			})
 
 			It("doesn't delete any other resources", func() {
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
 
 				Eventually(func() error {
@@ -365,7 +307,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
@@ -380,32 +322,16 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("and resources in the repository are updated", func() {
 			BeforeEach(func() {
-				instance = &farosv1alpha1.GitTrack{ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: "default"}, Spec: farosv1alpha1.GitTrackSpec{Repository: fmt.Sprintf("file://%s/fixtures", repositoryPath), Reference: "a14443638218c782b84cae56a14f1090ee9e5c9c"}}
-				err := c.Create(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 				// wait for reconcile for creating the GitTrack resource
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// wait for reconcile for creating the GitTrackObject resources
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			})
 
-			AfterEach(func() {
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
-				err := c.Delete(context.TODO(), instance)
-				Expect(err).NotTo(HaveOccurred())
-				// GC isn't run in the control-plane so guess we'll have to clean up manually
-				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
-				Expect(err).NotTo(HaveOccurred())
-				for _, gto := range gtos.Items {
-					err = c.Delete(context.TODO(), &gto)
-					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-
 			It("updates the updated resources", func() {
 				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
 
 				Eventually(func() error {
@@ -419,7 +345,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, after)
@@ -429,7 +355,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("doesn't modify any other resources", func() {
 				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
 
 				Eventually(func() error {
@@ -443,7 +369,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), gtKey, instance) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, after)
@@ -456,9 +382,127 @@ var _ = Describe("GitTrack Suite", func() {
 		})
 
 		Context("and the reference is invalid", func() {
+			BeforeEach(func() {
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				// wait for reconcile for creating the GitTrack resource
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// wait for reconcile for creating the GitTrackObject resources
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			})
+
+			It("does not update any of the resources", func() {
+				deployBefore, deployAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				serviceBefore, serviceAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+				instance.Spec.Reference = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployAfter)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceAfter)
+				}, timeout).Should(Succeed())
+
+				Expect(deployBefore).To(Equal(deployAfter))
+				Expect(serviceBefore).To(Equal(serviceAfter))
+			})
+
+			It("updates the FilesFetched condition", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				instance.Spec.Reference = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				// TODO: don't rely on ordering
+				c := instance.Status.Conditions[1]
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
+				Expect(c.Message).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
+			})
 		})
 
 		Context("and the subPath is invalid", func() {
+			BeforeEach(func() {
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				// wait for reconcile for creating the GitTrack resource
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// wait for reconcile for creating the GitTrackObject resources
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			})
+
+			It("does not update any of the resources", func() {
+				deployBefore, deployAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				serviceBefore, serviceAfter := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceBefore)
+				}, timeout).Should(Succeed())
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+				instance.Spec.SubPath = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployAfter)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceAfter)
+				}, timeout).Should(Succeed())
+
+				Expect(deployBefore).To(Equal(deployAfter))
+				Expect(serviceBefore).To(Equal(serviceAfter))
+			})
+
+			It("updates the FilesFetched condition", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				instance.Spec.SubPath = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				// TODO: don't rely on ordering
+				c := instance.Status.Conditions[1]
+				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
+				Expect(c.Message).To(Equal("no files for subpath 'does-not-exist'"))
+			})
 		})
 	})
 
