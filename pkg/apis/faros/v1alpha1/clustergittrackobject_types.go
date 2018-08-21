@@ -34,6 +34,16 @@ type ClusterGitTrackObject struct {
 	Status GitTrackObjectStatus `json:"status,omitempty"`
 }
 
+// GetSpec implements the GitTrackObject interface
+func (g *ClusterGitTrackObject) GetSpec() GitTrackObjectSpec {
+	return g.Spec
+}
+
+// GetStatus implements the GitTrackObject interface
+func (g *ClusterGitTrackObject) GetStatus() GitTrackObjectStatus {
+	return g.Status
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient:nonNamespaced
 
