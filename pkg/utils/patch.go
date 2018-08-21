@@ -82,7 +82,7 @@ func createThreeWayMergePatch(found, child *unstructured.Unstructured) ([]byte, 
 	}
 	foundJSON, childJSON, originalJSON, err := getJSON(found, child, original)
 	if err != nil {
-		return nil, fmt.Errorf("error getting json: %v", err)
+		return nil, fmt.Errorf("error getting JSON: %v", err)
 	}
 
 	patch, err := createThreeWayJSONMergePatch(originalJSON, childJSON, foundJSON)
@@ -100,11 +100,11 @@ func getJSON(found, child, original *unstructured.Unstructured) ([]byte, []byte,
 	}
 	childJSON, err := child.MarshalJSON()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to marshal found JSON: %v", err)
+		return nil, nil, nil, fmt.Errorf("unable to marshal child JSON: %v", err)
 	}
 	originalJSON, err := original.MarshalJSON()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to marshal found JSON: %v", err)
+		return nil, nil, nil, fmt.Errorf("unable to marshal original JSON: %v", err)
 	}
 	return foundJSON, childJSON, originalJSON, nil
 }

@@ -59,12 +59,12 @@ var _ = Describe("createThreeWayJSONMergePatch", func() {
 	It("should converge to modifed when all are different", func() {
 		testCreateThreeWayJSONMergePatch(nameFoo, nameBazWithExtra, nameBarWithExtra, replaceNameBazReplaceExtraExtra)
 	})
-	It("should throw an error when invalid JSON is passed in", func() {
+	It("should return an error when invalid JSON is passed in", func() {
 		testCreateThreeWayJSONMergePatchError(invalid, nameFoo, nameFooWithExtra)
 		testCreateThreeWayJSONMergePatchError(nameFooWithExtra, invalid, nameFoo)
 		testCreateThreeWayJSONMergePatchError(nameFoo, nameFooWithExtra, invalid)
 	})
-	It("should throw an error when JSON types mismatch", func() {
+	It("should return an error when JSON types mismatch", func() {
 		testCreateThreeWayJSONMergePatchError(nameFooWithExtraAsArray, nameFoo, nameFooWithExtra)
 		testCreateThreeWayJSONMergePatchError(nameFooWithExtra, nameFooWithExtraAsArray, nameFoo)
 		testCreateThreeWayJSONMergePatchError(nameFoo, nameFooWithExtra, nameFooWithExtraAsArray)
