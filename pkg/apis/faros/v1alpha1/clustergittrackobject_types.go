@@ -20,21 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// ClusterGitTrackObjectSpec defines the desired state of ClusterGitTrackObject
-type ClusterGitTrackObjectSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
-
-// ClusterGitTrackObjectStatus defines the observed state of ClusterGitTrackObject
-type ClusterGitTrackObjectStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient:nonNamespaced
@@ -45,8 +30,8 @@ type ClusterGitTrackObject struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterGitTrackObjectSpec   `json:"spec,omitempty"`
-	Status ClusterGitTrackObjectStatus `json:"status,omitempty"`
+	Spec   GitTrackObjectSpec   `json:"spec,omitempty"`
+	Status GitTrackObjectStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
