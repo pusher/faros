@@ -22,7 +22,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"reflect"
 	"syscall"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
@@ -236,9 +235,17 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	// Check if the Child already exists
 	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
+		found = child.DeepCopy()
+		err = utils.SetLastAppliedAnnotation(found, child)
+		if err != nil {
+			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
+			opts.inSyncError = fmt.Errorf("unable to set annotation: %v", err)
+			return reconcile.Result{}, opts.inSyncError
+		}
+
 		// Not found, so create child
 		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-		err = r.Create(context.TODO(), child)
+		err = r.Create(context.TODO(), found)
 		if err != nil {
 			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
 			opts.inSyncError = fmt.Errorf("unable to create child: %v", err)
@@ -253,13 +260,19 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// Update the object if the spec differs from the version running
-	childUpdated, err := updateChildResource(found, child)
+	childUpdated, err := utils.UpdateChildResource(found, child)
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
 		opts.inSyncError = fmt.Errorf("unable to update child: %v", err)
 		return reconcile.Result{}, opts.inSyncError
 	}
 	if childUpdated {
+		err := utils.SetLastAppliedAnnotation(found, child)
+		if err != nil {
+			opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
+			opts.inSyncError = fmt.Errorf("error setting last applied annotation: %v", err)
+			return reconcile.Result{}, opts.inSyncError
+		}
 		// Update the child resource on the API
 		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Update(context.TODO(), found)
@@ -271,36 +284,4 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	return reconcile.Result{}, nil
-}
-
-// updateChildResource compares the found object with the child object and
-// updates the found object if necessary.
-func updateChildResource(found, child *unstructured.Unstructured) (updated bool, err error) {
-	spec, err := updateField(found, child, "spec")
-	if err != nil {
-		return false, fmt.Errorf("unable to update spec: %v", err)
-	}
-	meta, err := updateField(found, child, "metadata")
-	if err != nil {
-		return false, fmt.Errorf("unable to update metadata: %v", err)
-	}
-	return spec || meta, nil
-}
-
-// updateField compares a field within two unstructured object's maps,
-// then updates the `found` resource to match the `child` if they do not match.
-func updateField(found, child *unstructured.Unstructured, field string) (updated bool, err error) {
-	var c, f interface{}
-	var ok bool
-	if c, ok = child.UnstructuredContent()[field]; !ok {
-		return false, fmt.Errorf("child has no field %s", field)
-	}
-	if f, ok = found.UnstructuredContent()[field]; !ok {
-		return false, fmt.Errorf("found has no field %s", field)
-	}
-	if !reflect.DeepEqual(c, f) {
-		found.UnstructuredContent()[field] = c
-		updated = true
-	}
-	return updated, nil
 }

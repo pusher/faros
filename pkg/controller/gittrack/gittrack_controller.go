@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"reflect"
 	"strings"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
@@ -236,14 +235,58 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return errorResult(name, fmt.Errorf("failed to get GitTrackObject for '%s': %v", name, err))
 	}
 
-	if !reflect.DeepEqual(gto.Spec, found.Spec) {
-		found.Spec = gto.Spec
+	childUpdated, err := r.updateChild(found, gto)
+	if err != nil {
+		return errorResult(name, fmt.Errorf("failed to update child resource: %v", err))
+	}
+	if childUpdated {
 		log.Printf("Updating GitTrackObject for '%s'\n", name)
 		if err = r.Update(context.TODO(), found); err != nil {
 			return errorResult(name, fmt.Errorf("failed to update GitTrackObject for '%s': %v", name, err))
 		}
 	}
 	return successResult(name)
+}
+
+// UpdateChild compares the two GitTrackObjects and updates the foundGTO if the
+// childGTO
+func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO *farosv1alpha1.GitTrackObject) (bool, error) {
+	// Convert the GitTrackObjects to unstructured
+	found := &unstructured.Unstructured{}
+	err := r.scheme.Convert(foundGTO, found, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to convert found GitTrackObject to Unstructured: %v", err)
+	}
+	child := &unstructured.Unstructured{}
+	err = r.scheme.Convert(childGTO, child, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to convert child GitTrackObject to Unstructured: %v", err)
+	}
+
+	// Compare and update the resources
+	childUpdated, err := utils.UpdateChildResource(found, child)
+	if err != nil {
+		return false, fmt.Errorf("error updating child resource: %v", err)
+	}
+
+	// Child wasn't updated, nothing to do now
+	if !childUpdated {
+		return false, nil
+	}
+
+	// Set the last applied annotation
+	err = utils.SetLastAppliedAnnotation(found, child)
+	if err != nil {
+		return false, fmt.Errorf("error applying last applied annotation: %v", err)
+	}
+
+	// Convert Found back to a structured GTO
+	err = r.scheme.Convert(found, foundGTO, nil)
+	if err != nil {
+		return false, fmt.Errorf("error converting object to structured: %v", err)
+	}
+
+	return true, nil
 }
 
 // deleteResources deletes any resources that are present in the given map

@@ -21,6 +21,12 @@
   version = "v10.15.2"
 
 [[projects]]
+  name = "github.com/benjamintf1/unmarshalledmatchers"
+  packages = ["."]
+  revision = "f49d1795d752929500b8ed2289f1e21f10414667"
+  version = "1.0.0"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -53,6 +59,12 @@
   ]
   revision = "f6c17b524822278a87e3b3bd809fec33b51f5b46"
   version = "v1.9.0"
+
+[[projects]]
+  name = "github.com/evanphx/json-patch"
+  packages = ["."]
+  revision = "afac545df32f2287a079e2dfb7ba2745a643747e"
+  version = "v3.0.0"
 
 [[projects]]
   name = "github.com/ghodss/yaml"
@@ -250,6 +262,12 @@
   packages = ["."]
   revision = "dd7de90c06bca70f18136e59dec2270c19a401e7"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mattbaird/jsonpatch"
+  packages = ["."]
+  revision = "81af80346b1a01caae0cbc27fd3c1ba5b11e189f"
 
 [[projects]]
   branch = "master"
@@ -957,6 +975,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "feb3e3caa410f8e246939789208549f9d34c3f6129546d32243643e27e130910"
+  inputs-digest = "fcfe7503f96587bed355a4ba60da9ed9cfec4f91aba61a87137c723bb0190a79"
   solver-name = "gps-cdcl"
   solver-version = 1
