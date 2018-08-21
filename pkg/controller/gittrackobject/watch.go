@@ -21,11 +21,10 @@ import (
 	"log"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	"github.com/pusher/faros/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers/internalinterfaces"
@@ -67,7 +66,7 @@ func (r *ReconcileGitTrackObject) newInformerFromObject(obj unstructured.Unstruc
 	gvk := obj.GetObjectKind().GroupVersionKind()
 
 	// Get API Resource and namespaced
-	gvr, namespaced, err := r.getAPIResource(gvk)
+	gvr, namespaced, err := utils.GetAPIResource(r.restMapper, gvk)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get API Resource: %v", err)
 	}
@@ -90,17 +89,6 @@ func (r *ReconcileGitTrackObject) newInformerFromObject(obj unstructured.Unstruc
 		},
 		tweakOptions,
 	), nil
-}
-
-// getAPIResource uses a rest mapper to get the GroupVersionResource and
-// determine whether an object is namespaced or not
-func (r *ReconcileGitTrackObject) getAPIResource(gvk schema.GroupVersionKind) (schema.GroupVersionResource, bool, error) {
-	fqKind := schema.FromAPIVersionAndKind(gvk.ToAPIVersionAndKind())
-	mapping, err := r.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
-	if err != nil {
-		return schema.GroupVersionResource{}, false, fmt.Errorf("unable to get REST mapping: %v", err)
-	}
-	return mapping.Resource, mapping.Scope == meta.RESTScopeNamespace, nil
 }
 
 // newSharedIndexInformer constructs a new SharedIndexInformer for the object.
