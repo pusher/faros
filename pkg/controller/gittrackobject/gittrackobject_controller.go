@@ -29,6 +29,7 @@ import (
 	"github.com/pusher/faros/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -93,6 +94,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to ClusterGitTrackObject
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for events on the reconciler's eventStream channel
 	if gtoReconciler, ok := r.(Reconciler); ok {
 		src := &source.Channel{
@@ -152,7 +159,7 @@ func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 // +kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	instance := &farosv1alpha1.GitTrackObject{}
+	var instance farosv1alpha1.GitTrackObjectInterface
 	opts := newStatusOpts()
 
 	// Update the GitTrackObject status when we leave this function
@@ -169,15 +176,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		}
 	}()
 
-	// Fetch the GitTrackObject instance
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	instance, err := r.getInstance(request)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
-
-			// Set instance to nil so we don't update the status
-			instance = nil
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -186,7 +189,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 	// Generate the child from the spec
 	child := &unstructured.Unstructured{}
-	*child, err = utils.YAMLToUnstructured(instance.Spec.Data)
+	*child, err = utils.YAMLToUnstructured(instance.GetSpec().Data)
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
 		opts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
@@ -202,8 +205,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, opts.inSyncError
 	}
 
-	// Add an owner reference to the child object
-	err = controllerutil.SetControllerReference(instance, child, r.scheme)
+	err = r.setControllerReference(instance, child, r.scheme)
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorAddingOwnerReference
 		opts.inSyncError = fmt.Errorf("unable to add owner reference: %v", err)
@@ -267,4 +269,42 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// getInstance fetches the requested (Cluster)GitTrackObject from the API server
+func (r *ReconcileGitTrackObject) getInstance(request reconcile.Request) (farosv1alpha1.GitTrackObjectInterface, error) {
+	if request.Namespace != "" {
+		// Fetch the GitTrackObject instance
+		instance := &farosv1alpha1.GitTrackObject{}
+		err := r.Get(context.TODO(), request.NamespacedName, instance)
+		if err != nil {
+			return nil, err
+		}
+		return instance, nil
+	}
+
+	// Fetch the ClusterGitTrackObject instance
+	instance := &farosv1alpha1.ClusterGitTrackObject{}
+	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	if err != nil {
+		return nil, err
+	}
+	return instance, nil
+}
+
+// setControllerReference sets the controller reference for the
+// (Cluster)GitTrackObject
+func (r *ReconcileGitTrackObject) setControllerReference(owner farosv1alpha1.GitTrackObjectInterface, object v1.Object, scheme *runtime.Scheme) error {
+	// Add an owner reference to the child object
+	switch t := owner.(type) {
+	case *farosv1alpha1.GitTrackObject:
+		g := owner.(*farosv1alpha1.GitTrackObject)
+		return controllerutil.SetControllerReference(g, object, scheme)
+	case *farosv1alpha1.ClusterGitTrackObject:
+		g := owner.(*farosv1alpha1.ClusterGitTrackObject)
+		return controllerutil.SetControllerReference(g, object, scheme)
+	default:
+		return fmt.Errorf("unknown type: %s", t)
+	}
+
 }

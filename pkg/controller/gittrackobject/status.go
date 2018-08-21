@@ -44,6 +44,23 @@ func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, opts *statusO
 	if gto == nil {
 		return false
 	}
+	status := gto.GetStatus()
+
+	setCondition(&status, farosv1alpha1.ObjectInSyncType, opts.inSyncError, opts.inSyncReason)
+
+	if !reflect.DeepEqual(gto.Status, status) {
+		gto.Status = status
+		return true
+	}
+	return false
+}
+
+// updateClusterGitTrackObjectStatus updates the ClsuterGitTrackObject's status
+// field if any condition has changed.
+func updateClusterGitTrackObjectStatus(gto *farosv1alpha1.ClusterGitTrackObject, opts *statusOpts) bool {
+	if gto == nil {
+		return false
+	}
 	status := gto.Status
 
 	setCondition(&status, farosv1alpha1.ObjectInSyncType, opts.inSyncError, opts.inSyncReason)
@@ -80,18 +97,36 @@ func setCondition(status *farosv1alpha1.GitTrackObjectStatus, condType farosv1al
 
 // updateStatus calculates a new status for the GitTrackObject and then updates
 // the resource on the API if the status differs from before.
-func (r *ReconcileGitTrackObject) updateStatus(original *farosv1alpha1.GitTrackObject, opts *statusOpts) error {
+func (r *ReconcileGitTrackObject) updateStatus(original farosv1alpha1.GitTrackObjectInterface, opts *statusOpts) error {
 	// Update the GitTrackObject's status
-	gto := original.DeepCopy()
-	gtoUpdated := updateGitTrackObjectStatus(gto, opts)
-
-	// If the status was modified, update the GitTrackObject on the API
-	if gtoUpdated {
-		log.Printf("Updating GitTrackObject %s status", gto.Name)
-		err := r.Update(context.TODO(), gto)
-		if err != nil {
-			return fmt.Errorf("unable to update GitTrackObject: %v", err)
+	switch t := original.(type) {
+	case *farosv1alpha1.GitTrackObject:
+		g := original.(*farosv1alpha1.GitTrackObject).DeepCopy()
+		gtoUpdated := updateGitTrackObjectStatus(g, opts)
+		// If the status was modified, update the GitTrackObject on the API
+		if gtoUpdated {
+			log.Printf("Updating GitTrackObject %s status", g.Name)
+			err := r.Update(context.TODO(), g)
+			if err != nil {
+				return fmt.Errorf("unable to update GitTrackObject: %v", err)
+			}
 		}
+	case *farosv1alpha1.ClusterGitTrackObject:
+		g := original.(*farosv1alpha1.ClusterGitTrackObject).DeepCopy()
+		gtoUpdated := updateClusterGitTrackObjectStatus(g, opts)
+		// If the status was modified, update the GitTrackObject on the API
+		if gtoUpdated {
+			log.Printf("Updating ClusterGitTrackObject %s status", g.Name)
+			err := r.Update(context.TODO(), g)
+			if err != nil {
+				return fmt.Errorf("unable to update ClusterGitTrackObject: %v", err)
+			}
+		}
+	case nil:
+		// If the object is nil, don't do anything
+		return nil
+	default:
+		return fmt.Errorf("unknown type: %s", t)
 	}
 	return nil
 }
