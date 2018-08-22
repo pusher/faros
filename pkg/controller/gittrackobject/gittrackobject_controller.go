@@ -106,11 +106,26 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			Source: gtoReconciler.EventStream(),
 		}
 		src.InjectStopChannel(gtoReconciler.StopChan())
+
+		restMapper, err := utils.NewRestMapper(mgr.GetConfig())
+		if err != nil {
+			msg := fmt.Sprintf("unable to create new RESTMapper: %v", err)
+			log.Printf(msg)
+			return fmt.Errorf(msg)
+		}
+
 		// When an event is received, queue the event's owner for reconciliation
 		err = c.Watch(src,
-			&handler.EnqueueRequestForOwner{
-				IsController: true,
-				OwnerType:    &farosv1alpha1.GitTrackObject{},
+			&gittrackobjectutils.EnqueueRequestForOwner{
+				NamespacedEnqueueRequestForOwner: &handler.EnqueueRequestForOwner{
+					IsController: true,
+					OwnerType:    &farosv1alpha1.GitTrackObject{},
+				},
+				NonNamespacedEnqueueRequestForOwner: &handler.EnqueueRequestForOwner{
+					IsController: true,
+					OwnerType:    &farosv1alpha1.ClusterGitTrackObject{},
+				},
+				RestMapper: restMapper,
 			},
 		)
 		if err != nil {
