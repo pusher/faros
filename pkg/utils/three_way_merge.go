@@ -23,6 +23,10 @@ import (
 	"github.com/mattbaird/jsonpatch"
 )
 
+var blacklistedPaths = []string{
+	"/metadata/creationTimestamp",
+}
+
 // createThreeWayJSONMergePatch takes three JSON documents and compares them.
 // It retures a JSON patch document which will merge changes to the modified
 // document into the current document.
@@ -43,6 +47,7 @@ func createThreeWayJSONMergePatch(original, modified, current []byte) ([]byte, e
 	}
 	// Only keep addition and changes
 	addAndChange = keepOrDeleteRemoveInPatch(addAndChange, false)
+	addAndChange = filterBlacklistedPaths(addAndChange)
 
 	del, err := jsonpatch.CreatePatch(original, modified)
 	if err != nil {
@@ -76,6 +81,27 @@ func keepOrDeleteRemoveInPatch(patch []jsonpatch.JsonPatchOperation, keepRemove 
 	}
 
 	return filteredPatch
+}
+
+// filterBlacklistedPaths filters (blacklisted) paths from the given slice of operations
+func filterBlacklistedPaths(patch []jsonpatch.JsonPatchOperation) []jsonpatch.JsonPatchOperation {
+	allowed := []jsonpatch.JsonPatchOperation{}
+	for _, po := range patch {
+		if ok := allowedPath(po.Path); ok {
+			allowed = append(allowed, po)
+		}
+	}
+	return allowed
+}
+
+// allowedPath returns whether a path is blacklisted or not
+func allowedPath(p string) bool {
+	for _, bp := range blacklistedPaths {
+		if p == bp {
+			return false
+		}
+	}
+	return true
 }
 
 // mergePatchToJSON adds creates a JSON patch document with all paths from
