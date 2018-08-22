@@ -17,6 +17,8 @@ var (
 	nameBar                         = `{"name":"bar"}`
 	nameFooWithExtra                = `{"name":"foo","extra":"field"}`
 	nameFooWithExtraAsArray         = `{"name":"foo","extra":["sub":"field"]}`
+	nameFooWithBlacklisted          = `{"name":"foo","metadata":{"creationTimestamp":null}}`
+	nameFooWithTimestamp            = `{"name":"foo","metadata":{"creationTimestamp":"123"}}`
 	nameBarWithExtra                = `{"name":"bar","extra":"field"}`
 	nameBazWithExtra                = `{"name":"baz","extra":"extra"}`
 	addExtra                        = `[{"op":"add","path":"/extra","value":"field"}]`
@@ -56,6 +58,10 @@ var _ = Describe("createThreeWayJSONMergePatch", func() {
 		})
 	})
 
+	It("should filter blacklisted paths", func() {
+		testCreateThreeWayJSONMergePatch(nameFoo, nameFooWithBlacklisted, nameFooWithTimestamp, emptyPatch)
+	})
+
 	It("should converge to modifed when all are different", func() {
 		testCreateThreeWayJSONMergePatch(nameFoo, nameBazWithExtra, nameBarWithExtra, replaceNameBazReplaceExtraExtra)
 	})
@@ -69,7 +75,6 @@ var _ = Describe("createThreeWayJSONMergePatch", func() {
 		testCreateThreeWayJSONMergePatchError(nameFooWithExtra, nameFooWithExtraAsArray, nameFoo)
 		testCreateThreeWayJSONMergePatchError(nameFoo, nameFooWithExtra, nameFooWithExtraAsArray)
 	})
-
 })
 
 var testCreateThreeWayJSONMergePatch = func(original, modified, current, expect string) {
