@@ -358,10 +358,10 @@
   version = "v0.8.0"
 
 [[projects]]
-  branch = "privatekey"
   name = "github.com/pusher/git-store"
   packages = ["."]
-  revision = "470beb7c188f7060c49403c5f0dfe165d86420e4"
+  revision = "ecade8d57b8cb845005d136c112d11fe39157429"
+  version = "v0.2.0"
 
 [[projects]]
   name = "github.com/sergi/go-diff"
@@ -975,6 +975,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fcfe7503f96587bed355a4ba60da9ed9cfec4f91aba61a87137c723bb0190a79"
+  inputs-digest = "7569bd34d69e4fa2005a01741a2ab2a567cb3b26bbe4a8fac6c16d173d4b4d26"
   solver-name = "gps-cdcl"
   solver-version = 1
