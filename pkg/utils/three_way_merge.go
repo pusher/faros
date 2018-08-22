@@ -83,25 +83,25 @@ func keepOrDeleteRemoveInPatch(patch []jsonpatch.JsonPatchOperation, keepRemove 
 	return filteredPatch
 }
 
-// filterBlacklistedPaths filters blacklisted paths from the given slice of operations
+// filterBlacklistedPaths filters (blacklisted) paths from the given slice of operations
 func filterBlacklistedPaths(patch []jsonpatch.JsonPatchOperation) []jsonpatch.JsonPatchOperation {
 	allowed := []jsonpatch.JsonPatchOperation{}
 	for _, po := range patch {
-		if y := blacklistedPath(po.Path); !y {
+		if ok := allowedPath(po.Path); ok {
 			allowed = append(allowed, po)
 		}
 	}
 	return allowed
 }
 
-// blacklistedPath returns whether a path is blacklisted or not
-func blacklistedPath(p string) bool {
+// allowedPath returns whether a path is blacklisted or not
+func allowedPath(p string) bool {
 	for _, bp := range blacklistedPaths {
 		if p == bp {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // mergePatchToJSON adds creates a JSON patch document with all paths from
