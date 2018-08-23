@@ -204,6 +204,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	// Generate the child from the spec
 	child := &unstructured.Unstructured{}
 	*child, err = utils.YAMLToUnstructured(instance.GetSpec().Data)
+	if child.GetName() == "" {
+		opts.inSyncReason = gittrackobjectutils.ErrorGettingChild
+		opts.inSyncError = fmt.Errorf("unable to get child: name cannot be empty")
+		return reconcile.Result{}, nil
+	}
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
 		opts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
