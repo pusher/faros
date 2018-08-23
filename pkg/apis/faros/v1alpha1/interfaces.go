@@ -16,10 +16,19 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
 // GitTrackObjectInterface represents an interface implemented by both
 // GitTrackObject and ClusterGitTrackObject to allow them to be passed
 // interchangably.
 type GitTrackObjectInterface interface {
+	runtime.Object
+	v1.Object
 	GetSpec() GitTrackObjectSpec
 	GetStatus() GitTrackObjectStatus
+	SetStatus(GitTrackObjectStatus)
+	DeepCopyInterface() GitTrackObjectInterface
 }

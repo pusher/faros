@@ -44,6 +44,16 @@ func (g *ClusterGitTrackObject) GetStatus() GitTrackObjectStatus {
 	return g.Status
 }
 
+// SetStatus implements the GitTrackObject interface
+func (g *ClusterGitTrackObject) SetStatus(s GitTrackObjectStatus) {
+	g.Status = s
+}
+
+// DeepCopyInterface implements the GitTrackObject interface
+func (g *ClusterGitTrackObject) DeepCopyInterface() GitTrackObjectInterface {
+	return g.DeepCopy()
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient:nonNamespaced
 
