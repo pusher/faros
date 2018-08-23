@@ -81,6 +81,31 @@ type GitTrackObject struct {
 	Status GitTrackObjectStatus `json:"status,omitempty"`
 }
 
+// GetSpec implements the GitTrackObject interface
+func (g *GitTrackObject) GetSpec() GitTrackObjectSpec {
+	return g.Spec
+}
+
+// SetSpec implements the GitTrackObject interface
+func (g *GitTrackObject) SetSpec(s GitTrackObjectSpec) {
+	g.Spec = s
+}
+
+// GetStatus implements the GitTrackObject interface
+func (g *GitTrackObject) GetStatus() GitTrackObjectStatus {
+	return g.Status
+}
+
+// SetStatus implements the GitTrackObject interface
+func (g *GitTrackObject) SetStatus(s GitTrackObjectStatus) {
+	g.Status = s
+}
+
+// DeepCopyInterface implements the GitTrackObject interface
+func (g *GitTrackObject) DeepCopyInterface() GitTrackObjectInterface {
+	return g.DeepCopy()
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GitTrackObjectList contains a list of GitTrackObject

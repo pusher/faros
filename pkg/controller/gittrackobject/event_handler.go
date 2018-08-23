@@ -47,10 +47,14 @@ func (e *eventToChannelHandler) OnDelete(obj interface{}) {
 
 // queueEventForObject sends the event onto the channel
 func (e *eventToChannelHandler) queueEventForObject(obj interface{}) {
+	if obj == nil {
+		// Can't do anything here
+		return
+	}
 	var u *unstructured.Unstructured
 	var ok bool
 	if u, ok = obj.(*unstructured.Unstructured); !ok {
-		log.Printf("unable to create unstructured object from interface")
+		log.Printf("unable to create unstructured object from interface: %+v", obj)
 		return
 	}
 

@@ -32,9 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -65,7 +63,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}()
 
 	// Create a restMapper (used by informer to look up resource kinds)
-	restMapper, err := newRestMapper(mgr.GetConfig())
+	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
 	if err != nil {
 		panic(fmt.Errorf("unable to create rest mapper: %v", err))
 	}
@@ -95,17 +93,38 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to ClusterGitTrackObject
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for events on the reconciler's eventStream channel
 	if gtoReconciler, ok := r.(Reconciler); ok {
 		src := &source.Channel{
 			Source: gtoReconciler.EventStream(),
 		}
 		src.InjectStopChannel(gtoReconciler.StopChan())
+
+		restMapper, err := utils.NewRestMapper(mgr.GetConfig())
+		if err != nil {
+			msg := fmt.Sprintf("unable to create new RESTMapper: %v", err)
+			log.Printf(msg)
+			return fmt.Errorf(msg)
+		}
+
 		// When an event is received, queue the event's owner for reconciliation
 		err = c.Watch(src,
-			&handler.EnqueueRequestForOwner{
-				IsController: true,
-				OwnerType:    &farosv1alpha1.GitTrackObject{},
+			&gittrackobjectutils.EnqueueRequestForOwner{
+				NamespacedEnqueueRequestForOwner: &handler.EnqueueRequestForOwner{
+					IsController: true,
+					OwnerType:    &farosv1alpha1.GitTrackObject{},
+				},
+				NonNamespacedEnqueueRequestForOwner: &handler.EnqueueRequestForOwner{
+					IsController: true,
+					OwnerType:    &farosv1alpha1.ClusterGitTrackObject{},
+				},
+				RestMapper: restMapper,
 			},
 		)
 		if err != nil {
@@ -116,21 +135,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	return nil
-}
-
-// newRestMapper creates a restMapper from the discovery client
-func newRestMapper(config *rest.Config) (meta.RESTMapper, error) {
-	client, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create dynamic client: %v", err)
-	}
-
-	apiGroupResources, err := restmapper.GetAPIGroupResources(client)
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch API Group Resources: %v", err)
-	}
-
-	return restmapper.NewDiscoveryRESTMapper(apiGroupResources), nil
 }
 
 // Reconciler allows the test suite to mock the required methods
@@ -169,7 +173,7 @@ func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 // +kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	instance := &farosv1alpha1.GitTrackObject{}
+	var instance farosv1alpha1.GitTrackObjectInterface
 	opts := newStatusOpts()
 
 	// Update the GitTrackObject status when we leave this function
@@ -186,15 +190,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		}
 	}()
 
-	// Fetch the GitTrackObject instance
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	instance, err := r.getInstance(request)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
-
-			// Set instance to nil so we don't update the status
-			instance = nil
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -203,7 +203,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 	// Generate the child from the spec
 	child := &unstructured.Unstructured{}
-	*child, err = utils.YAMLToUnstructured(instance.Spec.Data)
+	*child, err = utils.YAMLToUnstructured(instance.GetSpec().Data)
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
 		opts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
@@ -219,7 +219,6 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, opts.inSyncError
 	}
 
-	// Add an owner reference to the child object
 	err = controllerutil.SetControllerReference(instance, child, r.scheme)
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorAddingOwnerReference
@@ -284,4 +283,21 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// getInstance fetches the requested (Cluster)GitTrackObject from the API server
+func (r *ReconcileGitTrackObject) getInstance(request reconcile.Request) (farosv1alpha1.GitTrackObjectInterface, error) {
+	var instance farosv1alpha1.GitTrackObjectInterface
+	if request.Namespace != "" {
+		instance = &farosv1alpha1.GitTrackObject{}
+	} else {
+		instance = &farosv1alpha1.ClusterGitTrackObject{}
+	}
+
+	// Fetch the ClusterGitTrackObject instance
+	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	if err != nil {
+		return nil, err
+	}
+	return instance, nil
 }

@@ -29,7 +29,7 @@ import (
 	gitstore "github.com/pusher/git-store"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,7 +57,19 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	clientSet := kubernetes.NewForConfigOrDie(mgr.GetConfig())
-	return &ReconcileGitTrack{Client: mgr.GetClient(), scheme: mgr.GetScheme(), store: gitstore.NewRepoStore(clientSet)}
+
+	// Create a restMapper (used by informer to look up resource kinds)
+	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest mapper: %v", err))
+	}
+
+	return &ReconcileGitTrack{
+		Client:     mgr.GetClient(),
+		scheme:     mgr.GetScheme(),
+		store:      gitstore.NewRepoStore(clientSet),
+		restMapper: restMapper,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -82,6 +94,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &farosv1alpha1.GitTrack{},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -90,8 +110,9 @@ var _ reconcile.Reconciler = &ReconcileGitTrack{}
 // ReconcileGitTrack reconciles a GitTrack object
 type ReconcileGitTrack struct {
 	client.Client
-	scheme *runtime.Scheme
-	store  *gitstore.RepoStore
+	scheme     *runtime.Scheme
+	store      *gitstore.RepoStore
+	restMapper meta.RESTMapper
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
@@ -194,21 +215,32 @@ func successResult(name string) result {
 	return result{Name: name}
 }
 
-// newGitTrackObject initializes a GitTrackObject from a name and an Unstructured
-func newGitTrackObject(name string, u *unstructured.Unstructured, labels map[string]string) *farosv1alpha1.GitTrackObject {
-	data, _ := u.MarshalJSON()
-	return &farosv1alpha1.GitTrackObject{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: u.GetNamespace(),
-			Labels:    labels,
-		},
-		Spec: farosv1alpha1.GitTrackObjectSpec{
-			Name: u.GetName(),
-			Kind: u.GetKind(),
-			Data: data,
-		},
+func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructured.Unstructured, labels map[string]string) (farosv1alpha1.GitTrackObjectInterface, error) {
+	var instance farosv1alpha1.GitTrackObjectInterface
+	_, namespaced, err := utils.GetAPIResource(r.restMapper, u.GetObjectKind().GroupVersionKind())
+	if err != nil {
+		return nil, fmt.Errorf("error getting API resource: %v", err)
 	}
+	if namespaced {
+		instance = &farosv1alpha1.GitTrackObject{}
+	} else {
+		instance = &farosv1alpha1.ClusterGitTrackObject{}
+	}
+	instance.SetName(name)
+	instance.SetNamespace(u.GetNamespace())
+	instance.SetLabels(labels)
+
+	data, err := u.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling JSON: %v", err)
+	}
+
+	instance.SetSpec(farosv1alpha1.GitTrackObjectSpec{
+		Name: u.GetName(),
+		Kind: u.GetKind(),
+		Data: data,
+	})
+	return instance, nil
 }
 
 // objectName constructs a name from an Unstructured object
@@ -219,20 +251,23 @@ func objectName(u *unstructured.Unstructured) string {
 // handleObject either creates or updates a GitTrackObject
 func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
 	name := objectName(u)
-	gto := newGitTrackObject(name, u, makeLabels(owner))
-	if err := controllerutil.SetControllerReference(owner, gto, r.scheme); err != nil {
+	gto, err := r.newGitTrackObjectInterface(name, u, makeLabels(owner))
+	if err != nil {
 		return errorResult(name, err)
 	}
-	found := &farosv1alpha1.GitTrackObject{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: gto.Name, Namespace: gto.Namespace}, found)
+	if err = controllerutil.SetControllerReference(owner, gto, r.scheme); err != nil {
+		return errorResult(name, err)
+	}
+	found := gto.DeepCopyInterface()
+	err = r.Get(context.TODO(), types.NamespacedName{Name: gto.GetName(), Namespace: gto.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating GitTrackObject for '%s'\n", name)
+		log.Printf("Creating child for '%s'\n", name)
 		if err = r.Create(context.TODO(), gto); err != nil {
-			return errorResult(name, fmt.Errorf("failed to create GitTrackObject for '%s': %v", name, err))
+			return errorResult(name, fmt.Errorf("failed to create child for '%s': %v", name, err))
 		}
 		return successResult(name)
 	} else if err != nil {
-		return errorResult(name, fmt.Errorf("failed to get GitTrackObject for '%s': %v", name, err))
+		return errorResult(name, fmt.Errorf("failed to get child for '%s': %v", name, err))
 	}
 
 	childUpdated, err := r.updateChild(found, gto)
@@ -240,9 +275,9 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return errorResult(name, fmt.Errorf("failed to update child resource: %v", err))
 	}
 	if childUpdated {
-		log.Printf("Updating GitTrackObject for '%s'\n", name)
+		log.Printf("Updating child for '%s'\n", name)
 		if err = r.Update(context.TODO(), found); err != nil {
-			return errorResult(name, fmt.Errorf("failed to update GitTrackObject for '%s': %v", name, err))
+			return errorResult(name, fmt.Errorf("failed to update child for '%s': %v", name, err))
 		}
 	}
 	return successResult(name)
@@ -250,17 +285,17 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 
 // UpdateChild compares the two GitTrackObjects and updates the foundGTO if the
 // childGTO
-func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO *farosv1alpha1.GitTrackObject) (bool, error) {
+func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) (bool, error) {
 	// Convert the GitTrackObjects to unstructured
 	found := &unstructured.Unstructured{}
 	err := r.scheme.Convert(foundGTO, found, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to convert found GitTrackObject to Unstructured: %v", err)
+		return false, fmt.Errorf("failed to convert found child to Unstructured: %v", err)
 	}
 	child := &unstructured.Unstructured{}
 	err = r.scheme.Convert(childGTO, child, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to convert child GitTrackObject to Unstructured: %v", err)
+		return false, fmt.Errorf("failed to convert child child to Unstructured: %v", err)
 	}
 
 	// Compare and update the resources
@@ -292,9 +327,9 @@ func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO *farosv1alpha1.GitTra
 // deleteResources deletes any resources that are present in the given map
 func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.GitTrackObject) error {
 	for name, gto := range leftovers {
-		log.Printf("Deleting GitTrackObject '%s'\n", name)
+		log.Printf("Deleting child '%s'\n", name)
 		if err := r.Delete(context.TODO(), &gto); err != nil {
-			return fmt.Errorf("failed to delete GitTrackObject for '%s': '%s'", name, err)
+			return fmt.Errorf("failed to delete child for '%s': '%s'", name, err)
 		}
 	}
 	return nil
@@ -320,6 +355,7 @@ func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured,
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittracks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=faros.pusher.com,resources=clustergittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	instance := &farosv1alpha1.GitTrack{}
 	opts := newStatusOpts()

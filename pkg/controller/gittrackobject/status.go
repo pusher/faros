@@ -40,16 +40,16 @@ func newStatusOpts() *statusOpts {
 
 // updateGitTrackObjectStatus updates the GitTrackObject's status field if
 // any condition has changed.
-func updateGitTrackObjectStatus(gto *farosv1alpha1.GitTrackObject, opts *statusOpts) bool {
+func updateGitTrackObjectStatus(gto farosv1alpha1.GitTrackObjectInterface, opts *statusOpts) bool {
 	if gto == nil {
 		return false
 	}
-	status := gto.Status
+	status := gto.GetStatus()
 
 	setCondition(&status, farosv1alpha1.ObjectInSyncType, opts.inSyncError, opts.inSyncReason)
 
-	if !reflect.DeepEqual(gto.Status, status) {
-		gto.Status = status
+	if !reflect.DeepEqual(gto.GetStatus(), status) {
+		gto.SetStatus(status)
 		return true
 	}
 	return false
@@ -80,18 +80,20 @@ func setCondition(status *farosv1alpha1.GitTrackObjectStatus, condType farosv1al
 
 // updateStatus calculates a new status for the GitTrackObject and then updates
 // the resource on the API if the status differs from before.
-func (r *ReconcileGitTrackObject) updateStatus(original *farosv1alpha1.GitTrackObject, opts *statusOpts) error {
-	// Update the GitTrackObject's status
-	gto := original.DeepCopy()
+func (r *ReconcileGitTrackObject) updateStatus(original farosv1alpha1.GitTrackObjectInterface, opts *statusOpts) error {
+	// If original object nil, nothing to do.
+	if original == nil {
+		return nil
+	}
+	gto := original.DeepCopyInterface()
 	gtoUpdated := updateGitTrackObjectStatus(gto, opts)
-
-	// If the status was modified, update the GitTrackObject on the API
 	if gtoUpdated {
-		log.Printf("Updating GitTrackObject %s status", gto.Name)
+		log.Printf("Updating %s/%s status", gto.GetNamespace(), gto.GetName())
 		err := r.Update(context.TODO(), gto)
 		if err != nil {
-			return fmt.Errorf("unable to update GitTrackObject: %v", err)
+			return fmt.Errorf("unable to update status: %v", err)
 		}
 	}
+
 	return nil
 }
