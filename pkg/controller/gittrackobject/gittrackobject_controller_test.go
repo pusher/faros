@@ -164,18 +164,22 @@ var _ = Describe("GitTrackObject Suite", func() {
 	})
 
 	AfterEach(func() {
-		c.Delete(context.TODO(), instance)
-		c.Delete(context.TODO(), clusterInstance)
 		// GC isn't run in the control-plane so guess we'll have to clean up manually
-		deploys := &appsv1.DeploymentList{}
-		Expect(c.List(context.TODO(), client.InNamespace(instance.Namespace), deploys)).To(Succeed())
-		for _, d := range deploys.Items {
-			Expect(c.Delete(context.TODO(), &d)).To(Succeed())
+		if instance != nil {
+			c.Delete(context.TODO(), instance)
+			deploys := &appsv1.DeploymentList{}
+			Expect(c.List(context.TODO(), client.InNamespace(instance.Namespace), deploys)).To(Succeed())
+			for _, d := range deploys.Items {
+				Expect(c.Delete(context.TODO(), &d)).To(Succeed())
+			}
 		}
-		crbs := &rbacv1.ClusterRoleBindingList{}
-		Expect(c.List(context.TODO(), client.InNamespace(""), crbs)).To(Succeed())
-		for _, crb := range crbs.Items {
-			Expect(c.Delete(context.TODO(), &crb)).To(Succeed())
+		if clusterInstance != nil {
+			c.Delete(context.TODO(), clusterInstance)
+			crbs := &rbacv1.ClusterRoleBindingList{}
+			Expect(c.List(context.TODO(), client.InNamespace(""), crbs)).To(Succeed())
+			for _, crb := range crbs.Items {
+				Expect(c.Delete(context.TODO(), &crb)).To(Succeed())
+			}
 		}
 		close(stop)
 		close(stopInformers)
@@ -278,6 +282,20 @@ var (
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	WaitForStatus = func(key types.NamespacedName) {
+		var obj farosv1alpha1.GitTrackObjectInterface
+		statusUpdated := false
+		if key.Namespace != "" {
+			obj = &farosv1alpha1.GitTrackObject{}
+		} else {
+			obj = &farosv1alpha1.ClusterGitTrackObject{}
+		}
+		for !statusUpdated {
+			Eventually(func() error { return c.Get(context.TODO(), key, obj) }, timeout).Should(Succeed())
+			statusUpdated = (len(obj.GetStatus().Conditions) > 0)
+		}
+	}
+
 	// validDataTest runs the suite of tests for valid input data
 	validDataTest = func(initial, updated []byte) {
 		BeforeEach(func() {
@@ -286,6 +304,8 @@ var (
 			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			// wait for reconcile of status
 			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			// Wait for client cache to expire
+			WaitForStatus(depKey)
 		})
 
 		It("should create it's child resource", ShouldCreateChild)
@@ -322,12 +342,15 @@ var (
 	validClusterDataTest = func(initial, updated []byte) {
 		BeforeEach(func() {
 			CreateClusterInstance(initial)
+			// Wait for create reconcile
 			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+			// Wait for status reconcile
 			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+			// Wait for client cache to expire
+			WaitForStatus(crbKey)
 		})
-		// AfterEach(DeleteClusterInstance)
 
-		It("should create it's child resource", ClusterShouldCreateChild)
+		It("should create it's child resource", ClusterShouldCreateChild) // check
 
 		It("should add an owner reference to the child", ClusterShouldAddOwnerReference)
 
@@ -366,6 +389,8 @@ var (
 			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 			// wait for reconcile of status
 			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			// Wait for client cache to expire
+			WaitForStatus(depKey)
 		})
 
 		Context("should update the status", func() {
@@ -385,8 +410,9 @@ var (
 			CreateClusterInstance([]byte(invalidExample))
 			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
 			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+			// Wait for client cache to expire
+			WaitForStatus(crbKey)
 		})
-		// AfterEach(DeleteClusterInstance)
 
 		Context("should update the status", func() {
 			It("condition status should be false", func() {
@@ -410,9 +436,6 @@ var (
 		crb := &rbacv1.ClusterRoleBinding{}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).
 			Should(Succeed())
-
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 	}
 
 	// ShouldAddOwnerReference checks the owner reference was set
@@ -439,9 +462,6 @@ var (
 		Expect(oRef.APIVersion).To(Equal("faros.pusher.com/v1alpha1"))
 		Expect(oRef.Kind).To(Equal("ClusterGitTrackObject"))
 		Expect(oRef.Name).To(Equal(clusterInstance.Name))
-
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 	}
 
 	// ShouldAddLastApplied checks that the last applied annotation was set
@@ -464,9 +484,6 @@ var (
 		annotations := crb.ObjectMeta.Annotations
 		_, ok := annotations[utils.LastAppliedAnnotation]
 		Expect(ok).To(BeTrue())
-
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 	}
 
 	// ShouldUpdateConditionStatus checks the condition status was set
@@ -491,9 +508,6 @@ var (
 			crb := &rbacv1.ClusterRoleBinding{}
 			Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).
 				Should(Succeed())
-
-			// GC not enabled so manually delete the object
-			defer Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 		}
 
 		err := c.Get(context.TODO(), crbKey, clusterInstance)
@@ -539,9 +553,6 @@ var (
 			crb := &rbacv1.ClusterRoleBinding{}
 			Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).
 				Should(Succeed())
-
-			// GC not enabled so manually delete the object
-			defer Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 		}
 	}
 
@@ -603,8 +614,6 @@ var (
 			}
 			return nil
 		}, timeout).Should(Succeed())
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 	}
 
 	// ShouldNotUpdateChildOnGTOUpdate updates the GitTrackObject and checks the
@@ -659,9 +668,6 @@ var (
 		err = c.Get(context.TODO(), crbKey, crb)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(crb.ObjectMeta.ResourceVersion).To(Equal(originalVersion))
-
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 	}
 
 	// ShouldRecreateChildIfDeleted deletes the child and expects it to be
@@ -690,12 +696,11 @@ var (
 
 		// Delete the instance and expect it to be recreated
 		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
+		// wait for reconcile of delete
+		Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+		// wait for reconcile of status
 		Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).
-			Should(Succeed())
-
-		// GC not enabled so manually delete the object
-		Eventually(func() error { return c.Delete(context.TODO(), crb) }, timeout).
 			Should(Succeed())
 	}
 
@@ -736,6 +741,9 @@ var (
 		// Update the spec and expect it to be reset
 		crb.Subjects[0].Namespace = "test"
 		Expect(c.Update(context.TODO(), crb)).To(Succeed())
+		// wait for reconcile of delete
+		Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+		// wait for reconcile of status
 		Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
 		Eventually(func() error {
 			err := c.Get(context.TODO(), crbKey, crb)
@@ -748,9 +756,6 @@ var (
 			}
 			return nil
 		}, timeout).Should(Succeed())
-
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 	}
 
 	// ShouldResetChildIfMetaModified modifies the child metadata and checks that
@@ -804,8 +809,5 @@ var (
 			}
 			return nil
 		}, timeout).Should(Succeed())
-
-		// GC not enabled so manually delete the object
-		Expect(c.Delete(context.TODO(), crb)).To(Succeed())
 	}
 )
