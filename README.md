@@ -1,3 +1,5 @@
+<img src="./faros-logo.svg" width=150 height=150 alt="Faros Logo"/>
+
 # Faros
 > Faros - Greek for Lighthouse
 
