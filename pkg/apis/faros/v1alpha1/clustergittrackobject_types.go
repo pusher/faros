@@ -39,6 +39,11 @@ func (g *ClusterGitTrackObject) GetSpec() GitTrackObjectSpec {
 	return g.Spec
 }
 
+// SetSpec implements the GitTrackObject interface
+func (g *ClusterGitTrackObject) SetSpec(s GitTrackObjectSpec) {
+	g.Spec = s
+}
+
 // GetStatus implements the GitTrackObject interface
 func (g *ClusterGitTrackObject) GetStatus() GitTrackObjectStatus {
 	return g.Status

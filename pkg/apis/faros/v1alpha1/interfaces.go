@@ -28,6 +28,7 @@ type GitTrackObjectInterface interface {
 	runtime.Object
 	v1.Object
 	GetSpec() GitTrackObjectSpec
+	SetSpec(GitTrackObjectSpec)
 	GetStatus() GitTrackObjectStatus
 	SetStatus(GitTrackObjectStatus)
 	DeepCopyInterface() GitTrackObjectInterface
