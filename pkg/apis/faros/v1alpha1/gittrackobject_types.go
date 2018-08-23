@@ -86,6 +86,11 @@ func (g *GitTrackObject) GetSpec() GitTrackObjectSpec {
 	return g.Spec
 }
 
+// SetSpec implements the GitTrackObject interface
+func (g *GitTrackObject) SetSpec(s GitTrackObjectSpec) {
+	g.Spec = s
+}
+
 // GetStatus implements the GitTrackObject interface
 func (g *GitTrackObject) GetStatus() GitTrackObjectStatus {
 	return g.Status
