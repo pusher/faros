@@ -355,6 +355,7 @@ func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured,
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittracks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=faros.pusher.com,resources=clustergittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	instance := &farosv1alpha1.GitTrack{}
 	opts := newStatusOpts()
