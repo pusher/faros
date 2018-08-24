@@ -229,7 +229,7 @@ revision="f08db293d3ef80052d6513ece19792642a289fea"
 [[override]]
 name="sigs.k8s.io/controller-runtime"
 source="https://github.com/pusher/controller-runtime"
-branch="unstructured-1.11"
+branch="pusher-1.11"
 
 [[override]]
 name="sigs.k8s.io/controller-tools"
