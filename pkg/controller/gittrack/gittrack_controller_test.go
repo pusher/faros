@@ -17,6 +17,7 @@ limitations under the License.
 package gittrack
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -61,6 +62,25 @@ var gcInstance = func(key types.NamespacedName) {
 	}
 }
 
+var waitForInstanceCreated = func(key types.NamespacedName) {
+	request := reconcile.Request{NamespacedName: key}
+	// wait for reconcile for creating the GitTrack resource
+	Eventually(requests, timeout).Should(Receive(Equal(request)))
+	// wait for reconcile for updating the GitTrack resource's status
+	Eventually(requests, timeout).Should(Receive(Equal(request)))
+	obj := &farosv1alpha1.GitTrack{}
+	Eventually(func() error {
+		err := c.Get(context.TODO(), key, obj)
+		if err != nil {
+			return err
+		}
+		if len(obj.Status.Conditions) == 0 {
+			return fmt.Errorf("Status not updated")
+		}
+		return nil
+	}, timeout).Should(Succeed())
+}
+
 const timeout = time.Second * 5
 
 var _ = Describe("GitTrack Suite", func() {
@@ -93,10 +113,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("with a valid Spec", func() {
 			BeforeEach(func() {
 				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
-				// Wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("updates its status", func() {
@@ -161,10 +179,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("with multi-document YAML", func() {
 			BeforeEach(func() {
 				createInstance(instance, "9bf412f0e893c8c1624bb1c523cfeca8243534bc")
-				// Wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("creates GitTrackObjects", func() {
@@ -181,10 +197,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("with a cluster scoped resource", func() {
 			BeforeEach(func() {
 				createInstance(instance, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42")
-				// Wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("creates ClusterGitTrackObject", func() {
@@ -198,10 +212,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("with an invalid Reference", func() {
 			BeforeEach(func() {
 				createInstance(instance, "does-not-exist")
-				// Wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for updating status
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("updates the FilesFetched condition", func() {
@@ -222,10 +234,8 @@ var _ = Describe("GitTrack Suite", func() {
 			BeforeEach(func() {
 				instance.Spec.SubPath = "does-not-exist"
 				createInstance(instance, "master")
-				// Wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for updating status
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("updates the FilesFetched condition", func() {
@@ -247,10 +257,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("and resources are added to the repository", func() {
 			BeforeEach(func() {
 				createInstance(instance, "28928ccaeb314b96293e18cc8889997f0f46b79b")
-				// wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("creates the new resources", func() {
@@ -280,10 +288,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("and resources are removed from the repository", func() {
 			BeforeEach(func() {
 				createInstance(instance, "4532b487a5aaf651839f5401371556aa16732a6e")
-				// wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("deletes the removed resources", func() {
@@ -340,10 +346,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("and resources in the repository are updated", func() {
 			BeforeEach(func() {
 				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
-				// wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("updates the updated resources", func() {
@@ -401,10 +405,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("and the reference is invalid", func() {
 			BeforeEach(func() {
 				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
-				// wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("does not update any of the resources", func() {
@@ -463,10 +465,8 @@ var _ = Describe("GitTrack Suite", func() {
 		Context("and the subPath is invalid", func() {
 			BeforeEach(func() {
 				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
-				// wait for reconcile for creating the GitTrack resource
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// wait for reconcile for creating the GitTrackObject resources
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 			})
 
 			It("does not update any of the resources", func() {
