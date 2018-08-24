@@ -334,6 +334,12 @@
   version = "v1.4.1"
 
 [[projects]]
+  name = "github.com/pborman/uuid"
+  packages = ["."]
+  revision = "e790cca94e6cc75c7064b1332e63811d4aae1a53"
+  version = "v1.1"
+
+[[projects]]
   name = "github.com/pelletier/go-buffruneio"
   packages = ["."]
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
@@ -698,6 +704,7 @@
   packages = [
     "pkg/api/errors",
     "pkg/api/meta",
+    "pkg/api/meta/testrestmapper",
     "pkg/api/resource",
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
@@ -729,6 +736,7 @@
     "pkg/util/runtime",
     "pkg/util/sets",
     "pkg/util/strategicpatch",
+    "pkg/util/uuid",
     "pkg/util/validation",
     "pkg/util/validation/field",
     "pkg/util/wait",
@@ -863,6 +871,8 @@
     "tools/clientcmd/api",
     "tools/clientcmd/api/latest",
     "tools/clientcmd/api/v1",
+    "tools/leaderelection",
+    "tools/leaderelection/resourcelock",
     "tools/metrics",
     "tools/pager",
     "tools/record",
@@ -921,7 +931,7 @@
   revision = "f08db293d3ef80052d6513ece19792642a289fea"
 
 [[projects]]
-  branch = "unstructured-1.11"
+  branch = "pusher-1.11"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -936,6 +946,7 @@
     "pkg/handler",
     "pkg/internal/controller",
     "pkg/internal/recorder",
+    "pkg/leaderelection",
     "pkg/manager",
     "pkg/predicate",
     "pkg/reconcile",
@@ -947,7 +958,7 @@
     "pkg/source",
     "pkg/source/internal"
   ]
-  revision = "53ff7b7cc48ac8aa89793b93bfa64a6fbc1a4c9a"
+  revision = "e948349c8fc06e3c6fa2c3abc2eb5a1a429fab57"
   source = "https://github.com/pusher/controller-runtime"
 
 [[projects]]
@@ -975,6 +986,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7569bd34d69e4fa2005a01741a2ab2a567cb3b26bbe4a8fac6c16d173d4b4d26"
+  inputs-digest = "fccd5990aeee2855bd089b7027661160a3808b67c6fa9b0317d22b86879bc7b9"
   solver-name = "gps-cdcl"
   solver-version = 1

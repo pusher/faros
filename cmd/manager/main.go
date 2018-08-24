@@ -30,6 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
+var (
+	leaderElection           = flag.Bool("leader-election", false, "Should the controller use leader election")
+	leaderElectionID         = flag.String("leader-election-id", "", "Name of the configmap used by the leader election system")
+	leaederElectionNamespace = flag.String("leader-election-namespace", "", "Namespace for the configmap used by the leader election system")
+)
+
 func main() {
 	// Setup flags
 	goflag.Lookup("logtostderr").Value.Set("true")
@@ -43,7 +49,11 @@ func main() {
 	}
 
 	// Create a new Cmd to provide shared dependencies and start components
-	mgr, err := manager.New(cfg, manager.Options{})
+	mgr, err := manager.New(cfg, manager.Options{
+		LeaderElection:          *leaderElection,
+		LeaderElectionID:        *leaderElectionID,
+		LeaderElectionNamespace: *leaederElectionNamespace,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
