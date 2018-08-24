@@ -64,6 +64,10 @@ test:
   - wercker/setup-go-workspace:
       package-dir: github.com/pusher/faros
   - script:
+    name: Install Ginkgo CLI
+    code: |
+      go get -u github.com/onsi/ginkgo/ginkgo
+  - script:
       name: Setup Test environment
       code: |
         export TEST_ASSET_DIR=/usr/local/bin
@@ -80,8 +84,8 @@ test:
         chmod +x $TEST_ASSET_KUBE_APISERVER
         chmod +x $TEST_ASSET_KUBECTL
   - script:
-      name: go test
-      code: go test ./pkg/... ./cmd/...
+      name: ginkgo
+      code: ginkgo -v -race -randomizeAllSpecs ./pkg/... ./cmd/...
 
 build:
   steps:
