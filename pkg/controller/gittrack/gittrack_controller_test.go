@@ -17,6 +17,7 @@ limitations under the License.
 package gittrack
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -67,12 +68,17 @@ var waitForInstanceCreated = func(key types.NamespacedName) {
 	Eventually(requests, timeout).Should(Receive(Equal(request)))
 	// wait for reconcile for updating the GitTrack resource's status
 	Eventually(requests, timeout).Should(Receive(Equal(request)))
-	statusUpdated := false
 	obj := &farosv1alpha1.GitTrack{}
-	for !statusUpdated {
-		Eventually(func() error { return c.Get(context.TODO(), key, obj) }, timeout).Should(Succeed())
-		statusUpdated = (len(obj.Status.Conditions) > 0)
-	}
+	Eventually(func() error {
+		err := c.Get(context.TODO(), key, obj)
+		if err != nil {
+			return err
+		}
+		if len(obj.Status.Conditions) == 0 {
+			return fmt.Errorf("Status not updated")
+		}
+		return nil
+	}, timeout).Should(Succeed())
 }
 
 const timeout = time.Second * 5

@@ -18,6 +18,7 @@ package gittrackobject
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -284,16 +285,21 @@ var (
 
 	WaitForStatus = func(key types.NamespacedName) {
 		var obj farosv1alpha1.GitTrackObjectInterface
-		statusUpdated := false
 		if key.Namespace != "" {
 			obj = &farosv1alpha1.GitTrackObject{}
 		} else {
 			obj = &farosv1alpha1.ClusterGitTrackObject{}
 		}
-		for !statusUpdated {
-			Eventually(func() error { return c.Get(context.TODO(), key, obj) }, timeout).Should(Succeed())
-			statusUpdated = (len(obj.GetStatus().Conditions) > 0)
-		}
+		Eventually(func() error {
+			err := c.Get(context.TODO(), key, obj)
+			if err != nil {
+				return err
+			}
+			if len(obj.GetStatus().Conditions) == 0 {
+				return fmt.Errorf("Status not updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
 	}
 
 	// validDataTest runs the suite of tests for valid input data
