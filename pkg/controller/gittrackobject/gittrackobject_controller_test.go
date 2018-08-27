@@ -17,8 +17,11 @@ limitations under the License.
 package gittrackobject
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"html/template"
+	"log"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -132,6 +135,60 @@ containers:
 image: nginx:latest
 `
 
+var annotationExample = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example
+  namespace: default
+  labels:
+    app: nginx
+  annotations:
+    faros.pusher.com/update-strategy: "{{ .UpdateStrategy }}"
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:{{ .Tag }}
+`
+
+var clusterAnnotationExample = `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: example
+  labels:
+    app: nginx
+  annotations:
+    faros.pusher.com/update-strategy: "{{ .UpdateStrategy }}"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nginx-ingress-controller
+subjects:
+- kind: ServiceAccount
+  name: nginx-ingress-controller
+  namespace: {{ .Namespace }}
+`
+
+var renderExample = func(ex string, values map[string]string) []byte {
+	tmpl, err := template.New("object").Parse(ex)
+	if err != nil {
+		log.Fatalf("failed to parse template %v", err)
+	}
+	buff := new(bytes.Buffer)
+	err = tmpl.Execute(buff, values)
+	if err != nil {
+		log.Fatalf("failed to execute template: %v", err)
+	}
+	return buff.Bytes()
+}
+
 var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "example", Namespace: "default"}}
@@ -239,6 +296,64 @@ var _ = Describe("GitTrackObject Suite", func() {
 			invalidClusterDataTest()
 		})
 	})
+
+	Context("When a GitTrackObject has an `update-strategy` annotation", func() {
+		BeforeEach(func() {
+			values := map[string]string{"UpdateStrategy": "update", "Tag": "v1.0.0"}
+			CreateInstance(renderExample(annotationExample, values))
+			// wait for create reconcile
+			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			// wait for reconcile of status
+			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			// Wait for client cache to expire
+			WaitForStatus(depKey)
+		})
+
+		Context("and the value is `update`", func() {
+			It("does update the resource", UpdateStrategyShouldUpdate)
+		})
+
+		Context("and the value is `recreate`", func() {
+			It("recreates the resource", UpdateStrategyShouldRecreate)
+		})
+
+		Context("and the value is `never`", func() {
+			It("does not update the resource", UpdateStrategyShouldNever)
+		})
+
+		Context("and the value is anything else", func() {
+			It("sets an error condition", UpdateStrategyError)
+		})
+	})
+
+	Context("When a ClusterGitTrackObject has an `update-strategy` annotation", func() {
+		BeforeEach(func() {
+			values := map[string]string{"UpdateStrategy": "update", "Namespace": "default"}
+			CreateClusterInstance(renderExample(clusterAnnotationExample, values))
+			// wait for create reconcile
+			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+			// wait for reconcile of status
+			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+			// Wait for client cache to expire
+			WaitForStatus(crbKey)
+		})
+
+		Context("and the value is `update`", func() {
+			It("does update the resource", ClusterUpdateStrategyShouldUpdate)
+		})
+
+		Context("and the value is `recreate`", func() {
+			It("recreates the resource", ClusterUpdateStrategyShouldRecreate)
+		})
+
+		Context("and the value is `never`", func() {
+			It("does not update the resource", ClusterUpdateStrategyShouldNever)
+		})
+
+		Context("and the value is anything else", func() {
+			It("sets an error condition", ClusterUpdateStrategyError)
+		})
+	})
 })
 
 var (
@@ -277,10 +392,44 @@ var (
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	UpdateInstance = func(i *farosv1alpha1.GitTrackObject, data []byte, statusUpdate bool) {
+		i.Spec.Data = data
+		Expect(c.Update(context.TODO(), i)).ShouldNot(HaveOccurred())
+		// Wait for update reconcile to happen
+		Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+		if statusUpdate {
+			// Wait for status reconcile to happen
+			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+		}
+	}
+
+	UpdateClusterInstance = func(i *farosv1alpha1.ClusterGitTrackObject, data []byte, statusUpdate bool) {
+		i.Spec.Data = data
+		Expect(c.Update(context.TODO(), i)).ShouldNot(HaveOccurred())
+		// Wait for update reconcile to happen
+		Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+		if statusUpdate {
+			// Wait for status reconcile to happen
+			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+		}
+	}
+
 	// DeleteClusterInstance deletes the clusterInstance
 	DeleteClusterInstance = func() {
 		err := c.Delete(context.TODO(), clusterInstance)
 		Expect(err).NotTo(HaveOccurred())
+	}
+
+	CheckImageTag = func(imageTag string) error {
+		deploy := &appsv1.Deployment{}
+		err := c.Get(context.TODO(), depKey, deploy)
+		if err != nil {
+			return err
+		}
+		if deploy.Spec.Template.Spec.Containers[0].Image != imageTag {
+			return fmt.Errorf("image hasn't updated")
+		}
+		return nil
 	}
 
 	WaitForStatus = func(key types.NamespacedName) {
@@ -356,7 +505,7 @@ var (
 			WaitForStatus(crbKey)
 		})
 
-		It("should create it's child resource", ClusterShouldCreateChild) // check
+		It("should create it's child resource", ClusterShouldCreateChild)
 
 		It("should add an owner reference to the child", ClusterShouldAddOwnerReference)
 
@@ -815,5 +964,127 @@ var (
 			}
 			return nil
 		}, timeout).Should(Succeed())
+	}
+
+	UpdateStrategyShouldUpdate = func() {
+		values := map[string]string{"UpdateStrategy": "update", "Tag": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		container := deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:v1.0.0"))
+		UpdateInstance(instance, renderExample(annotationExample, values), true)
+		Eventually(func() error { return CheckImageTag("nginx:v2.0.0") }, timeout).Should(Succeed())
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		container = deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:v2.0.0"))
+	}
+
+	UpdateStrategyShouldRecreate = func() {
+		values := map[string]string{"UpdateStrategy": "recreate", "Tag": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		beforeUID := deploy.ObjectMeta.UID
+		container := deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:v1.0.0"))
+		UpdateInstance(instance, renderExample(annotationExample, values), true)
+		Eventually(func() error { return CheckImageTag("nginx:v2.0.0") }, timeout).Should(Succeed())
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		afterUID := deploy.ObjectMeta.UID
+		container = deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:v2.0.0"))
+		Expect(beforeUID).ToNot(Equal(afterUID))
+	}
+
+	UpdateStrategyShouldNever = func() {
+		values := map[string]string{"UpdateStrategy": "never", "Tag": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		container := deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:v1.0.0"))
+		UpdateInstance(instance, renderExample(annotationExample, values), false)
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		container = deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:v1.0.0"))
+	}
+
+	UpdateStrategyError = func() {
+		values := map[string]string{"UpdateStrategy": "anything-else", "Tag": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		UpdateInstance(instance, renderExample(annotationExample, values), true)
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		condition := instance.Status.Conditions[0]
+		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
+		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
+	}
+
+	ClusterUpdateStrategyShouldUpdate = func() {
+		values := map[string]string{"UpdateStrategy": "update", "Namespace": "other"}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		crb := &rbacv1.ClusterRoleBinding{}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		Expect(crb.Subjects[0].Namespace).To(Equal("default"))
+		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), true)
+		Eventually(func() error {
+			crb = &rbacv1.ClusterRoleBinding{}
+			err := c.Get(context.TODO(), crbKey, crb)
+			if err != nil {
+				return err
+			}
+			if crb.Subjects[0].Namespace != "other" {
+				return fmt.Errorf("namespace hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		Expect(crb.Subjects[0].Namespace).To(Equal("other"))
+	}
+
+	ClusterUpdateStrategyShouldRecreate = func() {
+		values := map[string]string{"UpdateStrategy": "recreate", "Namespace": "other"}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		crb := &rbacv1.ClusterRoleBinding{}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		beforeUID := crb.ObjectMeta.UID
+		Expect(crb.Subjects[0].Namespace).To(Equal("default"))
+		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), true)
+		Eventually(func() error {
+			crb = &rbacv1.ClusterRoleBinding{}
+			err := c.Get(context.TODO(), crbKey, crb)
+			if err != nil {
+				return err
+			}
+			if crb.Subjects[0].Namespace != "other" {
+				return fmt.Errorf("namespace hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		afterUID := crb.ObjectMeta.UID
+		Expect(crb.Subjects[0].Namespace).To(Equal("other"))
+		Expect(beforeUID).ToNot(Equal(afterUID))
+	}
+
+	ClusterUpdateStrategyShouldNever = func() {
+		values := map[string]string{"UpdateStrategy": "never", "Namespace": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		crb := &rbacv1.ClusterRoleBinding{}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		Expect(crb.Subjects[0].Namespace).To(Equal("default"))
+		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), false)
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		Expect(crb.Subjects[0].Namespace).To(Equal("default"))
+	}
+
+	ClusterUpdateStrategyError = func() {
+		values := map[string]string{"UpdateStrategy": "anything-else", "Namespace": "other"}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), true)
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		condition := clusterInstance.Status.Conditions[0]
+		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
+		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
 	}
 )

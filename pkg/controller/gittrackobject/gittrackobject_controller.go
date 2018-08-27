@@ -263,6 +263,18 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, opts.inSyncError
 	}
 
+	updateStrategy, err := gittrackobjectutils.GetUpdateStrategy(child)
+	if err != nil {
+		opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
+		opts.inSyncError = fmt.Errorf("unable to get update strategy: %v", err)
+		return reconcile.Result{}, opts.inSyncError
+	}
+
+	if updateStrategy == gittrackobjectutils.NeverUpdateStrategy {
+		log.Printf("Update strategy for %s set to never, ignoring", found.GetName())
+		return reconcile.Result{}, nil
+	}
+
 	// Update the object if the spec differs from the version running
 	childUpdated, err := utils.UpdateChildResource(found, child)
 	if err != nil {
@@ -271,23 +283,57 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, opts.inSyncError
 	}
 	if childUpdated {
-		err := utils.SetLastAppliedAnnotation(found, child)
-		if err != nil {
-			opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-			opts.inSyncError = fmt.Errorf("error setting last applied annotation: %v", err)
-			return reconcile.Result{}, opts.inSyncError
+		if updateStrategy == gittrackobjectutils.RecreateUpdateStrategy {
+			err = r.recreateChild(found, child)
+		} else {
+			err = r.updateChild(found, child)
 		}
-		// Update the child resource on the API
-		log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-		err = r.Update(context.TODO(), found)
 		if err != nil {
 			opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-			opts.inSyncError = fmt.Errorf("unable to update child resource: %v", err)
+			opts.inSyncError = err
 			return reconcile.Result{}, opts.inSyncError
 		}
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// recreateChild first deletes and then creates a child resource for a (Cluster)GitTrackObject
+func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) error {
+	log.Printf("Deleting child %s %s/%s\n", found.GetKind(), found.GetNamespace(), found.GetName())
+	err := r.Delete(context.TODO(), found)
+	if err != nil {
+		return fmt.Errorf("unable to delete child: %v", err)
+	}
+
+	found = child.DeepCopy()
+	err = utils.SetLastAppliedAnnotation(found, child)
+	if err != nil {
+		return fmt.Errorf("unable to set annotation: %v", err)
+	}
+
+	log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
+	err = r.Create(context.TODO(), child)
+	if err != nil {
+		return fmt.Errorf("unable to create child: %v", err)
+	}
+
+	return nil
+}
+
+// updateChild updates the given child resource of a (Cluster)GitTrackObject
+func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) error {
+	err := utils.SetLastAppliedAnnotation(found, child)
+	if err != nil {
+		return fmt.Errorf("error setting last applied annotation: %v", err)
+	}
+	// Update the child resource on the API
+	log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
+	err = r.Update(context.TODO(), found)
+	if err != nil {
+		return fmt.Errorf("unable to update child resource: %v", err)
+	}
+	return nil
 }
 
 // getInstance fetches the requested (Cluster)GitTrackObject from the API server
