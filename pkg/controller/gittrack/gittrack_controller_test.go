@@ -449,11 +449,20 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Eventually(func() error {
+					err = c.Get(context.TODO(), key, instance)
+					if err != nil {
+						return err
+					}
+					c := instance.Status.Conditions[1]
+					if c.Status != v1.ConditionFalse {
+						return fmt.Errorf("condition hasn't updated yet")
+					}
+					return nil
+				}, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
 				c := instance.Status.Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
-				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
