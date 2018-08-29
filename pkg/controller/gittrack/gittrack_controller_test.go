@@ -60,6 +60,13 @@ var gcInstance = func(key types.NamespacedName) {
 		err = c.Delete(context.TODO(), &gto)
 		Expect(err).NotTo(HaveOccurred())
 	}
+	cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
+	err = c.List(context.TODO(), &client.ListOptions{}, cgtos)
+	Expect(err).NotTo(HaveOccurred())
+	for _, cgto := range cgtos.Items {
+		err = c.Delete(context.TODO(), &cgto)
+		Expect(err).NotTo(HaveOccurred())
+	}
 }
 
 var waitForInstanceCreated = func(key types.NamespacedName) {
@@ -249,6 +256,68 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
 				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("no files for subpath 'does-not-exist'"))
+			})
+		})
+
+		Context("with a child owned by another controller", func() {
+			truth := true
+			var existingChild *farosv1alpha1.GitTrackObject
+			BeforeEach(func() {
+				existingChild = &farosv1alpha1.GitTrackObject{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "deployment-nginx",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion:         "faros.pusher.com/v1alpha1",
+								Kind:               "GitTrack",
+								Name:               "does-not-exist",
+								UID:                "12345",
+								Controller:         &truth,
+								BlockOwnerDeletion: &truth,
+							},
+						},
+					},
+					Spec: farosv1alpha1.GitTrackObjectSpec{
+						Name: "nginx",
+						Kind: "Deployment",
+						Data: []byte("kind: Deployment"),
+					},
+				}
+				err := c.Create(context.TODO(), existingChild.DeepCopy())
+				Expect(err).ToNot(HaveOccurred())
+
+				createInstance(instance, "master")
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
+			})
+
+			It("should not overwrite the existing child", func() {
+				deployGto := &farosv1alpha1.GitTrackObject{}
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployGto)
+				}, timeout).Should(Succeed())
+
+				o := deployGto.ObjectMeta
+				Expect(o.OwnerReferences).To(Equal(existingChild.ObjectMeta.OwnerReferences))
+				Expect(o.Name).To(Equal(existingChild.ObjectMeta.Name))
+				Expect(o.Namespace).To(Equal(existingChild.ObjectMeta.Namespace))
+
+				Expect(deployGto.Spec).To(Equal(existingChild.Spec))
+			})
+
+			It("update the ChildrenUpToDate condition", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+				// TODO: don't rely on ordering
+				c := instance.Status.Conditions[3]
+				Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
+				Expect(c.Status).To(Equal(v1.ConditionFalse))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorUpdatingChildren)))
+				Expect(c.Message).To(Equal("child 'deployment-nginx' is owned by another controller: child object is owned by 'does-not-exist'"))
 			})
 		})
 	})

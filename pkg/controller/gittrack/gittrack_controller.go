@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -270,6 +271,11 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return errorResult(name, fmt.Errorf("failed to get child for '%s': %v", name, err))
 	}
 
+	err = checkOwner(owner, found, r.scheme)
+	if err != nil {
+		return errorResult(name, fmt.Errorf("child '%s' is owned by another controller: %v", name, err))
+	}
+
 	childUpdated, err := r.updateChild(found, gto)
 	if err != nil {
 		return errorResult(name, fmt.Errorf("failed to update child resource: %v", err))
@@ -348,6 +354,22 @@ func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured,
 		objects = append(objects, us...)
 	}
 	return objects, errors
+}
+
+// checkOwner checks the owner reference of an object from the API to see if it
+// is owned by the current GitTrack.
+func checkOwner(owner *farosv1alpha1.GitTrack, child farosv1alpha1.GitTrackObjectInterface, s *runtime.Scheme) error {
+	gvk, err := apiutil.GVKForObject(owner, s)
+	if err != nil {
+		return err
+	}
+
+	for _, ref := range child.GetOwnerReferences() {
+		if ref.Kind == gvk.Kind && ref.UID != owner.UID {
+			return fmt.Errorf("child object is owned by '%s'", ref.Name)
+		}
+	}
+	return nil
 }
 
 // Reconcile reads the state of the cluster for a GitTrack object and makes changes based on the state read
