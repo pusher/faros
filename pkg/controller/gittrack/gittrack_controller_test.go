@@ -284,7 +284,7 @@ var _ = Describe("GitTrack Suite", func() {
 						Data: []byte("kind: Deployment"),
 					},
 				}
-				err := c.Create(context.TODO(), existingChild)
+				err := c.Create(context.TODO(), existingChild.DeepCopy())
 				Expect(err).ToNot(HaveOccurred())
 
 				createInstance(instance, "master")
@@ -298,7 +298,11 @@ var _ = Describe("GitTrack Suite", func() {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployGto)
 				}, timeout).Should(Succeed())
 
-				Expect(deployGto.ObjectMeta).To(Equal(existingChild.ObjectMeta))
+				o := deployGto.ObjectMeta
+				Expect(o.OwnerReferences).To(Equal(existingChild.ObjectMeta.OwnerReferences))
+				Expect(o.Name).To(Equal(existingChild.ObjectMeta.Name))
+				Expect(o.Namespace).To(Equal(existingChild.ObjectMeta.Namespace))
+
 				Expect(deployGto.Spec).To(Equal(existingChild.Spec))
 			})
 
