@@ -1072,7 +1072,7 @@ var (
 	}
 
 	ClusterUpdateStrategyShouldNever = func() {
-		values := map[string]string{"UpdateStrategy": "never", "Namespace": "v2.0.0"}
+		values := map[string]string{"UpdateStrategy": "never", "Namespace": "other"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		crb := &rbacv1.ClusterRoleBinding{}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
