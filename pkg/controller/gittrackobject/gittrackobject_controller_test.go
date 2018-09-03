@@ -222,29 +222,34 @@ var _ = Describe("GitTrackObject Suite", func() {
 	})
 
 	AfterEach(func() {
+		// Stop Controller and informers before cleaning up
+		close(stop)
+		close(stopInformers)
 		// GC isn't run in the control-plane so guess we'll have to clean up manually
 		gtos := &farosv1alpha1.GitTrackObjectList{}
-		Expect(c.List(context.TODO(), &client.ListOptions{}, gtos)).NotTo(HaveOccurred())
+		Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, gtos) }, timeout).Should(Succeed())
 		for _, gto := range gtos.Items {
+			log.Printf("deleting GTO %s/%s", gto.Namespace, gto.Name)
 			Expect(c.Delete(context.TODO(), &gto)).NotTo(HaveOccurred())
 		}
 		cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
-		Expect(c.List(context.TODO(), &client.ListOptions{}, cgtos)).NotTo(HaveOccurred())
+		Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, cgtos) }, timeout).Should(Succeed())
 		for _, cgto := range cgtos.Items {
+			log.Printf("deleting CGTO %s/%s", cgto.Namespace, cgto.Name)
 			Expect(c.Delete(context.TODO(), &cgto)).NotTo(HaveOccurred())
 		}
 		deploys := &appsv1.DeploymentList{}
-		Expect(c.List(context.TODO(), &client.ListOptions{}, deploys)).To(Succeed())
+		Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, deploys) }, timeout).Should(Succeed())
 		for _, d := range deploys.Items {
+			log.Printf("deleting Deployment %s/%s", d.Namespace, d.Name)
 			Expect(c.Delete(context.TODO(), &d)).To(Succeed())
 		}
 		crbs := &rbacv1.ClusterRoleBindingList{}
-		Expect(c.List(context.TODO(), &client.ListOptions{}, crbs)).To(Succeed())
+		Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, crbs) }, timeout).Should(Succeed())
 		for _, crb := range crbs.Items {
+			log.Printf("deleting ClusterRoleBinding %s/%s", crb.Namespace, crb.Name)
 			Expect(c.Delete(context.TODO(), &crb)).To(Succeed())
 		}
-		close(stop)
-		close(stopInformers)
 	})
 
 	Context("When a GitTrackObject is created", func() {
