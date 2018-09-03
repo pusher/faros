@@ -1018,7 +1018,16 @@ var (
 		values := map[string]string{"UpdateStrategy": "anything-else", "Tag": "v2.0.0"}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
 		UpdateInstance(instance, renderExample(annotationExample, values), true)
-		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		Eventually(func() error {
+			err := c.Get(context.TODO(), depKey, instance)
+			if err != nil {
+				return err
+			}
+			if instance.Status.Conditions[0].Reason != string(gittrackobjectutils.ErrorUpdatingChild) {
+				return fmt.Errorf("condition hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
 		condition := instance.Status.Conditions[0]
 		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
@@ -1086,7 +1095,16 @@ var (
 		values := map[string]string{"UpdateStrategy": "anything-else", "Namespace": "other"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), true)
-		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		Eventually(func() error {
+			err := c.Get(context.TODO(), crbKey, clusterInstance)
+			if err != nil {
+				return err
+			}
+			if clusterInstance.Status.Conditions[0].Reason != string(gittrackobjectutils.ErrorUpdatingChild) {
+				return fmt.Errorf("condition hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
 		condition := clusterInstance.Status.Conditions[0]
 		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
