@@ -112,8 +112,8 @@ var _ = Describe("GitTrack Suite", func() {
 	})
 
 	AfterEach(func() {
-		gcInstance(key)
 		close(stop)
+		gcInstance(key)
 	})
 
 	Context("When a GitTrack resource is created", func() {
