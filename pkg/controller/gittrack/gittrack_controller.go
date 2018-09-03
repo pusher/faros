@@ -45,6 +45,7 @@ import (
 )
 
 var privateKeyPath = flag.String("private-key", "", "Path to default private key to use for Git checkouts")
+var namespace = flag.String("namespace", "", "Only manage GitTrack resources in given namespace")
 
 const ownedByLabel = "faros.pusher.com/owned-by"
 
@@ -82,7 +83,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to GitTrack
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{}, &utils.NamespacedPredicate{
+		Namespace: *namespace,
+	})
 	if err != nil {
 		return err
 	}
