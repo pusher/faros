@@ -223,21 +223,25 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 	AfterEach(func() {
 		// GC isn't run in the control-plane so guess we'll have to clean up manually
-		if instance != nil {
-			c.Delete(context.TODO(), instance)
-			deploys := &appsv1.DeploymentList{}
-			Expect(c.List(context.TODO(), client.InNamespace(instance.Namespace), deploys)).To(Succeed())
-			for _, d := range deploys.Items {
-				Expect(c.Delete(context.TODO(), &d)).To(Succeed())
-			}
+		gtos := &farosv1alpha1.GitTrackObjectList{}
+		Expect(c.List(context.TODO(), &client.ListOptions{}, gtos)).NotTo(HaveOccurred())
+		for _, gto := range gtos.Items {
+			Expect(c.Delete(context.TODO(), &gto)).NotTo(HaveOccurred())
 		}
-		if clusterInstance != nil {
-			c.Delete(context.TODO(), clusterInstance)
-			crbs := &rbacv1.ClusterRoleBindingList{}
-			Expect(c.List(context.TODO(), client.InNamespace(""), crbs)).To(Succeed())
-			for _, crb := range crbs.Items {
-				Expect(c.Delete(context.TODO(), &crb)).To(Succeed())
-			}
+		cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
+		Expect(c.List(context.TODO(), &client.ListOptions{}, cgtos)).NotTo(HaveOccurred())
+		for _, cgto := range cgtos.Items {
+			Expect(c.Delete(context.TODO(), &cgto)).NotTo(HaveOccurred())
+		}
+		deploys := &appsv1.DeploymentList{}
+		Expect(c.List(context.TODO(), &client.ListOptions{}, deploys)).To(Succeed())
+		for _, d := range deploys.Items {
+			Expect(c.Delete(context.TODO(), &d)).To(Succeed())
+		}
+		crbs := &rbacv1.ClusterRoleBindingList{}
+		Expect(c.List(context.TODO(), &client.ListOptions{}, crbs)).To(Succeed())
+		for _, crb := range crbs.Items {
+			Expect(c.Delete(context.TODO(), &crb)).To(Succeed())
 		}
 		close(stop)
 		close(stopInformers)

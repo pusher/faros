@@ -54,7 +54,7 @@ var gcInstance = func(key types.NamespacedName) {
 	Expect(err).NotTo(HaveOccurred())
 	// GC isn't run in the control-plane so guess we'll have to clean up manually
 	gtos := &farosv1alpha1.GitTrackObjectList{}
-	err = c.List(context.TODO(), client.InNamespace(gt.Namespace), gtos)
+	err = c.List(context.TODO(), &client.ListOptions{}, gtos)
 	Expect(err).NotTo(HaveOccurred())
 	for _, gto := range gtos.Items {
 		err = c.Delete(context.TODO(), &gto)
