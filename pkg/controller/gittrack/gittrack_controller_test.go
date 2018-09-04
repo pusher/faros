@@ -41,56 +41,57 @@ var stop chan struct{}
 
 var key = types.NamespacedName{Name: "example", Namespace: "default"}
 var expectedRequest = reconcile.Request{NamespacedName: key}
-var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
-	gt.Spec.Reference = ref
-	err := c.Create(context.TODO(), gt)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-var gcInstance = func(key types.NamespacedName) {
-	gt := &farosv1alpha1.GitTrack{}
-	Eventually(func() error { return c.Get(context.TODO(), key, gt) }, timeout).Should(Succeed())
-	err := c.Delete(context.TODO(), gt)
-	Expect(err).NotTo(HaveOccurred())
-	// GC isn't run in the control-plane so guess we'll have to clean up manually
-	gtos := &farosv1alpha1.GitTrackObjectList{}
-	err = c.List(context.TODO(), &client.ListOptions{}, gtos)
-	Expect(err).NotTo(HaveOccurred())
-	for _, gto := range gtos.Items {
-		err = c.Delete(context.TODO(), &gto)
-		Expect(err).NotTo(HaveOccurred())
-	}
-	cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
-	err = c.List(context.TODO(), &client.ListOptions{}, cgtos)
-	Expect(err).NotTo(HaveOccurred())
-	for _, cgto := range cgtos.Items {
-		err = c.Delete(context.TODO(), &cgto)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
-var waitForInstanceCreated = func(key types.NamespacedName) {
-	request := reconcile.Request{NamespacedName: key}
-	// wait for reconcile for creating the GitTrack resource
-	Eventually(requests, timeout).Should(Receive(Equal(request)))
-	// wait for reconcile for updating the GitTrack resource's status
-	Eventually(requests, timeout).Should(Receive(Equal(request)))
-	obj := &farosv1alpha1.GitTrack{}
-	Eventually(func() error {
-		err := c.Get(context.TODO(), key, obj)
-		if err != nil {
-			return err
-		}
-		if len(obj.Status.Conditions) == 0 {
-			return fmt.Errorf("Status not updated")
-		}
-		return nil
-	}, timeout).Should(Succeed())
-}
 
 const timeout = time.Second * 5
 
 var _ = Describe("GitTrack Suite", func() {
+	var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
+		gt.Spec.Reference = ref
+		err := c.Create(context.TODO(), gt)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var gcInstance = func(key types.NamespacedName) {
+		gt := &farosv1alpha1.GitTrack{}
+		Eventually(func() error { return c.Get(context.TODO(), key, gt) }, timeout).Should(Succeed())
+		err := c.Delete(context.TODO(), gt)
+		Expect(err).NotTo(HaveOccurred())
+		// GC isn't run in the control-plane so guess we'll have to clean up manually
+		gtos := &farosv1alpha1.GitTrackObjectList{}
+		err = c.List(context.TODO(), &client.ListOptions{}, gtos)
+		Expect(err).NotTo(HaveOccurred())
+		for _, gto := range gtos.Items {
+			err = c.Delete(context.TODO(), &gto)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
+		err = c.List(context.TODO(), &client.ListOptions{}, cgtos)
+		Expect(err).NotTo(HaveOccurred())
+		for _, cgto := range cgtos.Items {
+			err = c.Delete(context.TODO(), &cgto)
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}
+
+	var waitForInstanceCreated = func(key types.NamespacedName) {
+		request := reconcile.Request{NamespacedName: key}
+		// wait for reconcile for creating the GitTrack resource
+		Eventually(requests, timeout).Should(Receive(Equal(request)))
+		// wait for reconcile for updating the GitTrack resource's status
+		Eventually(requests, timeout).Should(Receive(Equal(request)))
+		obj := &farosv1alpha1.GitTrack{}
+		Eventually(func() error {
+			err := c.Get(context.TODO(), key, obj)
+			if err != nil {
+				return err
+			}
+			if len(obj.Status.Conditions) == 0 {
+				return fmt.Errorf("Status not updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+	}
+
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
