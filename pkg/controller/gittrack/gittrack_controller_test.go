@@ -26,7 +26,9 @@ import (
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -51,28 +53,6 @@ var _ = Describe("GitTrack Suite", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	var gcInstance = func(key types.NamespacedName) {
-		gt := &farosv1alpha1.GitTrack{}
-		Eventually(func() error { return c.Get(context.TODO(), key, gt) }, timeout).Should(Succeed())
-		err := c.Delete(context.TODO(), gt)
-		Expect(err).NotTo(HaveOccurred())
-		// GC isn't run in the control-plane so guess we'll have to clean up manually
-		gtos := &farosv1alpha1.GitTrackObjectList{}
-		err = c.List(context.TODO(), &client.ListOptions{}, gtos)
-		Expect(err).NotTo(HaveOccurred())
-		for _, gto := range gtos.Items {
-			err = c.Delete(context.TODO(), &gto)
-			Expect(err).NotTo(HaveOccurred())
-		}
-		cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
-		err = c.List(context.TODO(), &client.ListOptions{}, cgtos)
-		Expect(err).NotTo(HaveOccurred())
-		for _, cgto := range cgtos.Items {
-			err = c.Delete(context.TODO(), &cgto)
-			Expect(err).NotTo(HaveOccurred())
-		}
-	}
-
 	var waitForInstanceCreated = func(key types.NamespacedName) {
 		request := reconcile.Request{NamespacedName: key}
 		// wait for reconcile for creating the GitTrack resource
@@ -90,6 +70,14 @@ var _ = Describe("GitTrack Suite", func() {
 			}
 			return nil
 		}, timeout).Should(Succeed())
+	}
+
+	var deleteAll = func(objs runtime.Object) {
+		Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, objs) }, timeout).Should(Succeed())
+		err := apimeta.EachListItem(objs, func(obj runtime.Object) error {
+			return c.Delete(context.TODO(), obj)
+		})
+		Expect(err).ToNot(HaveOccurred())
 	}
 
 	BeforeEach(func() {
@@ -114,7 +102,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 	AfterEach(func() {
 		close(stop)
-		gcInstance(key)
+		deleteAll(&farosv1alpha1.GitTrackList{})
+		deleteAll(&farosv1alpha1.GitTrackObjectList{})
+		deleteAll(&farosv1alpha1.ClusterGitTrackObjectList{})
 	})
 
 	Context("When a GitTrack resource is created", func() {
