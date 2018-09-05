@@ -71,6 +71,18 @@ var _ = Describe("GitTrack Suite", func() {
 		}, timeout).Should(Succeed())
 	}
 
+	var filterEvents = func(evs []v1.Event, exp v1.Event) []v1.Event {
+		filtered := []v1.Event{}
+		for _, e := range evs {
+			if e.Reason == exp.Reason {
+				if exp.Message == "" || e.Message == exp.Message {
+					filtered = append(filtered, e)
+				}
+			}
+		}
+		return filtered
+	}
+
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
@@ -96,6 +108,7 @@ var _ = Describe("GitTrack Suite", func() {
 		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackList{})
 		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
 		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &v1.EventList{})
 	})
 
 	Context("When a GitTrack resource is created", func() {
@@ -165,6 +178,34 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(deployGto.Labels).To(HaveKeyWithValue("faros.pusher.com/owned-by", "example"))
 				Expect(serviceGto.Labels).To(HaveKeyWithValue("faros.pusher.com/owned-by", "example"))
 			})
+
+			It("sends events about checking out configured Git repository", func() {
+				events := &v1.EventList{}
+				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				startEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutStarted"})
+				successEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutSuccessful"})
+				Expect(startEvents).ToNot(BeEmpty())
+				Expect(successEvents).ToNot(BeEmpty())
+				for _, e := range append(startEvents, successEvents...) {
+					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
+					Expect(e.InvolvedObject.Name).To(Equal("example"))
+					Expect(e.Type).To(Equal(string(v1.EventTypeNormal)))
+				}
+			})
+
+			It("sends events about creating GitTrackObjects", func() {
+				events := &v1.EventList{}
+				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				startEvents := filterEvents(events.Items, v1.Event{Reason: "CreateStarted"})
+				successEvents := filterEvents(events.Items, v1.Event{Reason: "CreateSuccessful"})
+				Expect(startEvents).ToNot(BeEmpty())
+				Expect(successEvents).ToNot(BeEmpty())
+				for _, e := range append(startEvents, successEvents...) {
+					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
+					Expect(e.InvolvedObject.Name).To(Equal("example"))
+					Expect(e.Type).To(Equal(string(v1.EventTypeNormal)))
+				}
+			})
 		})
 
 		Context("with multi-document YAML", func() {
@@ -219,6 +260,18 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
 			})
+
+			It("sends a CheckoutFailed event", func() {
+				events := &v1.EventList{}
+				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})
+				Expect(failedEvents).ToNot(BeEmpty())
+				for _, e := range failedEvents {
+					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
+					Expect(e.InvolvedObject.Name).To(Equal("example"))
+					Expect(e.Type).To(Equal(string(v1.EventTypeWarning)))
+				}
+			})
 		})
 
 		Context("with an invalid SubPath", func() {
@@ -240,6 +293,18 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
 				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("no files for subpath 'does-not-exist'"))
+			})
+
+			It("sends a CheckoutFailed event", func() {
+				events := &v1.EventList{}
+				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})
+				Expect(failedEvents).ToNot(BeEmpty())
+				for _, e := range failedEvents {
+					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
+					Expect(e.InvolvedObject.Name).To(Equal("example"))
+					Expect(e.Type).To(Equal(v1.EventTypeWarning))
+				}
 			})
 		})
 
@@ -466,6 +531,41 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 				Expect(after.Spec).To(Equal(before.Spec))
 			})
+
+			It("sends events about updating resources", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				instance.Spec.Reference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+				Expect(c.Update(context.TODO(), instance)).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error {
+					events := &v1.EventList{}
+					err := c.List(context.TODO(), &client.ListOptions{}, events)
+					if err != nil {
+						return err
+					}
+					if len(filterEvents(events.Items, v1.Event{Reason: "UpdateSuccessful"})) == 0 {
+						return fmt.Errorf("events hasn't been sent yet")
+					}
+					return nil
+				}, timeout*2).Should(Succeed())
+				events := &v1.EventList{}
+				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				startEvents := filterEvents(events.Items, v1.Event{Reason: "UpdateStarted"})
+				successEvents := filterEvents(events.Items, v1.Event{Reason: "UpdateSuccessful"})
+				failedEvents := filterEvents(events.Items, v1.Event{Reason: "UpdateFailed"})
+				Expect(startEvents).ToNot(BeEmpty())
+				Expect(successEvents).ToNot(BeEmpty())
+				Expect(failedEvents).To(BeEmpty())
+				for _, e := range append(startEvents, successEvents...) {
+					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
+					Expect(e.InvolvedObject.Name).To(Equal("example"))
+					Expect(e.Type).To(Equal(string(v1.EventTypeNormal)))
+					Expect(e.Reason).To(SatisfyAny(Equal("UpdateStarted"), Equal("UpdateSuccessful")))
+				}
+			})
 		})
 
 		Context("and the subPath has changed", func() {
@@ -538,6 +638,37 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
 			})
+
+			It("sends a CheckoutFailed event", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				instance.Spec.Reference = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error {
+					events := &v1.EventList{}
+					err := c.List(context.TODO(), &client.ListOptions{}, events)
+					if err != nil {
+						return err
+					}
+					if len(filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})) == 0 {
+						return fmt.Errorf("events hasn't been sent yet")
+					}
+					return nil
+				}, timeout).Should(Succeed())
+				events := &v1.EventList{}
+				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})
+				Expect(failedEvents).ToNot(BeEmpty())
+				for _, e := range failedEvents {
+					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
+					Expect(e.InvolvedObject.Name).To(Equal("example"))
+					Expect(e.Type).To(Equal(v1.EventTypeWarning))
+				}
+			})
 		})
 
 		Context("and the subPath is invalid", func() {
@@ -606,6 +737,39 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
 				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorFetchingFiles)))
 				Expect(c.Message).To(Equal("no files for subpath 'does-not-exist'"))
+			})
+
+			It("sends a CheckoutFailed event", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				instance.Spec.SubPath = "does-not-exist"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error {
+					events := &v1.EventList{}
+					err := c.List(context.TODO(), &client.ListOptions{}, events)
+					if err != nil {
+						return err
+					}
+					failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed", Message: "No files for SubPath 'does-not-exist'"})
+					if len(failedEvents) == 0 {
+						return fmt.Errorf("events hasn't been sent yet")
+					}
+					return nil
+				}, timeout).Should(Succeed())
+				events := &v1.EventList{}
+				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed", Message: "No files for SubPath 'does-not-exist'"})
+				Expect(failedEvents).ToNot(BeEmpty())
+				for _, e := range failedEvents {
+					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
+					Expect(e.InvolvedObject.Name).To(Equal("example"))
+					Expect(e.Message).To(Equal("No files for SubPath 'does-not-exist'"))
+					Expect(e.Type).To(Equal(string(v1.EventTypeWarning)))
+				}
 			})
 		})
 	})
