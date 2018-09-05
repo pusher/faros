@@ -36,6 +36,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -117,6 +118,7 @@ subjects:
 `
 
 var invalidExample = `apiVersion: apps/v1
+\x8f
 kind: Deployment
 metadata:
 name: example
@@ -229,10 +231,15 @@ var _ = Describe("GitTrackObject Suite", func() {
 		close(stop)
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
-		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
-		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
-		testutils.DeleteAll(c, timeout, &appsv1.DeploymentList{})
-		testutils.DeleteAll(c, timeout, &rbacv1.ClusterRoleBindingList{})
+		deleteClient, err := client.New(rest.CopyConfig(cfg), client.Options{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		testutils.DeleteAll(deleteClient, timeout, &farosv1alpha1.GitTrackObjectList{})
+		testutils.DeleteAll(deleteClient, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
+		testutils.DeleteAll(deleteClient, timeout, &appsv1.DeploymentList{})
+		testutils.DeleteAll(deleteClient, timeout, &rbacv1.ClusterRoleBindingList{})
+		testutils.DeleteAll(deleteClient, timeout, &v1.EventList{})
 	})
 
 	Context("When a GitTrackObject is created", func() {
@@ -443,6 +450,16 @@ var (
 		}, timeout).Should(Succeed())
 	}
 
+	FilterEvents = func(evs []v1.Event, f func(ev v1.Event) bool) []v1.Event {
+		filtered := []v1.Event{}
+		for _, e := range evs {
+			if f(e) {
+				filtered = append(filtered, e)
+			}
+		}
+		return filtered
+	}
+
 	// validDataTest runs the suite of tests for valid input data
 	validDataTest = func(initial, updated []byte) {
 		BeforeEach(func() {
@@ -482,6 +499,10 @@ var (
 			It("the spec is modified", ShouldResetChildIfSpecModified)
 
 			It("the meta is modified", ShouldResetChildIfMetaModified)
+		})
+
+		It("should send `StartedCreate` and `SuccessfulCreate` events", func() {
+			ShouldSendCreateEvents("GitTrackObject", "default")
 		})
 	}
 
@@ -526,6 +547,9 @@ var (
 			It("the meta is modified", ClusterShouldResetChildIfMetaModified)
 		})
 
+		It("should send `StartedCreate` and `SuccessfulCreate` events", func() {
+			ShouldSendCreateEvents("ClusterGitTrackObject", "")
+		})
 	}
 
 	// invalidDataTest runs the suite of tests for an invalid input
@@ -549,6 +573,10 @@ var (
 				ShouldUpdateConditionReason(gittrackobjectutils.ChildAppliedSuccess, false)
 			})
 		})
+
+		It("should send `FailedUnmarshal` event", func() {
+			ShouldSendFailedUnmarshalEvent("GitTrackObject", "default")
+		})
 	}
 
 	// invalidClusterDataTest runs the suite of tests for an invalid input
@@ -568,6 +596,10 @@ var (
 			It("condition reason should not be ChildAppliedSuccess", func() {
 				ClusterShouldUpdateConditionReason(gittrackobjectutils.ChildAppliedSuccess, false)
 			})
+		})
+
+		It("should send a `FailedUnmarshal` event", func() {
+			ShouldSendFailedUnmarshalEvent("ClusterGitTrackObject", "")
 		})
 	}
 
@@ -1095,5 +1127,64 @@ var (
 		condition := clusterInstance.Status.Conditions[0]
 		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
+	}
+
+	ShouldSendFailedUnmarshalEvent = func(kind, namespace string) {
+		events := &v1.EventList{}
+		Eventually(func() error {
+			err := c.List(context.TODO(), &client.ListOptions{}, events)
+			if err != nil {
+				return err
+			}
+			filtered := FilterEvents(events.Items, func(ev v1.Event) bool {
+				return ev.Reason == "FailedUnmarshal" && ev.InvolvedObject.Kind == kind
+			})
+			if len(filtered) == 0 {
+				return fmt.Errorf("event haven't been sent yet")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+		failedEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
+			return ev.Reason == "FailedUnmarshal" && ev.InvolvedObject.Kind == kind
+		})
+		Expect(failedEvents).ToNot(BeEmpty())
+		for _, e := range failedEvents {
+			Expect(e.InvolvedObject.Kind).To(Equal(kind))
+			Expect(e.InvolvedObject.Name).To(Equal("example"))
+			Expect(e.InvolvedObject.Namespace).To(Equal(namespace))
+			Expect(e.Type).To(Equal(string(v1.EventTypeWarning)))
+		}
+	}
+
+	ShouldSendCreateEvents = func(kind, namespace string) {
+		events := &v1.EventList{}
+		Eventually(func() error {
+			err := c.List(context.TODO(), &client.ListOptions{}, events)
+			if err != nil {
+				return err
+			}
+			filtered := FilterEvents(events.Items, func(ev v1.Event) bool {
+				return ev.Reason == "SuccessfulCreate" && ev.InvolvedObject.Kind == kind
+			})
+			if len(filtered) == 0 {
+				return fmt.Errorf("events haven't been sent yet")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+
+		startEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
+			return ev.Reason == "StartedCreate" && ev.InvolvedObject.Kind == kind
+		})
+		successEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
+			return ev.Reason == "SuccessfulCreate" && ev.InvolvedObject.Kind == kind
+		})
+		Expect(startEvents).ToNot(BeEmpty())
+		Expect(successEvents).ToNot(BeEmpty())
+		for _, e := range append(startEvents, successEvents...) {
+			Expect(e.InvolvedObject.Kind).To(Equal(kind))
+			Expect(e.InvolvedObject.Name).To(Equal("example"))
+			Expect(e.InvolvedObject.Namespace).To(Equal(namespace))
+			Expect(e.Type).To(Equal(string(v1.EventTypeNormal)))
+		}
 	}
 )
