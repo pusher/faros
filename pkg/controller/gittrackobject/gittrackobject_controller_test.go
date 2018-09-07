@@ -1015,7 +1015,6 @@ var (
 			return nil
 		}, timeout).Should(Succeed())
 		condition := instance.Status.Conditions[0]
-		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
 	}
 

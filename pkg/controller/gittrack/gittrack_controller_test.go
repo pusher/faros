@@ -585,7 +585,6 @@ var _ = Describe("GitTrack Suite", func() {
 				// TODO: don't rely on ordering
 				c := instance.Status.Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
-				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
