@@ -29,6 +29,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
+	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -222,25 +223,14 @@ var _ = Describe("GitTrackObject Suite", func() {
 	})
 
 	AfterEach(func() {
-		// GC isn't run in the control-plane so guess we'll have to clean up manually
-		if instance != nil {
-			c.Delete(context.TODO(), instance)
-			deploys := &appsv1.DeploymentList{}
-			Expect(c.List(context.TODO(), client.InNamespace(instance.Namespace), deploys)).To(Succeed())
-			for _, d := range deploys.Items {
-				Expect(c.Delete(context.TODO(), &d)).To(Succeed())
-			}
-		}
-		if clusterInstance != nil {
-			c.Delete(context.TODO(), clusterInstance)
-			crbs := &rbacv1.ClusterRoleBindingList{}
-			Expect(c.List(context.TODO(), client.InNamespace(""), crbs)).To(Succeed())
-			for _, crb := range crbs.Items {
-				Expect(c.Delete(context.TODO(), &crb)).To(Succeed())
-			}
-		}
+		// Stop Controller and informers before cleaning up
 		close(stop)
 		close(stopInformers)
+		// Clean up all resources as GC is disabled in the control plane
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &appsv1.DeploymentList{})
+		testutils.DeleteAll(c, timeout, &rbacv1.ClusterRoleBindingList{})
 	})
 
 	Context("When a GitTrackObject is created", func() {
@@ -1014,9 +1004,17 @@ var (
 		values := map[string]string{"UpdateStrategy": "anything-else", "Tag": "v2.0.0"}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
 		UpdateInstance(instance, renderExample(annotationExample, values), true)
-		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		Eventually(func() error {
+			err := c.Get(context.TODO(), depKey, instance)
+			if err != nil {
+				return err
+			}
+			if instance.Status.Conditions[0].Reason != string(gittrackobjectutils.ErrorUpdatingChild) {
+				return fmt.Errorf("condition hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
 		condition := instance.Status.Conditions[0]
-		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
 	}
 
@@ -1068,7 +1066,7 @@ var (
 	}
 
 	ClusterUpdateStrategyShouldNever = func() {
-		values := map[string]string{"UpdateStrategy": "never", "Namespace": "v2.0.0"}
+		values := map[string]string{"UpdateStrategy": "never", "Namespace": "other"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		crb := &rbacv1.ClusterRoleBinding{}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
@@ -1082,7 +1080,16 @@ var (
 		values := map[string]string{"UpdateStrategy": "anything-else", "Namespace": "other"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), true)
-		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		Eventually(func() error {
+			err := c.Get(context.TODO(), crbKey, clusterInstance)
+			if err != nil {
+				return err
+			}
+			if clusterInstance.Status.Conditions[0].Reason != string(gittrackobjectutils.ErrorUpdatingChild) {
+				return fmt.Errorf("condition hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
 		condition := clusterInstance.Status.Conditions[0]
 		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))

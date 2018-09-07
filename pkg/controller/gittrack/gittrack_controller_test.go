@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,56 +42,35 @@ var stop chan struct{}
 
 var key = types.NamespacedName{Name: "example", Namespace: "default"}
 var expectedRequest = reconcile.Request{NamespacedName: key}
-var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
-	gt.Spec.Reference = ref
-	err := c.Create(context.TODO(), gt)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-var gcInstance = func(key types.NamespacedName) {
-	gt := &farosv1alpha1.GitTrack{}
-	Eventually(func() error { return c.Get(context.TODO(), key, gt) }, timeout).Should(Succeed())
-	err := c.Delete(context.TODO(), gt)
-	Expect(err).NotTo(HaveOccurred())
-	// GC isn't run in the control-plane so guess we'll have to clean up manually
-	gtos := &farosv1alpha1.GitTrackObjectList{}
-	err = c.List(context.TODO(), client.InNamespace(gt.Namespace), gtos)
-	Expect(err).NotTo(HaveOccurred())
-	for _, gto := range gtos.Items {
-		err = c.Delete(context.TODO(), &gto)
-		Expect(err).NotTo(HaveOccurred())
-	}
-	cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
-	err = c.List(context.TODO(), &client.ListOptions{}, cgtos)
-	Expect(err).NotTo(HaveOccurred())
-	for _, cgto := range cgtos.Items {
-		err = c.Delete(context.TODO(), &cgto)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
-var waitForInstanceCreated = func(key types.NamespacedName) {
-	request := reconcile.Request{NamespacedName: key}
-	// wait for reconcile for creating the GitTrack resource
-	Eventually(requests, timeout).Should(Receive(Equal(request)))
-	// wait for reconcile for updating the GitTrack resource's status
-	Eventually(requests, timeout).Should(Receive(Equal(request)))
-	obj := &farosv1alpha1.GitTrack{}
-	Eventually(func() error {
-		err := c.Get(context.TODO(), key, obj)
-		if err != nil {
-			return err
-		}
-		if len(obj.Status.Conditions) == 0 {
-			return fmt.Errorf("Status not updated")
-		}
-		return nil
-	}, timeout).Should(Succeed())
-}
 
 const timeout = time.Second * 5
 
 var _ = Describe("GitTrack Suite", func() {
+	var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
+		gt.Spec.Reference = ref
+		err := c.Create(context.TODO(), gt)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var waitForInstanceCreated = func(key types.NamespacedName) {
+		request := reconcile.Request{NamespacedName: key}
+		// wait for reconcile for creating the GitTrack resource
+		Eventually(requests, timeout).Should(Receive(Equal(request)))
+		// wait for reconcile for updating the GitTrack resource's status
+		Eventually(requests, timeout).Should(Receive(Equal(request)))
+		obj := &farosv1alpha1.GitTrack{}
+		Eventually(func() error {
+			err := c.Get(context.TODO(), key, obj)
+			if err != nil {
+				return err
+			}
+			if len(obj.Status.Conditions) == 0 {
+				return fmt.Errorf("Status not updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+	}
+
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
@@ -112,8 +92,10 @@ var _ = Describe("GitTrack Suite", func() {
 	})
 
 	AfterEach(func() {
-		gcInstance(key)
 		close(stop)
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
 	})
 
 	Context("When a GitTrack resource is created", func() {
@@ -589,11 +571,20 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Eventually(func() error {
+					err = c.Get(context.TODO(), key, instance)
+					if err != nil {
+						return err
+					}
+					c := instance.Status.Conditions[1]
+					if c.Status != v1.ConditionFalse {
+						return fmt.Errorf("condition hasn't updated yet")
+					}
+					return nil
+				}, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
 				c := instance.Status.Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
-				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
