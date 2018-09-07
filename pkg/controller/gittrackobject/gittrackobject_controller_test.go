@@ -29,13 +29,12 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
+	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -207,14 +206,6 @@ var stopInformers chan struct{}
 const timeout = time.Second * 5
 
 var _ = Describe("GitTrackObject Suite", func() {
-	var deleteAll = func(objs runtime.Object) {
-		Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, objs) }, timeout).Should(Succeed())
-		err := apimeta.EachListItem(objs, func(obj runtime.Object) error {
-			return c.Delete(context.TODO(), obj)
-		})
-		Expect(err).ToNot(HaveOccurred())
-	}
-
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
@@ -236,10 +227,10 @@ var _ = Describe("GitTrackObject Suite", func() {
 		close(stop)
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
-		deleteAll(&farosv1alpha1.GitTrackObjectList{})
-		deleteAll(&farosv1alpha1.ClusterGitTrackObjectList{})
-		deleteAll(&appsv1.DeploymentList{})
-		deleteAll(&rbacv1.ClusterRoleBindingList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &appsv1.DeploymentList{})
+		testutils.DeleteAll(c, timeout, &rbacv1.ClusterRoleBindingList{})
 	})
 
 	Context("When a GitTrackObject is created", func() {

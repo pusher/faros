@@ -24,11 +24,10 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -72,14 +71,6 @@ var _ = Describe("GitTrack Suite", func() {
 		}, timeout).Should(Succeed())
 	}
 
-	var deleteAll = func(objs runtime.Object) {
-		Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, objs) }, timeout).Should(Succeed())
-		err := apimeta.EachListItem(objs, func(obj runtime.Object) error {
-			return c.Delete(context.TODO(), obj)
-		})
-		Expect(err).ToNot(HaveOccurred())
-	}
-
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
@@ -102,9 +93,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 	AfterEach(func() {
 		close(stop)
-		deleteAll(&farosv1alpha1.GitTrackList{})
-		deleteAll(&farosv1alpha1.GitTrackObjectList{})
-		deleteAll(&farosv1alpha1.ClusterGitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
+		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
 	})
 
 	Context("When a GitTrack resource is created", func() {
