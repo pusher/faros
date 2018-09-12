@@ -62,7 +62,7 @@ data:
 var mixedList = roleBinding + pdb
 
 var _ = Describe("YAMLToUnstructured", func() {
-	It("should convert the roleBinding to an unstructured roleBindung", func() {
+	It("should convert the roleBinding to an unstructured roleBinding", func() {
 		obj, err := YAMLToUnstructured([]byte(roleBinding))
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(obj.GetKind()).To(Equal("RoleBinding"))
@@ -70,6 +70,7 @@ var _ = Describe("YAMLToUnstructured", func() {
 		Expect(obj.GetNamespace()).To(Equal("kube-system"))
 		Expect(obj.IsList()).To(BeFalse())
 	})
+
 	It("should split a mixed list into a list of unstructureds", func() {
 		obj, err := YAMLToUnstructured([]byte(mixedList))
 		Expect(err).ShouldNot(HaveOccurred())
