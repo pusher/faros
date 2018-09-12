@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	yamlSeparator = "---\n"
+	yamlSeparator = "\n---\n"
 )
 
 // list represents a Kubernetes List object which can contain multiple other

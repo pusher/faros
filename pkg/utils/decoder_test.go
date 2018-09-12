@@ -45,10 +45,24 @@ spec:
       k8s-app: kubernetes-dashboard
 `
 
+var cm = `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hello-world
+  namespace: default
+data:
+  file1.yml: |-
+    hello: world
+  file2.yml: |-
+    ---
+    world: hello
+`
+
 var mixedList = roleBinding + pdb
 
 var _ = Describe("YAMLToUnstructured", func() {
-	It("should convert the roleBinding to an unstructured roleBindung", func() {
+	It("should convert the roleBinding to an unstructured roleBinding", func() {
 		obj, err := YAMLToUnstructured([]byte(roleBinding))
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(obj.GetKind()).To(Equal("RoleBinding"))
@@ -56,6 +70,7 @@ var _ = Describe("YAMLToUnstructured", func() {
 		Expect(obj.GetNamespace()).To(Equal("kube-system"))
 		Expect(obj.IsList()).To(BeFalse())
 	})
+
 	It("should split a mixed list into a list of unstructureds", func() {
 		obj, err := YAMLToUnstructured([]byte(mixedList))
 		Expect(err).ShouldNot(HaveOccurred())
@@ -72,6 +87,15 @@ var _ = Describe("YAMLToUnstructured", func() {
 		pdb, ok := listItems[1].(*unstructured.Unstructured)
 		Expect(ok).To(BeTrue())
 		Expect(pdb.GetKind()).To(Equal("PodDisruptionBudget"))
+	})
+
+	It("should only split on unindented triple dashes", func() {
+		obj, err := YAMLToUnstructured([]byte(cm))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(obj.GetKind()).To(Equal("ConfigMap"))
+		Expect(obj.GetName()).To(Equal("hello-world"))
+		Expect(obj.GetNamespace()).To(Equal("default"))
+		Expect(obj.IsList()).To(BeFalse())
 	})
 })
 
