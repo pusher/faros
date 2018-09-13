@@ -249,7 +249,7 @@ func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructu
 
 // objectName constructs a name from an Unstructured object
 func objectName(u *unstructured.Unstructured) string {
-	return strings.ToLower(fmt.Sprintf("%s-%s", u.GetKind(), u.GetName()))
+	return strings.ToLower(fmt.Sprintf("%s-%s", u.GetKind(), strings.Replace(u.GetName(), ":", "-", -1)))
 }
 
 // handleObject either creates or updates a GitTrackObject

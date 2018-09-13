@@ -304,6 +304,22 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.Message).To(Equal("child 'deployment-nginx' is owned by another controller: child object is owned by 'does-not-exist'"))
 			})
 		})
+
+		Context("with a child resource that has a name that contains `:`", func() {
+			BeforeEach(func() {
+				createInstance(instance, "241786090da55894dca4e91e3f5023c024d3d9a8")
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
+			})
+
+			It("replaces `:` with `-`", func() {
+				clusterRoleGto := &farosv1alpha1.ClusterGitTrackObject{}
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "clusterrole-test-read-ns-pods-svcs"}, clusterRoleGto)
+				}, timeout).Should(Succeed())
+				Expect(clusterRoleGto.Name).To(Equal("clusterrole-test-read-ns-pods-svcs"))
+			})
+		})
 	})
 
 	Context("When a GitTrack resource is updated", func() {
