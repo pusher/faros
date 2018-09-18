@@ -31,8 +31,15 @@ func DeleteAll(c client.Client, timeout time.Duration, objList runtime.Object) {
 	g.Eventually(func() error {
 		return c.List(context.TODO(), &client.ListOptions{}, objList)
 	}, timeout).Should(g.Succeed())
-	err := apimeta.EachListItem(objList, func(obj runtime.Object) error {
-		return c.Delete(context.TODO(), obj)
-	})
+	objs, err := apimeta.ExtractList(objList)
 	g.Expect(err).ToNot(g.HaveOccurred())
+	errs := make(chan error, len(objs))
+	for _, obj := range objs {
+		go func(o runtime.Object) {
+			errs <- c.Delete(context.TODO(), o)
+		}(obj)
+	}
+	for range objs {
+		g.Expect(<-errs).ToNot(g.HaveOccurred())
+	}
 }
