@@ -18,6 +18,7 @@ package gittrack
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -500,10 +501,16 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, after)
+					err = c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, after)
+					if err != nil {
+						return nil
+					}
+					if reflect.DeepEqual(after.Spec, before.Spec) {
+						return fmt.Errorf("deployment not updated yet")
+					}
+					return nil
 				}, timeout).Should(Succeed())
 				Expect(after.Spec).ToNot(Equal(before.Spec))
 			})
