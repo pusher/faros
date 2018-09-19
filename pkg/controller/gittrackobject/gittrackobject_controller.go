@@ -317,6 +317,8 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 	}
 
+	// If we got here everything is good so the object must be in-sync
+	mOpts.inSync = true
 	return reconcile.Result{}, nil
 }
 

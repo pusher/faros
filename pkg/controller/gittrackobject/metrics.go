@@ -17,15 +17,37 @@ limitations under the License.
 package gittrackobject
 
 import (
+	"fmt"
+
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	"github.com/pusher/faros/pkg/controller/gittrackobject/metrics"
 )
 
-type metricsOpts struct{}
+type metricsOpts struct {
+	inSync bool
+}
 
 func newMetricOpts() *metricsOpts {
 	return &metricsOpts{}
 }
 
 func (r *ReconcileGitTrackObject) updateMetrics(gto farosv1alpha1.GitTrackObjectInterface, opts *metricsOpts) error {
+	if gto == nil {
+		return nil
+	}
+	labels := map[string]string{
+		"kind":      gto.GetSpec().Kind,
+		"name":      gto.GetSpec().Name,
+		"namespace": gto.GetNamespace(),
+	}
+	inSync, err := metrics.InSync.GetMetricWith(labels)
+	if err != nil {
+		return fmt.Errorf("unable to update in-sync metric: %v", err)
+	}
+	if opts.inSync {
+		inSync.Set(1.0)
+	} else {
+		inSync.Set(0.0)
+	}
 	return nil
 }

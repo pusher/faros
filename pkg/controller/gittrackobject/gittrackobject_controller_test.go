@@ -26,7 +26,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	"github.com/pusher/faros/pkg/controller/gittrackobject/metrics"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
 	testevents "github.com/pusher/faros/test/events"
@@ -507,6 +510,12 @@ var (
 			})
 		})
 
+		Context("should update the metrics", func() {
+			It("should set in-sync metric to 1", func() {
+				ShouldSetInSyncMetricTo(instance, 1.0)
+			})
+		})
+
 		It("should update the resource when the GTO is updated", func() {
 			ShouldUpdateChildOnGTOUpdate(updated)
 		})
@@ -550,6 +559,12 @@ var (
 			})
 			It("condition reason should be ChildAppliedSuccess", func() {
 				ClusterShouldUpdateConditionReason(gittrackobjectutils.ChildAppliedSuccess, true)
+			})
+		})
+
+		Context("should update the metrics", func() {
+			It("should set in-sync metric to 1", func() {
+				ShouldSetInSyncMetricTo(clusterInstance, 1.0)
 			})
 		})
 
@@ -1288,5 +1303,21 @@ var (
 			Expect(e.InvolvedObject.Namespace).To(Equal(namespace))
 			Expect(e.Type).To(Equal(string(v1.EventTypeNormal)))
 		}
+	}
+
+	ShouldSetInSyncMetricTo = func(instance farosv1alpha1.GitTrackObjectInterface, value float64) {
+		var gauge prometheus.Gauge
+		Eventually(func() error {
+			var err error
+			gauge, err = metrics.InSync.GetMetricWith(map[string]string{
+				"kind":      instance.GetSpec().Kind,
+				"name":      instance.GetSpec().Name,
+				"namespace": instance.GetNamespace(),
+			})
+			return err
+		}, timeout).Should(Succeed())
+		var metric dto.Metric
+		Expect(gauge.Write(&metric)).NotTo(HaveOccurred())
+		Expect(metric.GetGauge().GetValue()).To(Equal(value))
 	}
 )
