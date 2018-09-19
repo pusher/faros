@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
@@ -73,16 +74,8 @@ var _ = Describe("GitTrack Suite", func() {
 		}, timeout).Should(Succeed())
 	}
 
-	var filterEvents = func(evs []v1.Event, exp v1.Event) []v1.Event {
-		filtered := []v1.Event{}
-		for _, e := range evs {
-			if e.Reason == exp.Reason {
-				if exp.Message == "" || e.Message == exp.Message {
-					filtered = append(filtered, e)
-				}
-			}
-		}
-		return filtered
+	var reasonFilter = func(reason string) func(v1.Event) bool {
+		return func(e v1.Event) bool { return e.Reason == reason }
 	}
 
 	BeforeEach(func() {
@@ -187,8 +180,8 @@ var _ = Describe("GitTrack Suite", func() {
 			It("sends events about checking out configured Git repository", func() {
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				startEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutStarted"})
-				successEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutSuccessful"})
+				startEvents := testevents.Select(events.Items, reasonFilter("CheckoutStarted"))
+				successEvents := testevents.Select(events.Items, reasonFilter("CheckoutSuccessful"))
 				Expect(startEvents).ToNot(BeEmpty())
 				Expect(successEvents).ToNot(BeEmpty())
 				for _, e := range append(startEvents, successEvents...) {
@@ -201,8 +194,8 @@ var _ = Describe("GitTrack Suite", func() {
 			It("sends events about creating GitTrackObjects", func() {
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				startEvents := filterEvents(events.Items, v1.Event{Reason: "CreateStarted"})
-				successEvents := filterEvents(events.Items, v1.Event{Reason: "CreateSuccessful"})
+				startEvents := testevents.Select(events.Items, reasonFilter("CreateStarted"))
+				successEvents := testevents.Select(events.Items, reasonFilter("CreateSuccessful"))
 				Expect(startEvents).ToNot(BeEmpty())
 				Expect(successEvents).ToNot(BeEmpty())
 				for _, e := range append(startEvents, successEvents...) {
@@ -269,7 +262,7 @@ var _ = Describe("GitTrack Suite", func() {
 			It("sends a CheckoutFailed event", func() {
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})
+				failedEvents := testevents.Select(events.Items, reasonFilter("CheckoutFailed"))
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {
 					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
@@ -303,7 +296,7 @@ var _ = Describe("GitTrack Suite", func() {
 			It("sends a CheckoutFailed event", func() {
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})
+				failedEvents := testevents.Select(events.Items, reasonFilter("CheckoutFailed"))
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {
 					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
@@ -557,16 +550,16 @@ var _ = Describe("GitTrack Suite", func() {
 					if err != nil {
 						return err
 					}
-					if len(filterEvents(events.Items, v1.Event{Reason: "UpdateSuccessful"})) == 0 {
+					if testevents.None(events.Items, reasonFilter("UpdateSuccessful")) {
 						return fmt.Errorf("events hasn't been sent yet")
 					}
 					return nil
 				}, timeout*2).Should(Succeed())
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				startEvents := filterEvents(events.Items, v1.Event{Reason: "UpdateStarted"})
-				successEvents := filterEvents(events.Items, v1.Event{Reason: "UpdateSuccessful"})
-				failedEvents := filterEvents(events.Items, v1.Event{Reason: "UpdateFailed"})
+				startEvents := testevents.Select(events.Items, reasonFilter("UpdateStarted"))
+				successEvents := testevents.Select(events.Items, reasonFilter("UpdateSuccessful"))
+				failedEvents := testevents.Select(events.Items, reasonFilter("UpdateFailed"))
 				Expect(startEvents).ToNot(BeEmpty())
 				Expect(successEvents).ToNot(BeEmpty())
 				Expect(failedEvents).To(BeEmpty())
@@ -665,14 +658,14 @@ var _ = Describe("GitTrack Suite", func() {
 					if err != nil {
 						return err
 					}
-					if len(filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})) == 0 {
+					if testevents.None(events.Items, reasonFilter("CheckoutFailed")) {
 						return fmt.Errorf("events hasn't been sent yet")
 					}
 					return nil
 				}, timeout).Should(Succeed())
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed"})
+				failedEvents := testevents.Select(events.Items, reasonFilter("CheckoutFailed"))
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {
 					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
@@ -759,21 +752,23 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				filter := func(e v1.Event) bool {
+					return e.Reason == "CheckoutFailed" && e.Message == "No files for SubPath 'does-not-exist'"
+				}
 				Eventually(func() error {
 					events := &v1.EventList{}
 					err := c.List(context.TODO(), &client.ListOptions{}, events)
 					if err != nil {
 						return err
 					}
-					failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed", Message: "No files for SubPath 'does-not-exist'"})
-					if len(failedEvents) == 0 {
+					if testevents.None(events.Items, filter) {
 						return fmt.Errorf("events hasn't been sent yet")
 					}
 					return nil
 				}, timeout).Should(Succeed())
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				failedEvents := filterEvents(events.Items, v1.Event{Reason: "CheckoutFailed", Message: "No files for SubPath 'does-not-exist'"})
+				failedEvents := testevents.Select(events.Items, filter)
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {
 					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))

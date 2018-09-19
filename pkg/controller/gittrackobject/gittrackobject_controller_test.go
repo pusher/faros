@@ -29,6 +29,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
+	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
@@ -445,16 +446,6 @@ var (
 			}
 			return nil
 		}, timeout).Should(Succeed())
-	}
-
-	FilterEvents = func(evs []v1.Event, f func(ev v1.Event) bool) []v1.Event {
-		filtered := []v1.Event{}
-		for _, e := range evs {
-			if f(e) {
-				filtered = append(filtered, e)
-			}
-		}
-		return filtered
 	}
 
 	// validDataTest runs the suite of tests for valid input data
@@ -1128,22 +1119,20 @@ var (
 
 	ShouldSendFailedUnmarshalEvent = func(kind, namespace string) {
 		events := &v1.EventList{}
+		filter := func(ev v1.Event) bool {
+			return ev.Reason == "UnmarshalFailed" && ev.InvolvedObject.Kind == kind
+		}
 		Eventually(func() error {
 			err := c.List(context.TODO(), &client.ListOptions{}, events)
 			if err != nil {
 				return err
 			}
-			filtered := FilterEvents(events.Items, func(ev v1.Event) bool {
-				return ev.Reason == "UnmarshalFailed" && ev.InvolvedObject.Kind == kind
-			})
-			if len(filtered) == 0 {
+			if testevents.None(events.Items, filter) {
 				return fmt.Errorf("event haven't been sent yet")
 			}
 			return nil
 		}, timeout).Should(Succeed())
-		failedEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
-			return ev.Reason == "UnmarshalFailed" && ev.InvolvedObject.Kind == kind
-		})
+		failedEvents := testevents.Select(events.Items, filter)
 		Expect(failedEvents).ToNot(BeEmpty())
 		for _, e := range failedEvents {
 			Expect(e.InvolvedObject.Kind).To(Equal(kind))
@@ -1155,26 +1144,22 @@ var (
 
 	ShouldSendCreateEvents = func(kind, namespace string) {
 		events := &v1.EventList{}
+		filter := func(r, k string) func(v1.Event) bool {
+			return func(ev v1.Event) bool { return ev.Reason == r && ev.InvolvedObject.Kind == k }
+		}
 		Eventually(func() error {
 			err := c.List(context.TODO(), &client.ListOptions{}, events)
 			if err != nil {
 				return err
 			}
-			filtered := FilterEvents(events.Items, func(ev v1.Event) bool {
-				return ev.Reason == "CreateSuccessful" && ev.InvolvedObject.Kind == kind
-			})
-			if len(filtered) == 0 {
+			if testevents.None(events.Items, filter("CreateSuccessful", kind)) {
 				return fmt.Errorf("events haven't been sent yet")
 			}
 			return nil
 		}, timeout).Should(Succeed())
 
-		startEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
-			return ev.Reason == "CreateStarted" && ev.InvolvedObject.Kind == kind
-		})
-		successEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
-			return ev.Reason == "CreateSuccessful" && ev.InvolvedObject.Kind == kind
-		})
+		startEvents := testevents.Select(events.Items, filter("CreateStarted", kind))
+		successEvents := testevents.Select(events.Items, filter("CreateSuccessful", kind))
 		Expect(startEvents).ToNot(BeEmpty())
 		Expect(successEvents).ToNot(BeEmpty())
 		for _, e := range append(startEvents, successEvents...) {
