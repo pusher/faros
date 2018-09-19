@@ -498,7 +498,7 @@ var (
 			It("the meta is modified", ShouldResetChildIfMetaModified)
 		})
 
-		It("should send `StartedCreate` and `SuccessfulCreate` events", func() {
+		It("should send `CreateStarted` and `CreateSuccessful` events", func() {
 			ShouldSendCreateEvents("GitTrackObject", "default")
 		})
 	}
@@ -544,7 +544,7 @@ var (
 			It("the meta is modified", ClusterShouldResetChildIfMetaModified)
 		})
 
-		It("should send `StartedCreate` and `SuccessfulCreate` events", func() {
+		It("should send `CreateStarted` and `CreateSuccessful` events", func() {
 			ShouldSendCreateEvents("ClusterGitTrackObject", "")
 		})
 	}
@@ -571,7 +571,7 @@ var (
 			})
 		})
 
-		It("should send `FailedUnmarshal` event", func() {
+		It("should send `UnmarshalFailed` event", func() {
 			ShouldSendFailedUnmarshalEvent("GitTrackObject", "default")
 		})
 	}
@@ -595,7 +595,7 @@ var (
 			})
 		})
 
-		It("should send a `FailedUnmarshal` event", func() {
+		It("should send a `UnmarshalFailed` event", func() {
 			ShouldSendFailedUnmarshalEvent("ClusterGitTrackObject", "")
 		})
 	}
@@ -1134,7 +1134,7 @@ var (
 				return err
 			}
 			filtered := FilterEvents(events.Items, func(ev v1.Event) bool {
-				return ev.Reason == "FailedUnmarshal" && ev.InvolvedObject.Kind == kind
+				return ev.Reason == "UnmarshalFailed" && ev.InvolvedObject.Kind == kind
 			})
 			if len(filtered) == 0 {
 				return fmt.Errorf("event haven't been sent yet")
@@ -1142,7 +1142,7 @@ var (
 			return nil
 		}, timeout).Should(Succeed())
 		failedEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
-			return ev.Reason == "FailedUnmarshal" && ev.InvolvedObject.Kind == kind
+			return ev.Reason == "UnmarshalFailed" && ev.InvolvedObject.Kind == kind
 		})
 		Expect(failedEvents).ToNot(BeEmpty())
 		for _, e := range failedEvents {
@@ -1161,7 +1161,7 @@ var (
 				return err
 			}
 			filtered := FilterEvents(events.Items, func(ev v1.Event) bool {
-				return ev.Reason == "SuccessfulCreate" && ev.InvolvedObject.Kind == kind
+				return ev.Reason == "CreateSuccessful" && ev.InvolvedObject.Kind == kind
 			})
 			if len(filtered) == 0 {
 				return fmt.Errorf("events haven't been sent yet")
@@ -1170,10 +1170,10 @@ var (
 		}, timeout).Should(Succeed())
 
 		startEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
-			return ev.Reason == "StartedCreate" && ev.InvolvedObject.Kind == kind
+			return ev.Reason == "CreateStarted" && ev.InvolvedObject.Kind == kind
 		})
 		successEvents := FilterEvents(events.Items, func(ev v1.Event) bool {
-			return ev.Reason == "SuccessfulCreate" && ev.InvolvedObject.Kind == kind
+			return ev.Reason == "CreateSuccessful" && ev.InvolvedObject.Kind == kind
 		})
 		Expect(startEvents).ToNot(BeEmpty())
 		Expect(successEvents).ToNot(BeEmpty())

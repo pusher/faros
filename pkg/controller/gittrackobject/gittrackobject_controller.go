@@ -226,7 +226,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
 		opts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
-		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "FailedUnmarshal", "Couldn't unmarshal object from JSON/YAML")
+		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UnmarshalFailed", "Couldn't unmarshal object from JSON/YAML")
 		return reconcile.Result{}, opts.inSyncError
 	}
 	if child.GetName() == "" {
@@ -269,15 +269,15 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 		// Not found, so create child
 		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "StartedCreate", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Create(context.TODO(), found)
 		if err != nil {
 			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
 			opts.inSyncError = fmt.Errorf("unable to create child: %v", err)
-			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "FailedCreate", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 			return reconcile.Result{}, opts.inSyncError
 		}
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "SuccessfulCreate", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CreateSuccessful", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		// Just created the object from the child, no need to check for update
 		return reconcile.Result{}, nil
 	} else if err != nil {
@@ -303,11 +303,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
 		opts.inSyncError = fmt.Errorf("unable to update child: %v", err)
-		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "FailedUpdate", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		return reconcile.Result{}, opts.inSyncError
 	}
 	if childUpdated {
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "StartedUpdate", "Starting update of child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "UpdateStarted", "Starting update of child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		if updateStrategy == gittrackobjectutils.RecreateUpdateStrategy {
 			err = r.recreateChild(found, child)
 		} else {
@@ -316,10 +316,10 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		if err != nil {
 			opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
 			opts.inSyncError = err
-			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "FailedUpdate", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 			return reconcile.Result{}, opts.inSyncError
 		}
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "SuccessfulUpdate", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 	}
 
 	return reconcile.Result{}, nil
