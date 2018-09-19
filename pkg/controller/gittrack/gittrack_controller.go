@@ -28,12 +28,14 @@ import (
 	utils "github.com/pusher/faros/pkg/utils"
 	gitstore "github.com/pusher/git-store"
 	flag "github.com/spf13/pflag"
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -71,6 +73,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		scheme:     mgr.GetScheme(),
 		store:      gitstore.NewRepoStore(clientSet),
 		restMapper: restMapper,
+		recorder:   mgr.GetRecorder("gittrack-controller"),
 	}
 }
 
@@ -117,6 +120,7 @@ type ReconcileGitTrack struct {
 	scheme     *runtime.Scheme
 	store      *gitstore.RepoStore
 	restMapper meta.RESTMapper
+	recorder   record.EventRecorder
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
@@ -145,19 +149,23 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo
 	return repo, nil
 }
 
-// getFilesForSpec checks out the Spec.Repository at Spec.Reference and returns a map of filename to
+// getFiles checks out the Spec.Repository at Spec.Reference and returns a map of filename to
 // gitstore.File pointers
-func (r *ReconcileGitTrack) getFilesForSpec(s farosv1alpha1.GitTrackSpec) (map[string]*gitstore.File, error) {
-	repo, err := r.checkoutRepo(s.Repository, s.Reference)
+func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gitstore.File, error) {
+	r.recorder.Eventf(gt, apiv1.EventTypeNormal, "CheckoutStarted", "Checking out '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
+	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference)
 	if err != nil {
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
 		return nil, err
 	}
 
-	files, err := repo.GetAllFiles(s.SubPath)
+	files, err := repo.GetAllFiles(gt.Spec.SubPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all files for subpath '%s': %v", s.SubPath, err)
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to get files for SubPath '%s'", gt.Spec.SubPath)
+		return nil, fmt.Errorf("failed to get all files for subpath '%s': %v", gt.Spec.SubPath, err)
 	} else if len(files) == 0 {
-		return nil, fmt.Errorf("no files for subpath '%s'", s.SubPath)
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "No files for SubPath '%s'", gt.Spec.SubPath)
+		return nil, fmt.Errorf("no files for subpath '%s'", gt.Spec.SubPath)
 	}
 
 	return files, nil
@@ -266,9 +274,12 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	err = r.Get(context.TODO(), types.NamespacedName{Name: gto.GetName(), Namespace: gto.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
 		log.Printf("Creating child for '%s'\n", name)
+		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
 		if err = r.Create(context.TODO(), gto); err != nil {
+			r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
 			return errorResult(name, fmt.Errorf("failed to create child for '%s': %v", name, err))
 		}
+		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
 		return successResult(name)
 	} else if err != nil {
 		return errorResult(name, fmt.Errorf("failed to get child for '%s': %v", name, err))
@@ -284,10 +295,13 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return errorResult(name, fmt.Errorf("failed to update child resource: %v", err))
 	}
 	if childUpdated {
+		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateStarted", "Updating child '%s'", name)
 		log.Printf("Updating child for '%s'\n", name)
 		if err = r.Update(context.TODO(), found); err != nil {
+			r.recorder.Eventf(owner, apiv1.EventTypeWarning, "UpdateFailed", "Failed to update child '%s'", name)
 			return errorResult(name, fmt.Errorf("failed to update child for '%s': %v", name, err))
 		}
+		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
 	return successResult(name)
 }
@@ -409,7 +423,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 
 	// Get a map of the files that are in the Spec
-	files, err := r.getFilesForSpec(instance.Spec)
+	files, err := r.getFiles(instance)
 	if err != nil {
 		opts.gitError = err
 		opts.gitReason = gittrackutils.ErrorFetchingFiles
@@ -417,6 +431,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 	// Git successful, set condition
 	opts.gitReason = gittrackutils.GitFetchSuccess
+	r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.Spec.Repository, instance.Spec.Reference)
 
 	// Attempt to parse k8s objects from files
 	objects, errors := objectsFrom(files)
@@ -470,7 +485,8 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	if err = r.deleteResources(objectsByName); err != nil {
 		opts.gcError = err
 		opts.gcReason = gittrackutils.ErrorDeletingChildren
-		return reconcile.Result{}, fmt.Errorf("failed to cleanup tracked objects: %v", err)
+		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "CleanupFailed", "Failed to clean-up leftover resources")
+		return reconcile.Result{}, fmt.Errorf("failed to clean-up tracked objects: %v", err)
 	}
 	opts.gcReason = gittrackutils.GCSuccess
 
