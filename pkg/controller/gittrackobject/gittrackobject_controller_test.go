@@ -36,7 +36,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -231,15 +230,13 @@ var _ = Describe("GitTrackObject Suite", func() {
 		close(stop)
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
-		deleteClient, err := client.New(rest.CopyConfig(cfg), client.Options{})
-		if err != nil {
-			log.Fatal(err)
-		}
-		testutils.DeleteAll(deleteClient, timeout, &farosv1alpha1.GitTrackObjectList{})
-		testutils.DeleteAll(deleteClient, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
-		testutils.DeleteAll(deleteClient, timeout, &appsv1.DeploymentList{})
-		testutils.DeleteAll(deleteClient, timeout, &rbacv1.ClusterRoleBindingList{})
-		testutils.DeleteAll(deleteClient, timeout, &v1.EventList{})
+		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackObjectList{},
+			&farosv1alpha1.ClusterGitTrackObjectList{},
+			&appsv1.DeploymentList{},
+			&rbacv1.ClusterRoleBindingList{},
+			&v1.EventList{},
+		)
 	})
 
 	Context("When a GitTrackObject is created", func() {

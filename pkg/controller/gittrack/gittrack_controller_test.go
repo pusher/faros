@@ -108,10 +108,12 @@ var _ = Describe("GitTrack Suite", func() {
 
 	AfterEach(func() {
 		close(stop)
-		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackList{})
-		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
-		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
-		testutils.DeleteAll(c, timeout, &v1.EventList{})
+		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackList{},
+			&farosv1alpha1.GitTrackObjectList{},
+			&farosv1alpha1.ClusterGitTrackObjectList{},
+			&v1.EventList{},
+		)
 	})
 
 	Context("When a GitTrack resource is created", func() {
