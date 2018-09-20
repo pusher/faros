@@ -23,10 +23,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
+	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -68,6 +70,17 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create rest mapper: %v", err))
 	}
 
+	var syncPeriod time.Duration
+	syncPeriodFlag := flag.Lookup("sync-period")
+	if syncPeriodFlag != nil {
+		syncPeriod, err = time.ParseDuration(syncPeriodFlag.Value.String())
+		if err != nil {
+			panic(fmt.Errorf("unable to parse sync-period: %v", err))
+		}
+	} else {
+		syncPeriod = 5 * time.Minute
+	}
+
 	return &ReconcileGitTrackObject{
 		Client:      mgr.GetClient(),
 		scheme:      mgr.GetScheme(),
@@ -76,6 +89,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		config:      mgr.GetConfig(),
 		stop:        stop,
 		restMapper:  restMapper,
+		syncPeriod:  syncPeriod,
 	}
 }
 
@@ -155,6 +169,7 @@ type ReconcileGitTrackObject struct {
 	config      *rest.Config
 	stop        chan struct{}
 	restMapper  meta.RESTMapper
+	syncPeriod  time.Duration
 }
 
 // EventStream returns a stream of generic event to trigger reconciles

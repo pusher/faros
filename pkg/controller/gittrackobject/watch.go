@@ -82,7 +82,7 @@ func (r *ReconcileGitTrackObject) newInformerFromObject(obj unstructured.Unstruc
 
 	return newSharedIndexInformer(
 		resourceClient,
-		2*time.Minute,
+		r.syncPeriod,
 		&unstructured.Unstructured{},
 		cache.Indexers{
 			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
