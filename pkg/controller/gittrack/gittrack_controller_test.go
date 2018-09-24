@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -28,6 +29,7 @@ import (
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
+	gitstore "github.com/pusher/git-store"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +51,7 @@ var key = types.NamespacedName{Name: "example", Namespace: "default"}
 var expectedRequest = reconcile.Request{NamespacedName: key}
 
 const timeout = time.Second * 5
+const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
 
 var _ = Describe("GitTrack Suite", func() {
 	var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
@@ -858,4 +861,65 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(key).To(BeEmpty())
 		})
 	})
+
+	Context("When getting files from a repository", func() {
+		/*
+			foo
+			├── bar
+			│   ├── non-yaml-file.txt
+			│   └── service.yaml
+			├── deployment.yaml
+			└── namespace.yaml
+		*/
+
+		getsFilesFromRepo("foo", 3)
+		getsFilesFromRepo("foo/", 3)
+		getsFilesFromRepo("/foo/", 3)
+		getsFilesFromRepo("foo/bar", 1)
+	})
 })
+
+var getsFilesFromRepo = func(path string, count int) {
+	Context(fmt.Sprintf("With subPath %s", path), func() {
+		var files map[string]*gitstore.File
+		var gt *farosv1alpha1.GitTrack
+
+		BeforeEach(func() {
+			var err error
+			var reconciler *ReconcileGitTrack
+			var ok bool
+			reconciler, ok = r.(*ReconcileGitTrack)
+			Expect(ok).To(BeTrue())
+			gt = &farosv1alpha1.GitTrack{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+				},
+				Spec: farosv1alpha1.GitTrackSpec{
+					SubPath:    path,
+					Repository: repositoryURL,
+					DeployKey:  farosv1alpha1.GitTrackDeployKey{},
+					Reference:  "4c31dbdd7103dc209c8bb21b75d78b3efafadc31",
+				},
+			}
+			files, err = reconciler.getFiles(gt)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("Filters files by SubPath", func() {
+			for filePath := range files {
+				Expect(filePath).To(HavePrefix(strings.TrimPrefix(path, "/")))
+			}
+		})
+
+		It("Filters files by file extension", func() {
+			for filePath := range files {
+				Expect(filePath).To(MatchRegexp(filePathRegexp))
+			}
+		})
+
+		It("Fetches all files recursively from the SubPath", func() {
+			Expect(files).To(HaveLen(count))
+		})
+
+	})
+}

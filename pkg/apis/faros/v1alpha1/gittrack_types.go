@@ -29,6 +29,7 @@ type GitTrackSpec struct {
 	// Repository is the git repository URI to clone from
 	Repository string `json:"repository"`
 
+	// +kubebuilder:validation:Pattern=^[a-zA-Z0-9/\-.]*$
 	// SubPath is the subpath within the repository underneath which files are considered
 	SubPath string `json:"subPath,omitempty"`
 
