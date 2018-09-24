@@ -146,6 +146,10 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo
 	return repo, nil
 }
 
+func (r *ReconcileGitTrack) fetchDeployKey(namespace string, deployKey *farosv1alpha1.GitTrackDeployKey) ([]byte, error) {
+	return []byte{}, nil
+}
+
 // getFiles checks out the Spec.Repository at Spec.Reference and returns a map of filename to
 // gitstore.File pointers
 func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gitstore.File, error) {
