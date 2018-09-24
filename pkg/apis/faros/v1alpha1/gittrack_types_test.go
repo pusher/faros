@@ -45,6 +45,16 @@ func TestStorageGitTrack(t *testing.T) {
 	g.Expect(c.Get(context.TODO(), key, fetched)).NotTo(gomega.HaveOccurred())
 	g.Expect(fetched).To(gomega.Equal(updated))
 
+	// Test Setting deployKey
+	keyless := fetched.DeepCopy()
+	keyless.Spec.DeployKey = GitTrackDeployKey{
+		SecretName: "secretfoo",
+		Key:        "secretbar",
+	}
+	g.Expect(c.Update(context.TODO(), keyless)).NotTo(gomega.HaveOccurred())
+	g.Expect(c.Get(context.TODO(), key, fetched)).NotTo(gomega.HaveOccurred())
+	g.Expect(fetched).To(gomega.Equal(keyless))
+
 	// Test Delete
 	g.Expect(c.Delete(context.TODO(), fetched)).NotTo(gomega.HaveOccurred())
 	g.Expect(c.Get(context.TODO(), key, fetched)).To(gomega.HaveOccurred())

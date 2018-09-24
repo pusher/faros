@@ -22,6 +22,16 @@ spec:
           type: object
         spec:
           properties:
+            deployKey:
+              properties:
+                key:
+                  type: string
+                secretName:
+                  type: string
+              required:
+              - secretName
+              - key
+              type: object
             reference:
               type: string
             repository:
