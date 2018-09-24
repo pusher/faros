@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -60,8 +59,6 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	clientSet := kubernetes.NewForConfigOrDie(mgr.GetConfig())
-
 	// Create a restMapper (used by informer to look up resource kinds)
 	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
 	if err != nil {
@@ -71,7 +68,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileGitTrack{
 		Client:     mgr.GetClient(),
 		scheme:     mgr.GetScheme(),
-		store:      gitstore.NewRepoStore(clientSet),
+		store:      gitstore.NewRepoStore(),
 		restMapper: restMapper,
 		recorder:   mgr.GetRecorder("gittrack-controller"),
 	}
