@@ -10,21 +10,25 @@ import (
 )
 
 var (
-	emptyPatch                      = `[]`
-	empty                           = `{}`
-	invalid                         = `{hello}`
-	nameFoo                         = `{"name":"foo"}`
-	nameBar                         = `{"name":"bar"}`
-	nameFooWithExtra                = `{"name":"foo","extra":"field"}`
-	nameFooWithExtraAsArray         = `{"name":"foo","extra":["sub":"field"]}`
-	nameFooWithBlacklisted          = `{"name":"foo","metadata":{"creationTimestamp":null}}`
-	nameFooWithTimestamp            = `{"name":"foo","metadata":{"creationTimestamp":"123"}}`
-	nameBarWithExtra                = `{"name":"bar","extra":"field"}`
-	nameBazWithExtra                = `{"name":"baz","extra":"extra"}`
-	addExtra                        = `[{"op":"add","path":"/extra","value":"field"}]`
-	removeExtra                     = `[{"op":"remove","path":"/extra"}]`
-	replaceNameFoo                  = `[{"op":"replace","path":"/name","value":"foo"}]`
-	replaceNameBazReplaceExtraExtra = `[{"op":"replace","path":"/name","value":"baz"},{"op":"replace","path":"/extra","value":"extra"}]`
+	emptyPatch                            = `[]`
+	empty                                 = `{}`
+	invalid                               = `{hello}`
+	nameFoo                               = `{"name":"foo"}`
+	nameBar                               = `{"name":"bar"}`
+	nameFooWithExtra                      = `{"name":"foo","extra":"field"}`
+	nameFooWithExtraAsArray               = `{"name":"foo","extra":["one","two","three"]}`
+	nameFooWithExtraAsObject              = `{"name":"foo","extra":{"sub":"field"}}`
+	nameFooWithExtraAsObjectWithTwoFields = `{"name":"foo","extra":{"sub":"field","second":"field"}}`
+	nameFooWithBlacklisted                = `{"name":"foo","metadata":{"creationTimestamp":null}}`
+	nameFooWithTimestamp                  = `{"name":"foo","metadata":{"creationTimestamp":"123"}}`
+	nameBarWithExtra                      = `{"name":"bar","extra":"field"}`
+	nameBazWithExtra                      = `{"name":"baz","extra":"extra"}`
+	addExtra                              = `[{"op":"add","path":"/extra","value":"field"}]`
+	addExtraSecondField                   = `[{"op":"add","path":"/extra/second","value":"field"}]`
+	removeExtra                           = `[{"op":"remove","path":"/extra"}]`
+	removeExtraSecondField                = `[{"op":"remove","path":"/extra/second"}]`
+	replaceNameFoo                        = `[{"op":"replace","path":"/name","value":"foo"}]`
+	replaceNameBazReplaceExtraExtra       = `[{"op":"replace","path":"/name","value":"baz"},{"op":"replace","path":"/extra","value":"extra"}]`
 )
 
 func TestThreeWayMerge(t *testing.T) {
@@ -47,6 +51,20 @@ var _ = Describe("createThreeWayJSONMergePatch", func() {
 
 	It("should add a field when added to to modified", func() {
 		testCreateThreeWayJSONMergePatch(nameFoo, nameFooWithExtra, nameFoo, addExtra)
+	})
+
+	Context("within a map", func() {
+		It("should ignore extra field in current", func() {
+			testCreateThreeWayJSONMergePatch(nameFooWithExtraAsObject, nameFooWithExtraAsObject, nameFooWithExtraAsObjectWithTwoFields, emptyPatch)
+		})
+
+		It("should remove extra field when removed from modified", func() {
+			testCreateThreeWayJSONMergePatch(nameFooWithExtraAsObjectWithTwoFields, nameFooWithExtraAsObject, nameFooWithExtraAsObjectWithTwoFields, removeExtraSecondField)
+		})
+
+		It("should add a field when added to to modified", func() {
+			testCreateThreeWayJSONMergePatch(nameFooWithExtraAsObject, nameFooWithExtraAsObjectWithTwoFields, nameFooWithExtraAsObject, addExtraSecondField)
+		})
 	})
 
 	Context("when original is empty", func() {
@@ -75,12 +93,6 @@ var _ = Describe("createThreeWayJSONMergePatch", func() {
 		testCreateThreeWayJSONMergePatchError(invalid, nameFoo, nameFooWithExtra)
 		testCreateThreeWayJSONMergePatchError(nameFooWithExtra, invalid, nameFoo)
 		testCreateThreeWayJSONMergePatchError(nameFoo, nameFooWithExtra, invalid)
-	})
-
-	It("should return an error when JSON types mismatch", func() {
-		testCreateThreeWayJSONMergePatchError(nameFooWithExtraAsArray, nameFoo, nameFooWithExtra)
-		testCreateThreeWayJSONMergePatchError(nameFooWithExtra, nameFooWithExtraAsArray, nameFoo)
-		testCreateThreeWayJSONMergePatchError(nameFoo, nameFooWithExtra, nameFooWithExtraAsArray)
 	})
 })
 
