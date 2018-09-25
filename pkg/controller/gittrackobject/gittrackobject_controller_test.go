@@ -29,6 +29,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
+	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
@@ -117,6 +118,7 @@ subjects:
 `
 
 var invalidExample = `apiVersion: apps/v1
+\x8f
 kind: Deployment
 metadata:
 name: example
@@ -229,10 +231,13 @@ var _ = Describe("GitTrackObject Suite", func() {
 		close(stop)
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
-		testutils.DeleteAll(c, timeout, &farosv1alpha1.GitTrackObjectList{})
-		testutils.DeleteAll(c, timeout, &farosv1alpha1.ClusterGitTrackObjectList{})
-		testutils.DeleteAll(c, timeout, &appsv1.DeploymentList{})
-		testutils.DeleteAll(c, timeout, &rbacv1.ClusterRoleBindingList{})
+		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackObjectList{},
+			&farosv1alpha1.ClusterGitTrackObjectList{},
+			&appsv1.DeploymentList{},
+			&rbacv1.ClusterRoleBindingList{},
+			&v1.EventList{},
+		)
 	})
 
 	Context("When a GitTrackObject is created", func() {
@@ -483,6 +488,10 @@ var (
 
 			It("the meta is modified", ShouldResetChildIfMetaModified)
 		})
+
+		It("should send `CreateStarted` and `CreateSuccessful` events", func() {
+			ShouldSendCreateEvents("GitTrackObject", "default")
+		})
 	}
 
 	// validDataTest runs the suite of tests for valid input data
@@ -526,6 +535,9 @@ var (
 			It("the meta is modified", ClusterShouldResetChildIfMetaModified)
 		})
 
+		It("should send `CreateStarted` and `CreateSuccessful` events", func() {
+			ShouldSendCreateEvents("ClusterGitTrackObject", "")
+		})
 	}
 
 	// invalidDataTest runs the suite of tests for an invalid input
@@ -549,6 +561,10 @@ var (
 				ShouldUpdateConditionReason(gittrackobjectutils.ChildAppliedSuccess, false)
 			})
 		})
+
+		It("should send `UnmarshalFailed` event", func() {
+			ShouldSendFailedUnmarshalEvent("GitTrackObject", "default")
+		})
 	}
 
 	// invalidClusterDataTest runs the suite of tests for an invalid input
@@ -568,6 +584,10 @@ var (
 			It("condition reason should not be ChildAppliedSuccess", func() {
 				ClusterShouldUpdateConditionReason(gittrackobjectutils.ChildAppliedSuccess, false)
 			})
+		})
+
+		It("should send a `UnmarshalFailed` event", func() {
+			ShouldSendFailedUnmarshalEvent("ClusterGitTrackObject", "")
 		})
 	}
 
@@ -1095,5 +1115,58 @@ var (
 		condition := clusterInstance.Status.Conditions[0]
 		Expect(condition.Reason).To(Equal(string(gittrackobjectutils.ErrorUpdatingChild)))
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
+	}
+
+	ShouldSendFailedUnmarshalEvent = func(kind, namespace string) {
+		events := &v1.EventList{}
+		filter := func(ev v1.Event) bool {
+			return ev.Reason == "UnmarshalFailed" && ev.InvolvedObject.Kind == kind
+		}
+		Eventually(func() error {
+			err := c.List(context.TODO(), &client.ListOptions{}, events)
+			if err != nil {
+				return err
+			}
+			if testevents.None(events.Items, filter) {
+				return fmt.Errorf("event haven't been sent yet")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+		failedEvents := testevents.Select(events.Items, filter)
+		Expect(failedEvents).ToNot(BeEmpty())
+		for _, e := range failedEvents {
+			Expect(e.InvolvedObject.Kind).To(Equal(kind))
+			Expect(e.InvolvedObject.Name).To(Equal("example"))
+			Expect(e.InvolvedObject.Namespace).To(Equal(namespace))
+			Expect(e.Type).To(Equal(string(v1.EventTypeWarning)))
+		}
+	}
+
+	ShouldSendCreateEvents = func(kind, namespace string) {
+		events := &v1.EventList{}
+		filter := func(r, k string) func(v1.Event) bool {
+			return func(ev v1.Event) bool { return ev.Reason == r && ev.InvolvedObject.Kind == k }
+		}
+		Eventually(func() error {
+			err := c.List(context.TODO(), &client.ListOptions{}, events)
+			if err != nil {
+				return err
+			}
+			if testevents.None(events.Items, filter("CreateSuccessful", kind)) {
+				return fmt.Errorf("events haven't been sent yet")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+
+		startEvents := testevents.Select(events.Items, filter("CreateStarted", kind))
+		successEvents := testevents.Select(events.Items, filter("CreateSuccessful", kind))
+		Expect(startEvents).ToNot(BeEmpty())
+		Expect(successEvents).ToNot(BeEmpty())
+		for _, e := range append(startEvents, successEvents...) {
+			Expect(e.InvolvedObject.Kind).To(Equal(kind))
+			Expect(e.InvolvedObject.Name).To(Equal("example"))
+			Expect(e.InvolvedObject.Namespace).To(Equal(namespace))
+			Expect(e.Type).To(Equal(string(v1.EventTypeNormal)))
+		}
 	}
 )
