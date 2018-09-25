@@ -33,6 +33,14 @@
   version = "1.0.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:ad4589ec239820ee99eb01c1ad47ebc5f8e02c4f5103a9b210adff9696d89f36"
+  name = "github.com/beorn7/perks"
+  packages = ["quantile"]
+  pruneopts = "T"
+  revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
+
+[[projects]]
   digest = "1:52f195ad0e20a92d8604c1ba3cd246c61644c03eaa454b5acd41be89841e0d10"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -336,6 +344,14 @@
   revision = "81af80346b1a01caae0cbc27fd3c1ba5b11e189f"
 
 [[projects]]
+  digest = "1:a8e3d14801bed585908d130ebfc3b925ba642208e6f30d879437ddfc7bb9b413"
+  name = "github.com/matttproud/golang_protobuf_extensions"
+  packages = ["pbutil"]
+  pruneopts = "T"
+  revision = "c12348ce28de40eed0136aa2b644d0ee0650e56c"
+  version = "v1.0.1"
+
+[[projects]]
   branch = "master"
   digest = "1:c7354463195544b1ab3c1f1fadb41430947f5d28dfbf2cdbd38268c5717a5a03"
   name = "github.com/mitchellh/go-homedir"
@@ -448,6 +464,50 @@
   pruneopts = "T"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
+
+[[projects]]
+  digest = "1:982a7f214f928ef1fcef5c098a0bf2f7ced1a55afc3826c4efb081312fb42624"
+  name = "github.com/prometheus/client_golang"
+  packages = [
+    "prometheus",
+    "prometheus/promhttp",
+  ]
+  pruneopts = "T"
+  revision = "c5b7fccd204277076155f10851dad72b76a49317"
+  version = "v0.8.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:185cf55b1f44a1bf243558901c3f06efa5c64ba62cfdcbb1bf7bbe8c3fb68561"
+  name = "github.com/prometheus/client_model"
+  packages = ["go"]
+  pruneopts = "T"
+  revision = "5c3871d89910bfb32f5fcab2aa4b9ec68e65a99f"
+
+[[projects]]
+  branch = "master"
+  digest = "1:957ed2f869f3628d455cff7cf44b5a42ddb44f4127b58a2abe84c912aa3c0d81"
+  name = "github.com/prometheus/common"
+  packages = [
+    "expfmt",
+    "internal/bitbucket.org/ww/goautoneg",
+    "model",
+  ]
+  pruneopts = "T"
+  revision = "c7de2306084e37d54b8be01f3541a8464345e9a5"
+
+[[projects]]
+  branch = "master"
+  digest = "1:008e9f0365bc976ae093c35da48df306b3ead62ad9569806907b2e303c1616ae"
+  name = "github.com/prometheus/procfs"
+  packages = [
+    ".",
+    "internal/util",
+    "nfs",
+    "xfs",
+  ]
+  pruneopts = "T"
+  revision = "418d78d0b9a7b7de3a6bbc8a23def624cc977bb2"
 
 [[projects]]
   digest = "1:a211781365d61763d123ed78f68df0cd6b3bef934d1c8b5cdb48b07efbefaca9"
@@ -791,6 +851,7 @@
   digest = "1:8b350a07b9e6aad42a26123a22d94d5498081214fd776b2b0336cb5c3d62246f"
   name = "k8s.io/api"
   packages = [
+    "admission/v1beta1",
     "admissionregistration/v1alpha1",
     "admissionregistration/v1beta1",
     "apps/v1",
@@ -1083,8 +1144,8 @@
   revision = "f08db293d3ef80052d6513ece19792642a289fea"
 
 [[projects]]
-  branch = "pusher-1.11"
-  digest = "1:a206aedfc294c6fac9e8c03df4da8bc4d7ee99b0a33d68d78c2fa033e34a20b5"
+  branch = "master+132+160"
+  digest = "1:7de64c8e079a7d5596b2d247c268d8b6c8c1388952fdac067a799478b697b714"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -1095,12 +1156,16 @@
     "pkg/controller",
     "pkg/controller/controllerutil",
     "pkg/envtest",
+    "pkg/envtest/printer",
     "pkg/event",
     "pkg/handler",
     "pkg/internal/controller",
+    "pkg/internal/controller/metrics",
     "pkg/internal/recorder",
     "pkg/leaderelection",
     "pkg/manager",
+    "pkg/metrics",
+    "pkg/patch",
     "pkg/predicate",
     "pkg/reconcile",
     "pkg/recorder",
@@ -1110,9 +1175,12 @@
     "pkg/runtime/signals",
     "pkg/source",
     "pkg/source/internal",
+    "pkg/webhook/admission",
+    "pkg/webhook/admission/types",
+    "pkg/webhook/types",
   ]
   pruneopts = "T"
-  revision = "e948349c8fc06e3c6fa2c3abc2eb5a1a429fab57"
+  revision = "97954394f48dc8fcb5ef1db4bccb442175481cd3"
   source = "https://github.com/pusher/controller-runtime"
 
 [[projects]]
@@ -1181,6 +1249,7 @@
     "k8s.io/client-go/restmapper",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/record",
+    "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/workqueue",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "sigs.k8s.io/controller-runtime/pkg/client",
