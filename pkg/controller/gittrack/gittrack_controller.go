@@ -119,12 +119,7 @@ type ReconcileGitTrack struct {
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
-func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, namespace string, deployKey farosv1alpha1.GitTrackDeployKey) (*gitstore.Repo, error) {
-	privateKey, err := r.fetchDeployKey(namespace, deployKey)
-	if err != nil {
-		return &gitstore.Repo{}, fmt.Errorf("failed to fetch deploy key: %v", err)
-	}
-
+func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, privateKey []byte) (*gitstore.Repo, error) {
 	log.Printf("Getting repository '%s'\n", url)
 	repo, err := r.store.Get(&gitstore.RepoRef{URL: url, PrivateKey: privateKey})
 	if err != nil {
@@ -140,8 +135,8 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, namespace strin
 	return repo, nil
 }
 
-// fetchDeployKey extracts a given key's data from a given deployKey secret reference
-func (r *ReconcileGitTrack) fetchDeployKey(namespace string, deployKey farosv1alpha1.GitTrackDeployKey) ([]byte, error) {
+// fetchPrivateyKey extracts a given key's data from a given deployKey secret reference
+func (r *ReconcileGitTrack) fetchPrivateKey(namespace string, deployKey farosv1alpha1.GitTrackDeployKey) ([]byte, error) {
 	// Check if the deployKey is empty, do nothing if it is
 	emptyKey := farosv1alpha1.GitTrackDeployKey{}
 	if deployKey == emptyKey {
@@ -175,7 +170,13 @@ func (r *ReconcileGitTrack) fetchDeployKey(namespace string, deployKey farosv1al
 // gitstore.File pointers
 func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gitstore.File, error) {
 	r.recorder.Eventf(gt, apiv1.EventTypeNormal, "CheckoutStarted", "Checking out '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
-	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference, gt.Namespace, gt.Spec.DeployKey)
+	privateKey, err := r.fetchPrivateKey(gt.Namespace, gt.Spec.DeployKey)
+	if err != nil {
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
+		return nil, fmt.Errorf("unable to retrieve private key: %v", err)
+	}
+
+	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference, privateKey)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
 		return nil, err
