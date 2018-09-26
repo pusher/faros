@@ -18,6 +18,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -38,6 +39,8 @@ func UpdateChildResource(found, child *unstructured.Unstructured) (bool, error) 
 		// nothing to do
 		return false, nil
 	}
+
+	log.Printf("patch = %s", string(patchBytes))
 
 	// Patch the unstructured object
 	err = patchUnstructured(found, patchBytes)
