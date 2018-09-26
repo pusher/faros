@@ -401,8 +401,8 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	opts := newStatusOpts()
 
 	if !nsPredicate.Match(request.Namespace) {
-		log.Printf("received reconcile request for another namespace: %+v, ignoring", request)
-		return reconcile.Result{}, nil
+		log.Printf("GitTrack, received reconcile request for another namespace: %+v", request)
+		// return reconcile.Result{}, nil
 	}
 
 	// Update the GitTrackObject status when we leave this function

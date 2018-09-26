@@ -27,7 +27,7 @@ import (
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
-	"github.com/pusher/faros/pkg/utils"
+	utils "github.com/pusher/faros/pkg/utils"
 	flag "github.com/spf13/pflag"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +47,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var nsPredicate utils.NamespacedPredicate
 
 // Add creates a new GitTrackObject Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -83,6 +85,13 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		syncPeriod = 5 * time.Minute
 	}
 
+	namespace := ""
+	if namespaceFlag := flag.Lookup("namespace"); namespaceFlag != nil {
+		namespace = namespaceFlag.Value.String()
+	}
+
+	nsPredicate = utils.NamespacedPredicate{Namespace: namespace}
+
 	return &ReconcileGitTrackObject{
 		Client:      mgr.GetClient(),
 		scheme:      mgr.GetScheme(),
@@ -105,13 +114,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to GitTrackObject
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{}, nsPredicate)
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterGitTrackObject
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{}, nsPredicate)
 	if err != nil {
 		return err
 	}
@@ -143,6 +152,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				},
 				RestMapper: restMapper,
 			},
+			nsPredicate,
 		)
 		if err != nil {
 			msg := fmt.Sprintf("unable to watch channel: %v", err)
@@ -194,6 +204,11 @@ func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var instance farosv1alpha1.GitTrackObjectInterface
 	opts := newStatusOpts()
+
+	if !nsPredicate.Match(request.Namespace) {
+		log.Printf("GitTrackObject, received reconcile request for another namespace: %+v", request)
+		// return reconcile.Result{}, nil
+	}
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {
