@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"log"
+
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -48,8 +50,15 @@ func (p NamespacedPredicate) Generic(e event.GenericEvent) bool {
 // inNamespace returns whether the given namespace is the same as
 // the one the Predicate was configured with
 func (p NamespacedPredicate) inNamespace(ns string) bool {
+	log.Printf("ns1=%v, ns2=%v", p.Namespace, ns)
 	if p.Namespace != "" && ns != "" {
 		return p.Namespace == ns
 	}
 	return true
+}
+
+// Match returns whether the given namespace is the same as
+// the one the Predicate was configured with
+func (p NamespacedPredicate) Match(ns string) bool {
+	return p.inNamespace(ns)
 }

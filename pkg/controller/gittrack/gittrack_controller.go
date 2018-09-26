@@ -48,6 +48,7 @@ import (
 
 var privateKeyPath = flag.String("private-key", "", "Path to default private key to use for Git checkouts")
 var namespace = flag.String("namespace", "", "Only manage GitTrack resources in given namespace")
+var nsPredicate utils.NamespacedPredicate
 
 const ownedByLabel = "faros.pusher.com/owned-by"
 
@@ -85,10 +86,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	nsPredicate = utils.NamespacedPredicate{Namespace: *namespace}
+
 	// Watch for changes to GitTrack
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{}, &utils.NamespacedPredicate{
-		Namespace: *namespace,
-	})
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{}, nsPredicate)
 	if err != nil {
 		return err
 	}
@@ -398,6 +399,11 @@ func checkOwner(owner *farosv1alpha1.GitTrack, child farosv1alpha1.GitTrackObjec
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	instance := &farosv1alpha1.GitTrack{}
 	opts := newStatusOpts()
+
+	if !nsPredicate.Match(request.Namespace) {
+		log.Printf("received reconcile request for another namespace: %+v, ignoring", request)
+		return reconcile.Result{}, nil
+	}
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {
