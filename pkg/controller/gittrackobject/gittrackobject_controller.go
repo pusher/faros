@@ -119,10 +119,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to ClusterGitTrackObject
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{}, nsPredicate)
-	if err != nil {
-		return err
+	if nsPredicate.Namespace == "" {
+		// Watch for changes to ClusterGitTrackObject
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{}, nsPredicate)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Watch for events on the reconciler's eventStream channel
