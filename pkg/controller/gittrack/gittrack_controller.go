@@ -19,7 +19,6 @@ package gittrack
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"strings"
 
@@ -34,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -46,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var privateKeyPath = flag.String("private-key", "", "Path to default private key to use for Git checkouts")
 var namespace = flag.String("namespace", "", "Only manage GitTrack resources in given namespace")
 
 const ownedByLabel = "faros.pusher.com/owned-by"
@@ -60,8 +57,6 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	clientSet := kubernetes.NewForConfigOrDie(mgr.GetConfig())
-
 	// Create a restMapper (used by informer to look up resource kinds)
 	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
 	if err != nil {
@@ -71,7 +66,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileGitTrack{
 		Client:     mgr.GetClient(),
 		scheme:     mgr.GetScheme(),
-		store:      gitstore.NewRepoStore(clientSet),
+		store:      gitstore.NewRepoStore(),
 		restMapper: restMapper,
 		recorder:   mgr.GetRecorder("gittrack-controller"),
 	}
@@ -124,16 +119,7 @@ type ReconcileGitTrack struct {
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
-func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo, error) {
-	privateKey := []byte{}
-	var err error
-	if *privateKeyPath != "" {
-		privateKey, err = ioutil.ReadFile(*privateKeyPath)
-		if err != nil {
-			return &gitstore.Repo{}, fmt.Errorf("failed to load private key: %v", err)
-		}
-	}
-
+func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, privateKey []byte) (*gitstore.Repo, error) {
 	log.Printf("Getting repository '%s'\n", url)
 	repo, err := r.store.Get(&gitstore.RepoRef{URL: url, PrivateKey: privateKey})
 	if err != nil {
@@ -149,11 +135,48 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string) (*gitstore.Repo
 	return repo, nil
 }
 
+// fetchPrivateyKey extracts a given key's data from a given deployKey secret reference
+func (r *ReconcileGitTrack) fetchPrivateKey(namespace string, deployKey farosv1alpha1.GitTrackDeployKey) ([]byte, error) {
+	// Check if the deployKey is empty, do nothing if it is
+	emptyKey := farosv1alpha1.GitTrackDeployKey{}
+	if deployKey == emptyKey {
+		return []byte{}, nil
+	}
+	// Check the deployKey fields are both non-empty
+	if deployKey.SecretName == "" || deployKey.Key == "" {
+		return []byte{}, fmt.Errorf("if using a deploy key, both SecretName and Key must be set")
+	}
+
+	// Fetch the secret from the API
+	secret := &apiv1.Secret{}
+	err := r.Get(context.TODO(), types.NamespacedName{
+		Namespace: namespace,
+		Name:      deployKey.SecretName,
+	}, secret)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to look up secret %s: %v", deployKey.SecretName, err)
+	}
+
+	// Extract the data from the secret
+	var ok bool
+	var privateKey []byte
+	if privateKey, ok = secret.Data[deployKey.Key]; !ok {
+		return []byte{}, fmt.Errorf("invalid deploy key reference. Secret %s does not have key %s", deployKey.SecretName, deployKey.Key)
+	}
+	return privateKey, nil
+}
+
 // getFiles checks out the Spec.Repository at Spec.Reference and returns a map of filename to
 // gitstore.File pointers
 func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gitstore.File, error) {
 	r.recorder.Eventf(gt, apiv1.EventTypeNormal, "CheckoutStarted", "Checking out '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
-	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference)
+	privateKey, err := r.fetchPrivateKey(gt.Namespace, gt.Spec.DeployKey)
+	if err != nil {
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
+		return nil, fmt.Errorf("unable to retrieve private key: %v", err)
+	}
+
+	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference, privateKey)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
 		return nil, err

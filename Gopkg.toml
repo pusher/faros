@@ -22,7 +22,7 @@ required = [
 
 [[constraint]]
 name="github.com/pusher/git-store"
-version="0.2.0"
+version="v0.3.0"
 
 [[override]]
 name = "github.com/Azure/go-autorest"
@@ -229,7 +229,7 @@ revision="f08db293d3ef80052d6513ece19792642a289fea"
 [[override]]
 name="sigs.k8s.io/controller-runtime"
 source="https://github.com/pusher/controller-runtime"
-branch="pusher-1.11"
+branch="master+132+160"
 
 [[override]]
 name="sigs.k8s.io/controller-tools"
