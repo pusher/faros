@@ -119,12 +119,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	if nsPredicate.Namespace == "" {
-		// Watch for changes to ClusterGitTrackObject
-		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{}, nsPredicate)
-		if err != nil {
-			return err
-		}
+	// Watch for changes to ClusterGitTrackObject
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
 	}
 
 	// Watch for events on the reconciler's eventStream channel
@@ -204,13 +202,9 @@ func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 // +kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Printf("GitTrackObject, starting reconcile for %+v", request)
 	var instance farosv1alpha1.GitTrackObjectInterface
 	opts := newStatusOpts()
-
-	if !nsPredicate.Match(request.Namespace) {
-		log.Printf("GitTrackObject, received reconcile request for another namespace: %+v", request)
-		// return reconcile.Result{}, nil
-	}
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {

@@ -97,19 +97,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &farosv1alpha1.GitTrack{},
-	})
+	}, nsPredicate)
 	if err != nil {
 		return err
 	}
 
-	if nsPredicate.Namespace == "" {
-		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &farosv1alpha1.GitTrack{},
-		})
-		if err != nil {
-			return err
-		}
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &farosv1alpha1.GitTrack{},
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -399,13 +397,9 @@ func checkOwner(owner *farosv1alpha1.GitTrack, child farosv1alpha1.GitTrackObjec
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=clustergittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Printf("GitTrack, starting reconcile for %+v", request)
 	instance := &farosv1alpha1.GitTrack{}
 	opts := newStatusOpts()
-
-	if !nsPredicate.Match(request.Namespace) {
-		log.Printf("GitTrack, received reconcile request for another namespace: %+v", request)
-		// return reconcile.Result{}, nil
-	}
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {
