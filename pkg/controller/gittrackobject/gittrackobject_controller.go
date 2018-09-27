@@ -32,6 +32,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -208,14 +209,16 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {
-		err := r.updateStatus(instance, opts)
-		// Print out any errors that may have occurred
-		for _, e := range []error{
-			err,
-			opts.inSyncError,
-		} {
-			if e != nil {
-				log.Printf("%v", e)
+		if !opts.ignore {
+			err := r.updateStatus(instance, opts)
+			// Print out any errors that may have occurred
+			for _, e := range []error{
+				err,
+				opts.inSyncError,
+			} {
+				if e != nil {
+					log.Printf("%v", e)
+				}
 			}
 		}
 	}()
@@ -282,6 +285,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Create(context.TODO(), found)
+		if err != nil && errors.IsForbidden(err) {
+			log.Printf("not allowed to create child, ignoring")
+			opts.ignore = true
+			return reconcile.Result{}, nil
+		}
 		if err != nil {
 			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
 			opts.inSyncError = fmt.Errorf("unable to create child: %v", err)
@@ -306,6 +314,13 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 	if updateStrategy == gittrackobjectutils.NeverUpdateStrategy {
 		log.Printf("Update strategy for %s set to never, ignoring", found.GetName())
+		return reconcile.Result{}, nil
+	}
+
+	if !metav1.IsControlledBy(found, instance) {
+		ref := metav1.GetControllerOf(found)
+		log.Printf("child '%s' is owned by another controller ('%s'), ignoring", found.GetName(), ref.Name)
+		opts.ignore = true
 		return reconcile.Result{}, nil
 	}
 

@@ -28,6 +28,7 @@ import (
 )
 
 type statusOpts struct {
+	ignore       bool
 	inSyncError  error
 	inSyncReason gittrackobjectutils.ConditionReason
 }
