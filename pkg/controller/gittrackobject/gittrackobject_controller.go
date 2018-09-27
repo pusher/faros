@@ -48,6 +48,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+var namespace string
+
 // Add creates a new GitTrackObject Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 // USER ACTION REQUIRED: update cmd/manager/main.go to call this faros.Add(mgr) to install this Controller
@@ -83,6 +85,10 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		syncPeriod = 5 * time.Minute
 	}
 
+	if namespaceFlag := flag.Lookup("namespace"); namespaceFlag != nil {
+		namespace = namespaceFlag.Value.String()
+	}
+
 	return &ReconcileGitTrackObject{
 		Client:      mgr.GetClient(),
 		scheme:      mgr.GetScheme(),
@@ -104,8 +110,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	predicate := utils.NamespacedPredicate{Namespace: namespace}
+
 	// Watch for changes to GitTrackObject
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{}, predicate)
 	if err != nil {
 		return err
 	}
@@ -143,6 +151,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				},
 				RestMapper: restMapper,
 			},
+			predicate,
 		)
 		if err != nil {
 			msg := fmt.Sprintf("unable to watch channel: %v", err)
