@@ -37,6 +37,7 @@ spec:
             repository:
               type: string
             subPath:
+              pattern: ^[a-zA-Z0-9/\-.]*$
               type: string
           required:
           - reference
