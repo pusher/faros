@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
@@ -36,8 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
+	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -74,17 +74,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create rest mapper: %v", err))
 	}
 
-	var syncPeriod time.Duration
-	syncPeriodFlag := flag.Lookup("sync-period")
-	if syncPeriodFlag != nil {
-		syncPeriod, err = time.ParseDuration(syncPeriodFlag.Value.String())
-		if err != nil {
-			panic(fmt.Errorf("unable to parse sync-period: %v", err))
-		}
-	} else {
-		syncPeriod = 5 * time.Minute
-	}
-
 	if namespaceFlag := flag.Lookup("namespace"); namespaceFlag != nil {
 		namespace = namespaceFlag.Value.String()
 	}
@@ -93,11 +82,11 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:      mgr.GetClient(),
 		scheme:      mgr.GetScheme(),
 		eventStream: make(chan event.GenericEvent),
-		informers:   make(map[string]cache.SharedIndexInformer),
+		cache:       mgr.GetCache(),
+		informers:   make(map[string]toolscache.SharedIndexInformer),
 		config:      mgr.GetConfig(),
 		stop:        stop,
 		restMapper:  restMapper,
-		syncPeriod:  syncPeriod,
 		recorder:    mgr.GetRecorder("gittrackobject-controller"),
 	}
 }
@@ -177,11 +166,11 @@ type ReconcileGitTrackObject struct {
 	client.Client
 	scheme      *runtime.Scheme
 	eventStream chan event.GenericEvent
-	informers   map[string]cache.SharedIndexInformer
+	cache       cache.Cache
+	informers   map[string]toolscache.SharedIndexInformer
 	config      *rest.Config
 	stop        chan struct{}
 	restMapper  meta.RESTMapper
-	syncPeriod  time.Duration
 	recorder    record.EventRecorder
 }
 
