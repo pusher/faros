@@ -36,6 +36,7 @@ var (
 	leaderElectionID         = flag.String("leader-election-id", "", "Name of the configmap used by the leader election system")
 	leaederElectionNamespace = flag.String("leader-election-namespace", "", "Namespace for the configmap used by the leader election system")
 	syncPeriod               = flag.Duration("sync-period", 5*time.Minute, "Reconcile sync period")
+	namespace                = flag.String("namespace", "", "Only manage GitTrack resources in given namespace")
 )
 
 func main() {
@@ -56,6 +57,7 @@ func main() {
 		LeaderElectionID:        *leaderElectionID,
 		LeaderElectionNamespace: *leaederElectionNamespace,
 		SyncPeriod:              syncPeriod,
+		Namespace:               *namespace,
 	})
 	if err != nil {
 		log.Fatal(err)

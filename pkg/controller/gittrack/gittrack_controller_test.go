@@ -88,7 +88,9 @@ var _ = Describe("GitTrack Suite", func() {
 		// channel when it is finished.
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
-		mgr, err = manager.New(cfg, manager.Options{})
+		mgr, err = manager.New(cfg, manager.Options{
+			Namespace: "default",
+		})
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
 
