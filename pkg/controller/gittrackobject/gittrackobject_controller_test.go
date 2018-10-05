@@ -267,6 +267,10 @@ var _ = Describe("GitTrackObject Suite", func() {
 		Context("with invalid data", func() {
 			invalidDataTest()
 		})
+
+		Context("in a different namespace", func() {
+			differentNamespaceTest()
+		})
 	})
 
 	Context("When a ClusterGitTrackObject is created", func() {
@@ -591,6 +595,42 @@ var (
 		It("should send a `UnmarshalFailed` event", func() {
 			ShouldSendFailedUnmarshalEvent("ClusterGitTrackObject", "")
 		})
+	}
+
+	differentNamespaceTest = func() {
+		var ns *v1.Namespace
+		var instance *farosv1alpha1.GitTrackObject
+		BeforeEach(func() {
+			ns = &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "not-default",
+				},
+			}
+			Expect(c.Create(context.TODO(), ns)).NotTo(HaveOccurred())
+
+			instance = &farosv1alpha1.GitTrackObject{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example",
+					Namespace: "not-default",
+				},
+				Spec: farosv1alpha1.GitTrackObjectSpec{
+					Name: "deployment-example",
+					Kind: "Deployment",
+					Data: []byte(exampleDeployment),
+				},
+			}
+			Expect(c.Create(context.TODO(), instance)).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			Expect(c.Delete(context.TODO(), ns)).NotTo(HaveOccurred())
+			Expect(c.Delete(context.TODO(), instance)).NotTo(HaveOccurred())
+		})
+
+		It("should not reconcile it", func() {
+			Eventually(requests, timeout).ShouldNot(Receive())
+		})
+
 	}
 
 	// ShouldCreateChild checks the child object was created

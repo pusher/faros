@@ -394,6 +394,28 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(clusterRoleGto.Name).To(Equal("clusterrole-test-read-ns-pods-svcs"))
 			})
 		})
+
+		Context("in a different namespace", func() {
+			var ns *v1.Namespace
+			BeforeEach(func() {
+				ns = &v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "not-default",
+					},
+				}
+				Expect(c.Create(context.TODO(), ns)).NotTo(HaveOccurred())
+				instance.Namespace = "not-default"
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			AfterEach(func() {
+				Expect(c.Delete(context.TODO(), ns)).NotTo(HaveOccurred())
+			})
+
+			It("should not reconcile it", func() {
+				Eventually(requests, timeout).ShouldNot(Receive())
+			})
+		})
 	})
 
 	Context("When a GitTrack resource is updated", func() {
