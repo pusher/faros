@@ -599,7 +599,6 @@ var (
 
 	differentNamespaceTest = func() {
 		var ns *v1.Namespace
-		var instance *farosv1alpha1.GitTrackObject
 		BeforeEach(func() {
 			ns = &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
