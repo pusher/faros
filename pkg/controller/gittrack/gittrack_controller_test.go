@@ -88,7 +88,9 @@ var _ = Describe("GitTrack Suite", func() {
 		// channel when it is finished.
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
-		mgr, err = manager.New(cfg, manager.Options{})
+		mgr, err = manager.New(cfg, manager.Options{
+			Namespace: "default",
+		})
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
 
@@ -390,6 +392,28 @@ var _ = Describe("GitTrack Suite", func() {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "clusterrole-test-read-ns-pods-svcs"}, clusterRoleGto)
 				}, timeout).Should(Succeed())
 				Expect(clusterRoleGto.Name).To(Equal("clusterrole-test-read-ns-pods-svcs"))
+			})
+		})
+
+		Context("in a different namespace", func() {
+			var ns *v1.Namespace
+			BeforeEach(func() {
+				ns = &v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "not-default",
+					},
+				}
+				Expect(c.Create(context.TODO(), ns)).NotTo(HaveOccurred())
+				instance.Namespace = "not-default"
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			AfterEach(func() {
+				Expect(c.Delete(context.TODO(), ns)).NotTo(HaveOccurred())
+			})
+
+			It("should not reconcile it", func() {
+				Eventually(requests, timeout).ShouldNot(Receive())
 			})
 		})
 	})

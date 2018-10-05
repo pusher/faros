@@ -1144,8 +1144,8 @@
   revision = "f08db293d3ef80052d6513ece19792642a289fea"
 
 [[projects]]
-  branch = "master+132+160"
-  digest = "1:7de64c8e079a7d5596b2d247c268d8b6c8c1388952fdac067a799478b697b714"
+  branch = "v0.1.4+132"
+  digest = "1:dddd80a142c17736dacfd1f0f2c645b43eb7c59fe5ccd2de33a8a9201e984249"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -1180,7 +1180,7 @@
     "pkg/webhook/types",
   ]
   pruneopts = "T"
-  revision = "97954394f48dc8fcb5ef1db4bccb442175481cd3"
+  revision = "e6dc9dcf08e806e804a630993403d4f120a0a34d"
   source = "https://github.com/pusher/controller-runtime"
 
 [[projects]]
@@ -1238,10 +1238,7 @@
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/yaml",
-    "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/discovery",
-    "k8s.io/client-go/dynamic",
-    "k8s.io/client-go/informers/internalinterfaces",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
@@ -1252,6 +1249,7 @@
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/workqueue",
     "k8s.io/code-generator/cmd/deepcopy-gen",
+    "sigs.k8s.io/controller-runtime/pkg/cache",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/apiutil",
     "sigs.k8s.io/controller-runtime/pkg/client/config",

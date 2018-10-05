@@ -27,7 +27,6 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
-	flag "github.com/spf13/pflag"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,8 +46,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
-
-var namespace string
 
 // Add creates a new GitTrackObject Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -74,10 +71,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create rest mapper: %v", err))
 	}
 
-	if namespaceFlag := flag.Lookup("namespace"); namespaceFlag != nil {
-		namespace = namespaceFlag.Value.String()
-	}
-
 	return &ReconcileGitTrackObject{
 		Client:      mgr.GetClient(),
 		scheme:      mgr.GetScheme(),
@@ -99,10 +92,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	predicate := utils.NamespacedPredicate{Namespace: namespace}
-
 	// Watch for changes to GitTrackObject
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{}, predicate)
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -140,7 +131,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				},
 				RestMapper: restMapper,
 			},
-			predicate,
 		)
 		if err != nil {
 			msg := fmt.Sprintf("unable to watch channel: %v", err)

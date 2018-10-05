@@ -26,7 +26,6 @@ import (
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	utils "github.com/pusher/faros/pkg/utils"
 	gitstore "github.com/pusher/git-store"
-	flag "github.com/spf13/pflag"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -43,8 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
-
-var namespace = flag.String("namespace", "", "Only manage GitTrack resources in given namespace")
 
 const ownedByLabel = "faros.pusher.com/owned-by"
 
@@ -81,9 +78,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to GitTrack
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{}, &utils.NamespacedPredicate{
-		Namespace: *namespace,
-	})
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}

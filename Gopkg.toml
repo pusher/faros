@@ -226,10 +226,11 @@ revision="906d99f89cd644eecf75ab547b29bf9f876f0b59"
 name="k8s.io/kube-openapi"
 revision="f08db293d3ef80052d6513ece19792642a289fea"
 
+# Running the latest release plus PR#132 (metrics)
 [[override]]
 name="sigs.k8s.io/controller-runtime"
 source="https://github.com/pusher/controller-runtime"
-branch="master+132+160"
+branch="v0.1.4+132"
 
 [[override]]
 name="sigs.k8s.io/controller-tools"
