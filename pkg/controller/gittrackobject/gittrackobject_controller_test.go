@@ -202,6 +202,7 @@ var crbKey = types.NamespacedName{Name: "example"}
 var mgr manager.Manager
 var instance *farosv1alpha1.GitTrackObject
 var clusterInstance *farosv1alpha1.ClusterGitTrackObject
+var gitTrack *farosv1alpha1.GitTrack
 var requests chan reconcile.Request
 var stop chan struct{}
 var stopInformers chan struct{}
@@ -226,6 +227,18 @@ var _ = Describe("GitTrackObject Suite", func() {
 		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
 		stopInformers = testReconciler.(Reconciler).StopChan()
 		stop = StartTestManager(mgr)
+
+		gitTrack = &farosv1alpha1.GitTrack{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testgittrack",
+				Namespace: "default",
+			},
+			Spec: farosv1alpha1.GitTrackSpec{
+				Reference:  "foo",
+				Repository: "bar",
+			},
+		}
+		Expect(c.Create(context.TODO(), gitTrack)).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
@@ -234,6 +247,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
 		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackList{},
 			&farosv1alpha1.GitTrackObjectList{},
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&appsv1.DeploymentList{},
@@ -297,6 +311,10 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 		Context("with invalid data", func() {
 			invalidClusterDataTest()
+		})
+
+		Context("with its owner in a different namespace", func() {
+			differentNamespaceOwnerTest()
 		})
 	})
 
@@ -383,6 +401,14 @@ var (
 		clusterInstance = &farosv1alpha1.ClusterGitTrackObject{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example",
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "faros.pusher.com/v1alpha1",
+						Kind:       "GitTrack",
+						UID:        gitTrack.UID,
+						Name:       gitTrack.Name,
+					},
+				},
 			},
 			Spec: farosv1alpha1.GitTrackObjectSpec{
 				Name: "clusterrolebinding-example",
@@ -597,6 +623,60 @@ var (
 		})
 	}
 
+	differentNamespaceOwnerTest = func() {
+		var ns *v1.Namespace
+		var gt *farosv1alpha1.GitTrack
+		BeforeEach(func() {
+			ns = &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "not-default",
+				},
+			}
+			c.Create(context.TODO(), ns)
+
+			gt = &farosv1alpha1.GitTrack{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testgittrack",
+					Namespace: "cluster-not-default",
+				},
+				Spec: farosv1alpha1.GitTrackSpec{
+					Reference:  "foo",
+					Repository: "bar",
+				},
+			}
+			Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
+
+			clusterInstance = &farosv1alpha1.ClusterGitTrackObject{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "example",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: "faros.pusher.com/v1alpha1",
+							Kind:       "GitTrack",
+							UID:        gt.UID,
+							Name:       gt.Name,
+						},
+					},
+				},
+				Spec: farosv1alpha1.GitTrackObjectSpec{
+					Name: "clusterrolebinding-example",
+					Kind: "ClusterRoleBinding",
+					Data: []byte(exampleClusterRoleBinding),
+				},
+			}
+			Expect(c.Create(context.TODO(), clusterInstance)).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			Expect(c.Delete(context.TODO(), gt)).NotTo(HaveOccurred())
+			Expect(c.Delete(context.TODO(), clusterInstance)).NotTo(HaveOccurred())
+		})
+
+		It("should not reconcile it", func() {
+			Eventually(requests, timeout).ShouldNot(Receive())
+		})
+	}
+
 	differentNamespaceTest = func() {
 		var ns *v1.Namespace
 		BeforeEach(func() {
@@ -605,7 +685,7 @@ var (
 					Name: "not-default",
 				},
 			}
-			Expect(c.Create(context.TODO(), ns)).NotTo(HaveOccurred())
+			c.Create(context.TODO(), ns)
 
 			instance = &farosv1alpha1.GitTrackObject{
 				ObjectMeta: metav1.ObjectMeta{
@@ -622,7 +702,6 @@ var (
 		})
 
 		AfterEach(func() {
-			Expect(c.Delete(context.TODO(), ns)).NotTo(HaveOccurred())
 			Expect(c.Delete(context.TODO(), instance)).NotTo(HaveOccurred())
 		})
 
