@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,12 +62,18 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create rest mapper: %v", err))
 	}
 
+	gvrs, err := farosflags.ParseIgnoredResources()
+	if err != nil {
+		panic(fmt.Errorf("unable to parse ignored resources: %v", err))
+	}
+
 	return &ReconcileGitTrack{
-		Client:     mgr.GetClient(),
-		scheme:     mgr.GetScheme(),
-		store:      gitstore.NewRepoStore(),
-		restMapper: restMapper,
-		recorder:   mgr.GetRecorder("gittrack-controller"),
+		Client:      mgr.GetClient(),
+		scheme:      mgr.GetScheme(),
+		store:       gitstore.NewRepoStore(),
+		restMapper:  restMapper,
+		recorder:    mgr.GetRecorder("gittrack-controller"),
+		ignoredGVRs: gvrs,
 	}
 }
 
@@ -108,10 +115,11 @@ var _ reconcile.Reconciler = &ReconcileGitTrack{}
 // ReconcileGitTrack reconciles a GitTrack object
 type ReconcileGitTrack struct {
 	client.Client
-	scheme     *runtime.Scheme
-	store      *gitstore.RepoStore
-	restMapper meta.RESTMapper
-	recorder   record.EventRecorder
+	scheme      *runtime.Scheme
+	store       *gitstore.RepoStore
+	restMapper  meta.RESTMapper
+	recorder    record.EventRecorder
+	ignoredGVRs map[schema.GroupVersionResource]interface{}
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
@@ -288,7 +296,11 @@ func objectName(u *unstructured.Unstructured) string {
 // handleObject either creates or updates a GitTrackObject
 func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
 	name := objectName(u)
-	if farosflags.Namespace != "" && u.GetNamespace() != "" && farosflags.Namespace != u.GetNamespace() {
+	ignored, err := r.ignoreObject(u)
+	if err != nil {
+		return errorResult(name, err)
+	}
+	if ignored {
 		return ignoreResult(name)
 	}
 
@@ -417,6 +429,24 @@ func checkOwner(owner *farosv1alpha1.GitTrack, child farosv1alpha1.GitTrackObjec
 		}
 	}
 	return nil
+}
+
+// ignoreObject checks whether the unstructured object should be ignored
+func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, error) {
+	gvr, namespaced, err := utils.GetAPIResource(r.restMapper, u.GetObjectKind().GroupVersionKind())
+	if err != nil {
+		return false, err
+	}
+
+	// Ignore namespaced objects not in the namespace managed by the controller
+	if namespaced && farosflags.Namespace != "" && farosflags.Namespace != u.GetNamespace() {
+		return true, nil
+	}
+	// Ignore GVKs in the ignoredGVKs set
+	if _, ok := r.ignoredGVRs[gvr]; ok {
+		return true, nil
+	}
+	return false, nil
 }
 
 // Reconcile reads the state of the cluster for a GitTrack object and makes changes based on the state read
