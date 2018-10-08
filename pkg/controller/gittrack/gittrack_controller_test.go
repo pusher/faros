@@ -942,6 +942,7 @@ var getsFilesFromRepo = func(path string, count int) {
 			Expect(ok).To(BeTrue())
 			gt = &farosv1alpha1.GitTrack{
 				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
 					Namespace: "default",
 				},
 				Spec: farosv1alpha1.GitTrackSpec{
@@ -951,8 +952,15 @@ var getsFilesFromRepo = func(path string, count int) {
 					Reference:  "4c31dbdd7103dc209c8bb21b75d78b3efafadc31",
 				},
 			}
+
+			Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
+
 			files, err = reconciler.getFiles(gt)
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			Expect(c.Delete(context.TODO(), gt)).NotTo(HaveOccurred())
 		})
 
 		It("Filters files by SubPath", func() {
