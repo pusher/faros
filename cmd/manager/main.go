@@ -24,6 +24,7 @@ import (
 
 	"github.com/pusher/faros/pkg/apis"
 	"github.com/pusher/faros/pkg/controller"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	flag "github.com/spf13/pflag"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -36,12 +37,12 @@ var (
 	leaderElectionID         = flag.String("leader-election-id", "", "Name of the configmap used by the leader election system")
 	leaederElectionNamespace = flag.String("leader-election-namespace", "", "Namespace for the configmap used by the leader election system")
 	syncPeriod               = flag.Duration("sync-period", 5*time.Minute, "Reconcile sync period")
-	namespace                = flag.String("namespace", "", "Only manage GitTrack resources in given namespace")
 )
 
 func main() {
 	// Setup flags
 	goflag.Lookup("logtostderr").Value.Set("true")
+	flag.CommandLine.AddFlagSet(farosflags.FlagSet)
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
 
@@ -57,7 +58,7 @@ func main() {
 		LeaderElectionID:        *leaderElectionID,
 		LeaderElectionNamespace: *leaederElectionNamespace,
 		SyncPeriod:              syncPeriod,
-		Namespace:               *namespace,
+		Namespace:               farosflags.Namespace,
 	})
 	if err != nil {
 		log.Fatal(err)

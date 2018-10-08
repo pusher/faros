@@ -24,6 +24,7 @@ import (
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	utils "github.com/pusher/faros/pkg/utils"
 	gitstore "github.com/pusher/git-store"
 	apiv1 "k8s.io/api/core/v1"
@@ -241,6 +242,11 @@ func errorResult(name string, err error) result {
 	return result{Name: name, Error: err, Ignored: true}
 }
 
+// ignoreResult is a convenience function for creating an ignore result
+func ignoreResult(name string) result {
+	return result{Name: name, Ignored: true}
+}
+
 // successResult is a convenience function for creating a success result
 func successResult(name string) result {
 	return result{Name: name}
@@ -282,6 +288,10 @@ func objectName(u *unstructured.Unstructured) string {
 // handleObject either creates or updates a GitTrackObject
 func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
 	name := objectName(u)
+	if farosflags.Namespace != "" && u.GetNamespace() != "" && farosflags.Namespace != u.GetNamespace() {
+		return ignoreResult(name)
+	}
+
 	gto, err := r.newGitTrackObjectInterface(name, u, makeLabels(owner))
 	if err != nil {
 		return errorResult(name, err)
@@ -306,7 +316,8 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 
 	err = checkOwner(owner, found, r.scheme)
 	if err != nil {
-		return errorResult(name, fmt.Errorf("child '%s' is owned by another controller: %v", name, err))
+		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "ControllerMismatch", "Child '%s' is owned by another controller: %v", name, err)
+		return ignoreResult(name)
 	}
 
 	childUpdated, err := r.updateChild(found, gto)

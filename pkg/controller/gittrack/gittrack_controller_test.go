@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	gitstore "github.com/pusher/git-store"
@@ -89,7 +90,7 @@ var _ = Describe("GitTrack Suite", func() {
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
-			Namespace: "default",
+			Namespace: farosflags.Namespace,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
@@ -317,6 +318,30 @@ var _ = Describe("GitTrack Suite", func() {
 			})
 		})
 
+		Context("with files from an unmanaged namespace", func() {
+			BeforeEach(func() {
+				instance.Spec.SubPath = "foo"
+				createInstance(instance, "4c31dbdd7103dc209c8bb21b75d78b3efafadc31")
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
+			})
+
+			It("ignores the files", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+				// TODO: don't rely on ordering
+				c := instance.Status.Conditions[3]
+				Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
+				Expect(c.Status).To(Equal(v1.ConditionTrue))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
+
+				Expect(instance.Status.ObjectsIgnored).To(Equal(int64(2)))
+			})
+		})
+
 		Context("with a child owned by another controller", func() {
 			truth := true
 			var existingChild *farosv1alpha1.GitTrackObject
@@ -342,10 +367,10 @@ var _ = Describe("GitTrack Suite", func() {
 						Data: []byte("kind: Deployment"),
 					},
 				}
-				err := c.Create(context.TODO(), existingChild.DeepCopy())
+				err := c.Create(context.TODO(), existingChild)
 				Expect(err).ToNot(HaveOccurred())
 
-				createInstance(instance, "master")
+				createInstance(instance, "4c31dbdd7103dc209c8bb21b75d78b3efafadc31")
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
 			})
@@ -364,18 +389,19 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(deployGto.Spec).To(Equal(existingChild.Spec))
 			})
 
-			It("update the ChildrenUpToDate condition", func() {
+			It("should ignore the GitTrackObject", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				// TODO: don't rely on ordering
 				c := instance.Status.Conditions[3]
 				Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
-				Expect(c.Status).To(Equal(v1.ConditionFalse))
+				Expect(c.Status).To(Equal(v1.ConditionTrue))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
-				Expect(c.Reason).To(Equal(string(gittrackutils.ErrorUpdatingChildren)))
-				Expect(c.Message).To(Equal("child 'deployment-nginx' is owned by another controller: child object is owned by 'does-not-exist'"))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
+
+				Expect(instance.Status.ObjectsIgnored).To(Equal(int64(3)))
 			})
 		})
 
