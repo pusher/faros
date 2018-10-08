@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	gitstore "github.com/pusher/git-store"
@@ -89,7 +90,7 @@ var _ = Describe("GitTrack Suite", func() {
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
-			Namespace: "default",
+			Namespace: farosflags.Namespace,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
@@ -314,6 +315,30 @@ var _ = Describe("GitTrack Suite", func() {
 					Expect(e.InvolvedObject.Name).To(Equal("example"))
 					Expect(e.Type).To(Equal(v1.EventTypeWarning))
 				}
+			})
+		})
+
+		Context("with files from an unmanaged namespace", func() {
+			BeforeEach(func() {
+				instance.Spec.SubPath = "foo"
+				createInstance(instance, "4c31dbdd7103dc209c8bb21b75d78b3efafadc31")
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
+			})
+
+			It("ignores the files", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+				// TODO: don't rely on ordering
+				c := instance.Status.Conditions[3]
+				Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
+				Expect(c.Status).To(Equal(v1.ConditionTrue))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
+
+				Expect(instance.Status.ObjectsIgnored).To(Equal(int64(2)))
 			})
 		})
 
