@@ -102,7 +102,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}},
 		&handler.EnqueueRequestForObject{},
-		utils.OwnerInNamespacePredicate{Client: mgr.GetClient()},
+		utils.NewOwnerInNamespacePredicate(mgr.GetClient()),
 	)
 	if err != nil {
 		return err

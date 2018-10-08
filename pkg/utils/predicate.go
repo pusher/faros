@@ -28,7 +28,7 @@ import (
 // OwnerInNamespacePredicate filters events to check the owner of the event
 // object is in the controller's namespace
 type OwnerInNamespacePredicate struct {
-	Client client.Client
+	client client.Client
 }
 
 // Create returns true if the event object's owner is in the same namespace
@@ -60,7 +60,7 @@ func (p OwnerInNamespacePredicate) Generic(e event.GenericEvent) bool {
 // in the namespace the controller is managing.
 func (p OwnerInNamespacePredicate) ownerInNamespace(ownerRefs []metav1.OwnerReference) bool {
 	gtList := &farosv1alpha1.GitTrackList{}
-	err := p.Client.List(context.TODO(), &client.ListOptions{}, gtList)
+	err := p.client.List(context.TODO(), &client.ListOptions{}, gtList)
 	if err != nil {
 		// We can't list CGTOs so fail closed and ignore the requests
 		return false
@@ -75,4 +75,11 @@ func (p OwnerInNamespacePredicate) ownerInNamespace(ownerRefs []metav1.OwnerRefe
 		}
 	}
 	return false
+}
+
+// NewOwnerInNamespacePredicate constructs a new OwnerInNamespacePredicate
+func NewOwnerInNamespacePredicate(client client.Client) OwnerInNamespacePredicate {
+	return OwnerInNamespacePredicate{
+		client: client,
+	}
 }
