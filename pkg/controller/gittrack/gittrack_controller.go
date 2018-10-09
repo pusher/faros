@@ -457,18 +457,21 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, er
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=clustergittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	instance := &farosv1alpha1.GitTrack{}
-	opts := newStatusOpts()
+	sOpts := newStatusOpts()
+	mOpts := newMetricOpts()
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {
-		err := r.updateStatus(instance, opts)
+		err := r.updateStatus(instance, sOpts)
+		mErr := r.updateMetrics(instance, mOpts)
 		// Print out any errors that may have occurred
 		for _, e := range []error{
 			err,
-			opts.gitError,
-			opts.parseError,
-			opts.gcError,
-			opts.upToDateError,
+			mErr,
+			sOpts.gitError,
+			sOpts.parseError,
+			sOpts.gcError,
+			sOpts.upToDateError,
 		} {
 			if e != nil {
 				log.Printf("%v", e)
@@ -485,25 +488,25 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	// Get a map of the files that are in the Spec
 	files, err := r.getFiles(instance)
 	if err != nil {
-		opts.gitError = err
-		opts.gitReason = gittrackutils.ErrorFetchingFiles
+		sOpts.gitError = err
+		sOpts.gitReason = gittrackutils.ErrorFetchingFiles
 		return reconcile.Result{}, err
 	}
 	// Git successful, set condition
-	opts.gitReason = gittrackutils.GitFetchSuccess
+	sOpts.gitReason = gittrackutils.GitFetchSuccess
 	r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.Spec.Repository, instance.Spec.Reference)
 
 	// Attempt to parse k8s objects from files
 	objects, errors := objectsFrom(files)
 	if len(errors) > 0 {
-		opts.parseError = fmt.Errorf(strings.Join(errors, ",\n"))
-		opts.parseReason = gittrackutils.ErrorParsingFiles
+		sOpts.parseError = fmt.Errorf(strings.Join(errors, ",\n"))
+		sOpts.parseReason = gittrackutils.ErrorParsingFiles
 	} else {
-		opts.parseReason = gittrackutils.FileParseSuccess
+		sOpts.parseReason = gittrackutils.FileParseSuccess
 	}
 
 	// Update status with the number of objects discovered
-	opts.discovered = int64(len(objects))
+	sOpts.discovered = int64(len(objects))
 	// Get a list of the GitTrackObjects that currently exist, by name
 	objectsByName, err := r.listObjectsByName(instance)
 	if err != nil {
@@ -522,9 +525,9 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	for range objects {
 		res := <-resultsChan
 		if res.Ignored {
-			opts.ignored++
+			sOpts.ignored++
 		} else {
-			opts.applied++
+			sOpts.applied++
 		}
 		delete(objectsByName, res.Name)
 		if res.Error != nil {
@@ -535,20 +538,20 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	// If there were errors updating the child objects, set the ChildrenUpToDate
 	// condition appropriately
 	if len(handlerErrors) > 0 {
-		opts.upToDateError = fmt.Errorf(strings.Join(handlerErrors, ",\n"))
-		opts.upToDateReason = gittrackutils.ErrorUpdatingChildren
+		sOpts.upToDateError = fmt.Errorf(strings.Join(handlerErrors, ",\n"))
+		sOpts.upToDateReason = gittrackutils.ErrorUpdatingChildren
 	} else {
-		opts.upToDateReason = gittrackutils.ChildrenUpdateSuccess
+		sOpts.upToDateReason = gittrackutils.ChildrenUpdateSuccess
 	}
 
 	// Cleanup potentially leftover resources
 	if err = r.deleteResources(objectsByName); err != nil {
-		opts.gcError = err
-		opts.gcReason = gittrackutils.ErrorDeletingChildren
+		sOpts.gcError = err
+		sOpts.gcReason = gittrackutils.ErrorDeletingChildren
 		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "CleanupFailed", "Failed to clean-up leftover resources")
 		return reconcile.Result{}, fmt.Errorf("failed to clean-up tracked objects: %v", err)
 	}
-	opts.gcReason = gittrackutils.GCSuccess
+	sOpts.gcReason = gittrackutils.GCSuccess
 
 	return reconcile.Result{}, nil
 }
