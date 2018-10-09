@@ -34,6 +34,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -926,6 +927,39 @@ var _ = Describe("GitTrack Suite", func() {
 		getsFilesFromRepo("foo/", 3)
 		getsFilesFromRepo("/foo/", 3)
 		getsFilesFromRepo("foo/bar", 1)
+	})
+
+	Context("When a list of ignored GVRs is supplied", func() {
+		BeforeEach(func() {
+			reconciler, ok := r.(*ReconcileGitTrack)
+			Expect(ok).To(BeTrue())
+			reconciler.ignoredGVRs = make(map[schema.GroupVersionResource]interface{})
+			deploymentGVR := schema.GroupVersionResource{
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "deployments",
+			}
+			reconciler.ignoredGVRs[deploymentGVR] = nil
+
+			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			// Wait for client cache to expire
+			waitForInstanceCreated(key)
+		})
+
+		It("ignores the deployment files", func() {
+			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+
+			// TODO: don't rely on ordering
+			c := instance.Status.Conditions[3]
+			Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
+			Expect(c.Status).To(Equal(v1.ConditionTrue))
+			Expect(c.LastUpdateTime).NotTo(BeNil())
+			Expect(c.LastTransitionTime).NotTo(BeNil())
+			Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+			Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
+
+			Expect(instance.Status.ObjectsIgnored).To(Equal(int64(1)))
+		})
 	})
 })
 

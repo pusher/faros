@@ -17,7 +17,11 @@ limitations under the License.
 package flags
 
 import (
+	"fmt"
+	"strings"
+
 	flag "github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
@@ -26,9 +30,36 @@ var (
 
 	// Namespace is the namespace for the controller to be restricted to
 	Namespace string
+
+	// ignoredResources is a list of Kubernets kinds to ignore when reconciling
+	ignoredResources []string
 )
 
 func init() {
 	FlagSet = flag.NewFlagSet("faros", flag.PanicOnError)
 	FlagSet.StringVar(&Namespace, "namespace", "", "Only manage GitTrack resources in given namespace")
+	FlagSet.StringSliceVar(&ignoredResources, "ignore-resource", []string{}, "Ignore resources of these kinds found in repositories, specified in <resource>.<group>/<version> format eg jobs.batch/v1")
+}
+
+// ParseIgnoredResources attempts to parse the ignore-resource flag value and
+// create a set of GroupVersionResources from the slice
+func ParseIgnoredResources() (map[schema.GroupVersionResource]interface{}, error) {
+	gvrs := make(map[schema.GroupVersionResource]interface{})
+	for _, ignored := range ignoredResources {
+		if !strings.Contains(ignored, ".") || !strings.Contains(ignored, "/") {
+			return nil, fmt.Errorf("%s is invalid, should be of format <resource>.<group>/<version>", ignored)
+		}
+		split := strings.SplitN(ignored, ".", 2)
+		gv, err := schema.ParseGroupVersion(split[1])
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse group version %s: %v", split[1], err)
+		}
+		gvr := schema.GroupVersionResource{
+			Group:    gv.Group,
+			Version:  gv.Version,
+			Resource: split[0],
+		}
+		gvrs[gvr] = nil
+	}
+	return gvrs, nil
 }
