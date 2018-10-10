@@ -31,6 +31,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	"github.com/pusher/faros/pkg/controller/gittrackobject/metrics"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	"github.com/pusher/faros/pkg/utils"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
@@ -207,6 +208,7 @@ var instance *farosv1alpha1.GitTrackObject
 var clusterInstance *farosv1alpha1.ClusterGitTrackObject
 var gitTrack *farosv1alpha1.GitTrack
 var requests chan reconcile.Request
+var testEvents chan TestEvent
 var stop chan struct{}
 var stopInformers chan struct{}
 
@@ -219,7 +221,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
-			Namespace:          "default",
+			Namespace:          farosflags.Namespace,
 			MetricsBindAddress: "0", // Disable serving metrics while testing
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -227,7 +229,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 		var recFn reconcile.Reconciler
 		testReconciler := newReconciler(mgr)
-		recFn, requests = SetupTestReconcile(testReconciler)
+		recFn, testEvents = SetupTestEventRecorder(testReconciler)
+		recFn, requests = SetupTestReconcile(recFn)
 		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
 		stopInformers = testReconciler.(Reconciler).StopChan()
 		stop = StartTestManager(mgr)
@@ -534,6 +537,8 @@ var (
 		It("should send `CreateStarted` and `CreateSuccessful` events", func() {
 			ShouldSendCreateEvents("GitTrackObject", "default")
 		})
+
+		It("should send all events to the namespace the controller is restricted to", ShouldSendAllEventsToNamespace)
 	}
 
 	// validDataTest runs the suite of tests for valid input data
@@ -584,8 +589,10 @@ var (
 		})
 
 		It("should send `CreateStarted` and `CreateSuccessful` events", func() {
-			ShouldSendCreateEvents("ClusterGitTrackObject", "")
+			ShouldSendCreateEvents("ClusterGitTrackObject", "default")
 		})
+
+		It("should send all events to the namespace the controller is restricted to", ShouldSendAllEventsToNamespace)
 	}
 
 	// invalidDataTest runs the suite of tests for an invalid input
@@ -635,7 +642,7 @@ var (
 		})
 
 		It("should send a `UnmarshalFailed` event", func() {
-			ShouldSendFailedUnmarshalEvent("ClusterGitTrackObject", "")
+			ShouldSendFailedUnmarshalEvent("ClusterGitTrackObject", "default")
 		})
 	}
 
@@ -1320,5 +1327,17 @@ var (
 		var metric dto.Metric
 		Expect(gauge.Write(&metric)).NotTo(HaveOccurred())
 		Expect(metric.GetGauge().GetValue()).To(Equal(value))
+	}
+
+	ShouldSendAllEventsToNamespace = func() {
+		events := &v1.EventList{}
+		Eventually(func() error {
+			return c.List(context.TODO(), &client.ListOptions{}, events)
+		}, timeout).Should(Succeed())
+
+		for range events.Items {
+			event := <-testEvents
+			Expect(event.Namespace).To(Equal(farosflags.Namespace))
+		}
 	}
 )
