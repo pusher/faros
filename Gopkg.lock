@@ -510,12 +510,12 @@
   revision = "418d78d0b9a7b7de3a6bbc8a23def624cc977bb2"
 
 [[projects]]
-  digest = "1:a211781365d61763d123ed78f68df0cd6b3bef934d1c8b5cdb48b07efbefaca9"
+  digest = "1:48f437a4e0789de254e4801d900f10796271fbce2a8e00fb80bca15095e46d4e"
   name = "github.com/pusher/git-store"
   packages = ["."]
   pruneopts = "T"
-  revision = "09117c18d44edb39395fb3a5577c2d1ef0163d94"
-  version = "v0.3.0"
+  revision = "afb02e58412f9528e53a7af7d8f22ff9873d56d3"
+  version = "v0.4.0"
 
 [[projects]]
   digest = "1:c85dd9a95433394aa8ec4949b5de91398c3e3895db5a341fa27f9e7b251a8cb9"
@@ -1221,6 +1221,8 @@
     "github.com/mattbaird/jsonpatch",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/prometheus/client_golang/prometheus",
+    "github.com/prometheus/client_model/go",
     "github.com/pusher/git-store",
     "github.com/spf13/pflag",
     "golang.org/x/net/context",
@@ -1259,6 +1261,7 @@
     "sigs.k8s.io/controller-runtime/pkg/event",
     "sigs.k8s.io/controller-runtime/pkg/handler",
     "sigs.k8s.io/controller-runtime/pkg/manager",
+    "sigs.k8s.io/controller-runtime/pkg/metrics",
     "sigs.k8s.io/controller-runtime/pkg/reconcile",
     "sigs.k8s.io/controller-runtime/pkg/runtime/inject",
     "sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
