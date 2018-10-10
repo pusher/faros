@@ -252,6 +252,7 @@ type result struct {
 	Name         string
 	Error        error
 	Ignored      bool
+	InSync       bool
 	TimeToDeploy time.Duration
 }
 
@@ -266,8 +267,8 @@ func ignoreResult(name string) result {
 }
 
 // successResult is a convenience function for creating a success result
-func successResult(name string, timeToDeploy time.Duration) result {
-	return result{Name: name, TimeToDeploy: timeToDeploy}
+func successResult(name string, timeToDeploy time.Duration, inSync bool) result {
+	return result{Name: name, TimeToDeploy: timeToDeploy, InSync: inSync}
 }
 
 func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructured.Unstructured, labels map[string]string) (farosv1alpha1.GitTrackObjectInterface, error) {
@@ -333,7 +334,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 			return errorResult(name, fmt.Errorf("failed to create child for '%s': %v", name, err))
 		}
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
-		return successResult(name, timeToDeploy)
+		return successResult(name, timeToDeploy, false)
 	} else if err != nil {
 		return errorResult(name, fmt.Errorf("failed to get child for '%s': %v", name, err))
 	}
@@ -344,11 +345,13 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return ignoreResult(name)
 	}
 
+	inSync := childInSync(found)
 	childUpdated, err := r.updateChild(found, gto)
 	if err != nil {
 		return errorResult(name, fmt.Errorf("failed to update child resource: %v", err))
 	}
 	if childUpdated {
+		inSync = false
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateStarted", "Updating child '%s'", name)
 		log.Printf("Updating child for '%s'\n", name)
 		if err = r.Update(context.TODO(), found); err != nil {
@@ -357,7 +360,16 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		}
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
-	return successResult(name, timeToDeploy)
+	return successResult(name, timeToDeploy, inSync)
+}
+
+func childInSync(child farosv1alpha1.GitTrackObjectInterface) bool {
+	for _, condition := range child.GetStatus().Conditions {
+		if condition.Type == farosv1alpha1.ObjectInSyncType && condition.Status == apiv1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 // UpdateChild compares the two GitTrackObjects and updates the foundGTO if the
@@ -545,6 +557,9 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 			sOpts.applied++
 		}
 		mOpts.timeToDeploy = append(mOpts.timeToDeploy, res.TimeToDeploy)
+		if res.InSync {
+			sOpts.inSync++
+		}
 		delete(objectsByName, res.Name)
 		if res.Error != nil {
 			handlerErrors = append(handlerErrors, res.Error.Error())
