@@ -26,6 +26,7 @@ import (
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	"github.com/pusher/faros/pkg/utils"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -221,7 +222,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		sOpts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
 		sOpts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
-		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UnmarshalFailed", "Couldn't unmarshal object from JSON/YAML")
+		r.sendEvent(instance, apiv1.EventTypeWarning, "UnmarshalFailed", "Couldn't unmarshal object from JSON/YAML")
 		return reconcile.Result{}, sOpts.inSyncError
 	}
 	if child.GetName() == "" {
@@ -264,15 +265,15 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 		// Not found, so create child
 		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.sendEvent(instance, apiv1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Create(context.TODO(), found)
 		if err != nil {
 			sOpts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
 			sOpts.inSyncError = fmt.Errorf("unable to create child: %v", err)
-			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+			r.sendEvent(instance, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 			return reconcile.Result{}, sOpts.inSyncError
 		}
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CreateSuccessful", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.sendEvent(instance, apiv1.EventTypeNormal, "CreateSuccessful", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		// Just created the object from the child, no need to check for update
 		return reconcile.Result{}, nil
 	} else if err != nil {
@@ -298,11 +299,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
 		sOpts.inSyncError = fmt.Errorf("unable to update child: %v", err)
-		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.sendEvent(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		return reconcile.Result{}, sOpts.inSyncError
 	}
 	if childUpdated {
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "UpdateStarted", "Starting update of child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.sendEvent(instance, apiv1.EventTypeNormal, "UpdateStarted", "Starting update of child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		if updateStrategy == gittrackobjectutils.RecreateUpdateStrategy {
 			err = r.recreateChild(found, child)
 		} else {
@@ -311,10 +312,10 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		if err != nil {
 			sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
 			sOpts.inSyncError = err
-			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+			r.sendEvent(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 			return reconcile.Result{}, sOpts.inSyncError
 		}
-		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		r.sendEvent(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 	}
 
 	// If we got here everything is good so the object must be in-sync
@@ -375,4 +376,15 @@ func (r *ReconcileGitTrackObject) getInstance(request reconcile.Request) (farosv
 		return nil, err
 	}
 	return instance, nil
+}
+
+// sendEvent wraps event recording to make sure the namespace is set correctly
+// on all events
+func (r *ReconcileGitTrackObject) sendEvent(gto farosv1alpha1.GitTrackObjectInterface, eventType, reason, messageFmt string, args ...interface{}) {
+	instance := gto.DeepCopyInterface()
+	if instance.GetNamespace() == "" {
+		instance.SetNamespace(farosflags.Namespace)
+	}
+
+	r.recorder.Eventf(instance, eventType, reason, messageFmt, args...)
 }
