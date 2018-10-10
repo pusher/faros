@@ -25,7 +25,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	testevents "github.com/pusher/faros/test/events"
@@ -151,6 +154,31 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(gitErrorCondition.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 				Expect(gcErrorCondition.Type).To(Equal(farosv1alpha1.ChildrenGarbageCollectedType))
 				Expect(upToDateCondiiton.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
+			})
+
+			Context("sets the status metrics", func() {
+				var setsMetric = func(status string, value float64) {
+					It(fmt.Sprintf("sets status `%s` to %f", status, value), func() {
+						var gauge prometheus.Gauge
+						Eventually(func() error {
+							var err error
+							gauge, err = metrics.ChildStatus.GetMetricWith(map[string]string{
+								"name":      instance.GetName(),
+								"namespace": instance.GetNamespace(),
+								"status":    status,
+							})
+							return err
+						}, timeout).Should(Succeed())
+						var metric dto.Metric
+						Expect(gauge.Write(&metric)).NotTo(HaveOccurred())
+						Expect(metric.GetGauge().GetValue()).To(Equal(value))
+					})
+				}
+
+				setsMetric("discovered", 2.0)
+				setsMetric("applied", 2.0)
+				setsMetric("ignored", 0.0)
+				setsMetric("inSync", 0.0)
 			})
 
 			It("creates GitTrackObjects", func() {

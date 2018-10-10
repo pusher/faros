@@ -458,7 +458,7 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, er
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	instance := &farosv1alpha1.GitTrack{}
 	sOpts := newStatusOpts()
-	mOpts := newMetricOpts()
+	mOpts := newMetricOpts(sOpts)
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {

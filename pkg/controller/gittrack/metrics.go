@@ -17,15 +17,52 @@ limitations under the License.
 package gittrack
 
 import (
+	"fmt"
+
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 )
 
-type metricsOpts struct{}
+type metricsOpts struct {
+	status *statusOpts
+}
 
-func newMetricOpts() *metricsOpts {
-	return &metricsOpts{}
+func newMetricOpts(status *statusOpts) *metricsOpts {
+	return &metricsOpts{
+		status: status,
+	}
 }
 
 func (r *ReconcileGitTrack) updateMetrics(gt *farosv1alpha1.GitTrack, opts *metricsOpts) error {
+	if gt == nil {
+		return nil
+	}
+	err := updateChildStatusMetric(gt.GetName(), gt.GetNamespace(),
+		map[string]int64{
+			"discovered": opts.status.discovered,
+			"applied":    opts.status.applied,
+			"ignored":    opts.status.ignored,
+			"inSync":     opts.status.inSync,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("error updating Child Status metric: %v", err)
+	}
+	return nil
+}
+
+func updateChildStatusMetric(gtName, gtNamespace string, values map[string]int64) error {
+	for status, value := range values {
+		labels := map[string]string{
+			"name":      gtName,
+			"namespace": gtNamespace,
+			"status":    status,
+		}
+		metric, err := metrics.ChildStatus.GetMetricWith(labels)
+		if err != nil {
+			return fmt.Errorf("unable to get metric with labels %+v: %v", labels, err)
+		}
+		metric.Set(float64(value))
+	}
 	return nil
 }
