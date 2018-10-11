@@ -40,4 +40,5 @@ var (
 
 func init() {
 	ctrlmetrics.Registry.MustRegister(ChildStatus)
+	ctrlmetrics.Registry.MustRegister(TimeToDeploy)
 }
