@@ -658,6 +658,40 @@ var _ = Describe("GitTrack Suite", func() {
 					Expect(e.Reason).To(SatisfyAny(Equal("UpdateStarted"), Equal("UpdateSuccessful")))
 				}
 			})
+
+			It("updates the time to deploy metric", func() {
+				// Reset the time to deploy metric
+				metrics.TimeToDeploy = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+					Name: "faros_gittrack_time_to_deploy_seconds",
+					Help: "Counts the time from commit to deploy of a child resource",
+				}, []string{"name", "namespace", "repository"})
+
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
+
+				// Update the reference
+				instance.Spec.Reference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+				err := c.Update(context.TODO(), instance)
+				Expect(err).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+
+				var hist prometheus.Histogram
+				Eventually(func() error {
+					var err error
+					hist, err = metrics.TimeToDeploy.GetMetricWith(map[string]string{
+						"name":       instance.GetName(),
+						"namespace":  instance.GetNamespace(),
+						"repository": instance.Spec.Repository,
+					})
+					return err
+				}, timeout).Should(Succeed())
+				var metric dto.Metric
+				Expect(hist.Write(&metric)).NotTo(HaveOccurred())
+				Expect(metric.GetHistogram().GetSampleCount()).To(Equal(uint64(4)))
+			})
 		})
 
 		Context("and the subPath has changed", func() {

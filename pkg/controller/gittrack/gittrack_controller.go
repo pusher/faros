@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
@@ -68,12 +69,13 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 
 	return &ReconcileGitTrack{
-		Client:      mgr.GetClient(),
-		scheme:      mgr.GetScheme(),
-		store:       gitstore.NewRepoStore(),
-		restMapper:  restMapper,
-		recorder:    mgr.GetRecorder("gittrack-controller"),
-		ignoredGVRs: gvrs,
+		Client:          mgr.GetClient(),
+		scheme:          mgr.GetScheme(),
+		store:           gitstore.NewRepoStore(),
+		restMapper:      restMapper,
+		recorder:        mgr.GetRecorder("gittrack-controller"),
+		ignoredGVRs:     gvrs,
+		lastUpdateTimes: make(map[string]time.Time),
 	}
 }
 
@@ -115,11 +117,12 @@ var _ reconcile.Reconciler = &ReconcileGitTrack{}
 // ReconcileGitTrack reconciles a GitTrack object
 type ReconcileGitTrack struct {
 	client.Client
-	scheme      *runtime.Scheme
-	store       *gitstore.RepoStore
-	restMapper  meta.RESTMapper
-	recorder    record.EventRecorder
-	ignoredGVRs map[schema.GroupVersionResource]interface{}
+	scheme          *runtime.Scheme
+	store           *gitstore.RepoStore
+	restMapper      meta.RESTMapper
+	recorder        record.EventRecorder
+	ignoredGVRs     map[schema.GroupVersionResource]interface{}
+	lastUpdateTimes map[string]time.Time
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
@@ -135,6 +138,12 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, privateKey []by
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to checkout '%s': %v", ref, err)
 	}
+
+	lastUpdated, err := repo.LastUpdated()
+	if err != nil {
+		return &gitstore.Repo{}, fmt.Errorf("failed to get last updated timestamp: %v", err)
+	}
+	r.lastUpdateTimes[url] = lastUpdated
 
 	return repo, nil
 }
@@ -240,9 +249,10 @@ func makeLabels(g *farosv1alpha1.GitTrack) map[string]string {
 
 // result represents the result of creating or updating a GitTrackObject
 type result struct {
-	Name    string
-	Error   error
-	Ignored bool
+	Name         string
+	Error        error
+	Ignored      bool
+	TimeToDeploy time.Duration
 }
 
 // errorResult is a convenience function for creating an error result
@@ -256,8 +266,8 @@ func ignoreResult(name string) result {
 }
 
 // successResult is a convenience function for creating a success result
-func successResult(name string) result {
-	return result{Name: name}
+func successResult(name string, timeToDeploy time.Duration) result {
+	return result{Name: name, TimeToDeploy: timeToDeploy}
 }
 
 func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructured.Unstructured, labels map[string]string) (farosv1alpha1.GitTrackObjectInterface, error) {
@@ -304,6 +314,8 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return ignoreResult(name)
 	}
 
+	timeToDeploy := time.Now().Sub(r.lastUpdateTimes[owner.Spec.Repository])
+
 	gto, err := r.newGitTrackObjectInterface(name, u, makeLabels(owner))
 	if err != nil {
 		return errorResult(name, err)
@@ -321,7 +333,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 			return errorResult(name, fmt.Errorf("failed to create child for '%s': %v", name, err))
 		}
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
-		return successResult(name)
+		return successResult(name, timeToDeploy)
 	} else if err != nil {
 		return errorResult(name, fmt.Errorf("failed to get child for '%s': %v", name, err))
 	}
@@ -345,7 +357,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		}
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
-	return successResult(name)
+	return successResult(name, timeToDeploy)
 }
 
 // UpdateChild compares the two GitTrackObjects and updates the foundGTO if the
@@ -485,6 +497,9 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		return reconcile.Result{}, err
 	}
 
+	// Set the repository for metrics
+	mOpts.repository = instance.Spec.Repository
+
 	// Get a map of the files that are in the Spec
 	files, err := r.getFiles(instance)
 	if err != nil {
@@ -529,6 +544,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		} else {
 			sOpts.applied++
 		}
+		mOpts.timeToDeploy = append(mOpts.timeToDeploy, res.TimeToDeploy)
 		delete(objectsByName, res.Name)
 		if res.Error != nil {
 			handlerErrors = append(handlerErrors, res.Error.Error())

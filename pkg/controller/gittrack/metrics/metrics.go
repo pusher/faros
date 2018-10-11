@@ -28,6 +28,14 @@ var (
 		Name: "faros_gittrack_child_status",
 		Help: "Shows the status of a GitTracks child objects",
 	}, []string{"name", "namespace", "status"})
+
+	// TimeToDeploy is a prometheus histogram that holds the time between a new
+	// commit being added to the head of the git tree and the changes being
+	// reflected within the GitTrackObjects
+	TimeToDeploy = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "faros_gittrack_time_to_deploy_seconds",
+		Help: "Counts the time from commit to deploy of a child resource",
+	}, []string{"name", "namespace", "repository"})
 )
 
 func init() {

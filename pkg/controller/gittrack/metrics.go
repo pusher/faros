@@ -18,18 +18,22 @@ package gittrack
 
 import (
 	"fmt"
+	"time"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 )
 
 type metricsOpts struct {
-	status *statusOpts
+	status       *statusOpts
+	timeToDeploy []time.Duration
+	repository   string
 }
 
 func newMetricOpts(status *statusOpts) *metricsOpts {
 	return &metricsOpts{
-		status: status,
+		status:       status,
+		timeToDeploy: []time.Duration{},
 	}
 }
 
@@ -48,6 +52,11 @@ func (r *ReconcileGitTrack) updateMetrics(gt *farosv1alpha1.GitTrack, opts *metr
 	if err != nil {
 		return fmt.Errorf("error updating Child Status metric: %v", err)
 	}
+
+	err = updateTimeToDeployMetric(gt.GetName(), gt.GetNamespace(), opts.repository, opts.timeToDeploy)
+	if err != nil {
+		return fmt.Errorf("error updating Time To Deploy metric: %v", err)
+	}
 	return nil
 }
 
@@ -64,5 +73,24 @@ func updateChildStatusMetric(gtName, gtNamespace string, values map[string]int64
 		}
 		metric.Set(float64(value))
 	}
+	return nil
+}
+
+func updateTimeToDeployMetric(gtName, gtNamespace, repository string, durations []time.Duration) error {
+	labels := map[string]string{
+		"name":       gtName,
+		"namespace":  gtNamespace,
+		"repository": repository,
+	}
+	metric, err := metrics.TimeToDeploy.GetMetricWith(labels)
+	if err != nil {
+		return fmt.Errorf("unable to get metric with labels %+v: %v", labels, err)
+	}
+	for _, duration := range durations {
+		if duration != 0 {
+			metric.Observe(duration.Seconds())
+		}
+	}
+
 	return nil
 }
