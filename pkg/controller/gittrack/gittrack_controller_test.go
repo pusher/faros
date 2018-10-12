@@ -94,7 +94,8 @@ var _ = Describe("GitTrack Suite", func() {
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
-			Namespace: farosflags.Namespace,
+			Namespace:          farosflags.Namespace,
+			MetricsBindAddress: "0", // Disable serving metrics while testing
 		})
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()

@@ -219,7 +219,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
-			Namespace: "default",
+			Namespace:          "default",
+			MetricsBindAddress: "0", // Disable serving metrics while testing
 		})
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
