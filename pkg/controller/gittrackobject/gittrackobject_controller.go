@@ -185,15 +185,18 @@ func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var instance farosv1alpha1.GitTrackObjectInterface
-	opts := newStatusOpts()
+	sOpts := newStatusOpts()
+	mOpts := newMetricOpts()
 
 	// Update the GitTrackObject status when we leave this function
 	defer func() {
-		err := r.updateStatus(instance, opts)
+		err := r.updateStatus(instance, sOpts)
+		mErr := r.updateMetrics(instance, mOpts)
 		// Print out any errors that may have occurred
 		for _, e := range []error{
 			err,
-			opts.inSyncError,
+			mErr,
+			sOpts.inSyncError,
 		} {
 			if e != nil {
 				log.Printf("%v", e)
@@ -216,14 +219,14 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	child := &unstructured.Unstructured{}
 	*child, err = utils.YAMLToUnstructured(instance.GetSpec().Data)
 	if err != nil {
-		opts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
-		opts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
+		sOpts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
+		sOpts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
 		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UnmarshalFailed", "Couldn't unmarshal object from JSON/YAML")
-		return reconcile.Result{}, opts.inSyncError
+		return reconcile.Result{}, sOpts.inSyncError
 	}
 	if child.GetName() == "" {
-		opts.inSyncReason = gittrackobjectutils.ErrorGettingChild
-		opts.inSyncError = fmt.Errorf("unable to get child: name cannot be empty")
+		sOpts.inSyncReason = gittrackobjectutils.ErrorGettingChild
+		sOpts.inSyncError = fmt.Errorf("unable to get child: name cannot be empty")
 		return reconcile.Result{}, nil
 	}
 
@@ -231,16 +234,16 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	// already being watched
 	err = r.watch(*child)
 	if err != nil {
-		opts.inSyncReason = gittrackobjectutils.ErrorWatchingChild
-		opts.inSyncError = fmt.Errorf("unable to create watch: %v", err)
-		return reconcile.Result{}, opts.inSyncError
+		sOpts.inSyncReason = gittrackobjectutils.ErrorWatchingChild
+		sOpts.inSyncError = fmt.Errorf("unable to create watch: %v", err)
+		return reconcile.Result{}, sOpts.inSyncError
 	}
 
 	err = controllerutil.SetControllerReference(instance, child, r.scheme)
 	if err != nil {
-		opts.inSyncReason = gittrackobjectutils.ErrorAddingOwnerReference
-		opts.inSyncError = fmt.Errorf("unable to add owner reference: %v", err)
-		return reconcile.Result{}, opts.inSyncError
+		sOpts.inSyncReason = gittrackobjectutils.ErrorAddingOwnerReference
+		sOpts.inSyncError = fmt.Errorf("unable to add owner reference: %v", err)
+		return reconcile.Result{}, sOpts.inSyncError
 	}
 
 	// Construct holder for API copy of child
@@ -254,9 +257,9 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		found = child.DeepCopy()
 		err = utils.SetLastAppliedAnnotation(found, child)
 		if err != nil {
-			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
-			opts.inSyncError = fmt.Errorf("unable to set annotation: %v", err)
-			return reconcile.Result{}, opts.inSyncError
+			sOpts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
+			sOpts.inSyncError = fmt.Errorf("unable to set annotation: %v", err)
+			return reconcile.Result{}, sOpts.inSyncError
 		}
 
 		// Not found, so create child
@@ -264,25 +267,25 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		err = r.Create(context.TODO(), found)
 		if err != nil {
-			opts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
-			opts.inSyncError = fmt.Errorf("unable to create child: %v", err)
+			sOpts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
+			sOpts.inSyncError = fmt.Errorf("unable to create child: %v", err)
 			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-			return reconcile.Result{}, opts.inSyncError
+			return reconcile.Result{}, sOpts.inSyncError
 		}
 		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CreateSuccessful", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		// Just created the object from the child, no need to check for update
 		return reconcile.Result{}, nil
 	} else if err != nil {
-		opts.inSyncReason = gittrackobjectutils.ErrorGettingChild
-		opts.inSyncError = fmt.Errorf("unable to get child: %v", err)
-		return reconcile.Result{}, opts.inSyncError
+		sOpts.inSyncReason = gittrackobjectutils.ErrorGettingChild
+		sOpts.inSyncError = fmt.Errorf("unable to get child: %v", err)
+		return reconcile.Result{}, sOpts.inSyncError
 	}
 
 	updateStrategy, err := gittrackobjectutils.GetUpdateStrategy(child)
 	if err != nil {
-		opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-		opts.inSyncError = fmt.Errorf("unable to get update strategy: %v", err)
-		return reconcile.Result{}, opts.inSyncError
+		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
+		sOpts.inSyncError = fmt.Errorf("unable to get update strategy: %v", err)
+		return reconcile.Result{}, sOpts.inSyncError
 	}
 
 	if updateStrategy == gittrackobjectutils.NeverUpdateStrategy {
@@ -293,10 +296,10 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	// Update the object if the spec differs from the version running
 	childUpdated, err := utils.UpdateChildResource(found, child)
 	if err != nil {
-		opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-		opts.inSyncError = fmt.Errorf("unable to update child: %v", err)
+		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
+		sOpts.inSyncError = fmt.Errorf("unable to update child: %v", err)
 		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		return reconcile.Result{}, opts.inSyncError
+		return reconcile.Result{}, sOpts.inSyncError
 	}
 	if childUpdated {
 		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "UpdateStarted", "Starting update of child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
@@ -306,14 +309,16 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 			err = r.updateChild(found, child)
 		}
 		if err != nil {
-			opts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-			opts.inSyncError = err
+			sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
+			sOpts.inSyncError = err
 			r.recorder.Eventf(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-			return reconcile.Result{}, opts.inSyncError
+			return reconcile.Result{}, sOpts.inSyncError
 		}
 		r.recorder.Eventf(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 	}
 
+	// If we got here everything is good so the object must be in-sync
+	mOpts.inSync = true
 	return reconcile.Result{}, nil
 }
 
