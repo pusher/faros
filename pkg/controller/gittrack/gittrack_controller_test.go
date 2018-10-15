@@ -141,6 +141,28 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(instance.Status.ObjectsApplied).To(Equal(two))
 				Expect(instance.Status.ObjectsIgnored).To(Equal(zero))
 				Expect(instance.Status.ObjectsInSync).To(Equal(zero))
+
+				deployGto := &farosv1alpha1.GitTrackObject{}
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployGto)
+				}, timeout).Should(Succeed())
+
+				now := metav1.NewTime(time.Now())
+				deployGto.Status.Conditions = []farosv1alpha1.GitTrackObjectCondition{
+					{
+						Type:               farosv1alpha1.ObjectInSyncType,
+						Status:             v1.ConditionTrue,
+						LastTransitionTime: now,
+						LastUpdateTime:     now,
+					},
+				}
+				Expect(c.Update(context.TODO(), deployGto)).ToNot(HaveOccurred())
+				// Wait for reconcile for update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status update
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.Status.ObjectsInSync).To(Equal(int64(1)))
 			})
 
 			It("sets the status conditions", func() {
