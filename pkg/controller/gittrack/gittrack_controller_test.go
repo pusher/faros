@@ -1073,6 +1073,13 @@ var getsFilesFromRepo = func(path string, count int) {
 			}
 
 			Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test",
+					Namespace: "default",
+				},
+			}
+			Eventually(requests, timeout).Should(Receive(Equal(req)))
 
 			files, err = reconciler.getFiles(gt)
 			Expect(err).ToNot(HaveOccurred())
