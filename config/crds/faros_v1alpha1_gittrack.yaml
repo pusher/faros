@@ -45,9 +45,6 @@ spec:
           type: object
         status:
           properties:
-            ObjectsIgnored:
-              format: int64
-              type: integer
             conditions:
               items:
                 properties:
@@ -76,13 +73,16 @@ spec:
             objectsDiscovered:
               format: int64
               type: integer
+            objectsIgnored:
+              format: int64
+              type: integer
             objectsInSync:
               format: int64
               type: integer
           required:
           - objectsDiscovered
           - objectsApplied
-          - ObjectsIgnored
+          - objectsIgnored
           - objectsInSync
           type: object
       type: object
