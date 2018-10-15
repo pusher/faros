@@ -1329,7 +1329,7 @@ var (
 		Expect(metric.GetGauge().GetValue()).To(Equal(value))
 	}
 
-	ShouldSendAllEventsToNamespace = func() {
+	ShouldSendAllEventsToNamespace = func(done Done) {
 		events := &v1.EventList{}
 		Eventually(func() error {
 			return c.List(context.TODO(), &client.ListOptions{}, events)
@@ -1339,5 +1339,7 @@ var (
 			event := <-testEvents
 			Expect(event.Namespace).To(Equal(farosflags.Namespace))
 		}
+
+		close(done)
 	}
 )
