@@ -25,8 +25,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/pkg/apis"
+	farosflags "github.com/pusher/faros/pkg/flags"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -46,6 +50,8 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
 	}
 	apis.AddToScheme(scheme.Scheme)
+
+	farosflags.Namespace = "default"
 
 	var err error
 	if cfg, err = t.Start(); err != nil {
@@ -87,4 +93,43 @@ func StartTestManager(mgr manager.Manager) chan struct{} {
 		Expect(mgr.Start(stop)).NotTo(HaveOccurred())
 	}()
 	return stop
+}
+
+// testEventRecorder is used to inspect the input to the Reconciler's event
+// recorder during tests
+type testEventRecorder struct {
+	record.EventRecorder
+	events chan TestEvent
+}
+
+// Eventf implements the record.EventRecorder interface
+// Sends TestEvents to the testEventRecorder's events channel for tests to
+// read from
+func (t *testEventRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	obj, ok := object.(v1.Object)
+	Expect(ok).To(BeTrue())
+
+	// Not every test will listen for events so send them in a go routine so
+	// we don't block
+	go func() {
+		t.events <- TestEvent{Namespace: obj.GetNamespace()}
+	}()
+
+	t.EventRecorder.Eventf(object, eventtype, reason, messageFmt, args...)
+}
+
+// TestEvent holds information about the EventRecorder input from the reconciler
+type TestEvent struct {
+	Namespace string
+}
+
+// SetupTestEventRecorder injects the testEventRecorder into the reconciler
+func SetupTestEventRecorder(inner reconcile.Reconciler) (reconcile.Reconciler, chan TestEvent) {
+	events := make(chan TestEvent)
+	reconciler := inner.(*ReconcileGitTrackObject)
+	reconciler.recorder = &testEventRecorder{
+		EventRecorder: reconciler.recorder,
+		events:        events,
+	}
+	return reconciler, events
 }
