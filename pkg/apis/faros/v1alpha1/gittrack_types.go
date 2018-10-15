@@ -55,7 +55,7 @@ type GitTrackStatus struct {
 	ObjectsApplied int64 `json:"objectsApplied"`
 
 	// ObjectsIgnored is the number of k8s objects found in the repository path for which no GitTrackObject was created
-	ObjectsIgnored int64 `json:"ObjectsIgnored"`
+	ObjectsIgnored int64 `json:"objectsIgnored"`
 
 	// ObjectsInSync is the number of GitTrackObjects that were successfully applied to the cluster
 	ObjectsInSync int64 `json:"objectsInSync"`
