@@ -683,11 +683,8 @@ var _ = Describe("GitTrack Suite", func() {
 			})
 
 			It("updates the time to deploy metric", func() {
-				// Reset the time to deploy metric
-				metrics.TimeToDeploy = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-					Name: "faros_gittrack_time_to_deploy_seconds",
-					Help: "Counts the time from commit to deploy of a child resource",
-				}, []string{"name", "namespace", "repository"})
+				// Reset the metric before testing
+				metrics.TimeToDeploy.Reset()
 
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
@@ -1073,6 +1070,13 @@ var getsFilesFromRepo = func(path string, count int) {
 			}
 
 			Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test",
+					Namespace: "default",
+				},
+			}
+			Eventually(requests, timeout).Should(Receive(Equal(req)))
 
 			files, err = reconciler.getFiles(gt)
 			Expect(err).ToNot(HaveOccurred())
