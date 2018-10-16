@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
@@ -76,6 +77,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		recorder:        mgr.GetRecorder("gittrack-controller"),
 		ignoredGVRs:     gvrs,
 		lastUpdateTimes: make(map[string]time.Time),
+		mutex:           sync.RWMutex{},
 	}
 }
 
@@ -123,6 +125,7 @@ type ReconcileGitTrack struct {
 	recorder        record.EventRecorder
 	ignoredGVRs     map[schema.GroupVersionResource]interface{}
 	lastUpdateTimes map[string]time.Time
+	mutex           sync.RWMutex
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
@@ -143,7 +146,10 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, privateKey []by
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to get last updated timestamp: %v", err)
 	}
+
+	r.mutex.Lock()
 	r.lastUpdateTimes[url] = lastUpdated
+	r.mutex.Unlock()
 
 	return repo, nil
 }
@@ -315,7 +321,9 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return ignoreResult(name)
 	}
 
+	r.mutex.RLock()
 	timeToDeploy := time.Now().Sub(r.lastUpdateTimes[owner.Spec.Repository])
+	r.mutex.RUnlock()
 
 	gto, err := r.newGitTrackObjectInterface(name, u, makeLabels(owner))
 	if err != nil {
