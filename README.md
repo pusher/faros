@@ -24,6 +24,26 @@ understand the project before deploying to production.
 
 ## Introduction
 
+Faros aims to make it easier for teams to ensure that the desired state of their
+applications is synchronised between a Kubernetes cluster and Git.
+
+Typically, a team running workloads on Kubernetes will use
+infrastructure-as-code concepts and keep a copy of their deployment
+configuration under source control just as they do with their product code.
+The process of taking this desired state from Git and applying it to the
+Kubernetes cluster is the problem Faros aims to solve.
+
+By providing Faros with a reference to a Git repository (URL and Git Reference
+(eg master)), credentials to access the repository and an optional path within
+the repository, Faros will load all Kubernetes resource definitions from the
+repository and synchronise these with the Kubernetes cluster.
+
+Faros then watches the child resources and, if they are ever modified,
+immediately reverts the change back to the state of the Git repository.
+This forces users to make changes to their deployment configuration in Git,
+which in turn allows for auditing, peer review and a canonical history of what
+was deployed and when.
+
 ## Installation
 
 ## Quick Start
