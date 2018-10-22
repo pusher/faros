@@ -232,17 +232,28 @@ func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1
 
 // listObjectsByName lists and filters GitTrackObjects by the `faros.pusher.com/owned-by` label,
 // and returns a map of names to GitTrackObject mappings
-func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (map[string]farosv1alpha1.GitTrackObject, error) {
-	result := make(map[string]farosv1alpha1.GitTrackObject)
+func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (map[string]farosv1alpha1.GitTrackObjectInterface, error) {
+	result := make(map[string]farosv1alpha1.GitTrackObjectInterface)
+	opts := client.MatchingLabels(makeLabels(owner))
+
 	gtos := &farosv1alpha1.GitTrackObjectList{}
-	opts := client.InNamespace(owner.Namespace).MatchingLabels(makeLabels(owner))
 	err := r.List(context.TODO(), opts, gtos)
 	if err != nil {
 		return nil, err
 	}
 	for _, gto := range gtos.Items {
-		result[gto.Name] = gto
+		result[gto.GetNamespacedName()] = &gto
 	}
+
+	cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
+	err = r.List(context.TODO(), opts, cgtos)
+	if err != nil {
+		return nil, err
+	}
+	for _, cgto := range cgtos.Items {
+		result[cgto.GetNamespacedName()] = &cgto
+	}
+
 	return result, nil
 }
 
@@ -255,26 +266,26 @@ func makeLabels(g *farosv1alpha1.GitTrack) map[string]string {
 
 // result represents the result of creating or updating a GitTrackObject
 type result struct {
-	Name         string
-	Error        error
-	Ignored      bool
-	InSync       bool
-	TimeToDeploy time.Duration
+	NamespacedName string
+	Error          error
+	Ignored        bool
+	InSync         bool
+	TimeToDeploy   time.Duration
 }
 
 // errorResult is a convenience function for creating an error result
-func errorResult(name string, err error) result {
-	return result{Name: name, Error: err, Ignored: true}
+func errorResult(namespacedName string, err error) result {
+	return result{NamespacedName: namespacedName, Error: err, Ignored: true}
 }
 
 // ignoreResult is a convenience function for creating an ignore result
-func ignoreResult(name string) result {
-	return result{Name: name, Ignored: true}
+func ignoreResult(namespacedName string) result {
+	return result{NamespacedName: namespacedName, Ignored: true}
 }
 
 // successResult is a convenience function for creating a success result
-func successResult(name string, timeToDeploy time.Duration, inSync bool) result {
-	return result{Name: name, TimeToDeploy: timeToDeploy, InSync: inSync}
+func successResult(namespacedName string, timeToDeploy time.Duration, inSync bool) result {
+	return result{NamespacedName: namespacedName, TimeToDeploy: timeToDeploy, InSync: inSync}
 }
 
 func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructured.Unstructured, labels map[string]string) (farosv1alpha1.GitTrackObjectInterface, error) {
@@ -313,24 +324,26 @@ func objectName(u *unstructured.Unstructured) string {
 // handleObject either creates or updates a GitTrackObject
 func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
 	name := objectName(u)
+	gto, err := r.newGitTrackObjectInterface(name, u, makeLabels(owner))
+	if err != nil {
+		namespacedName := strings.TrimLeft(fmt.Sprintf("%s/%s", u.GetNamespace(), name), "/")
+		return errorResult(namespacedName, err)
+	}
+
 	ignored, err := r.ignoreObject(u)
 	if err != nil {
-		return errorResult(name, err)
+		return errorResult(gto.GetNamespacedName(), err)
 	}
 	if ignored {
-		return ignoreResult(name)
+		return ignoreResult(gto.GetNamespacedName())
 	}
 
 	r.mutex.RLock()
 	timeToDeploy := time.Now().Sub(r.lastUpdateTimes[owner.Spec.Repository])
 	r.mutex.RUnlock()
 
-	gto, err := r.newGitTrackObjectInterface(name, u, makeLabels(owner))
-	if err != nil {
-		return errorResult(name, err)
-	}
 	if err = controllerutil.SetControllerReference(owner, gto, r.scheme); err != nil {
-		return errorResult(name, err)
+		return errorResult(gto.GetNamespacedName(), err)
 	}
 	found := gto.DeepCopyInterface()
 	err = r.Get(context.TODO(), types.NamespacedName{Name: gto.GetName(), Namespace: gto.GetNamespace()}, found)
@@ -339,24 +352,24 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
 		if err = r.Create(context.TODO(), gto); err != nil {
 			r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
-			return errorResult(name, fmt.Errorf("failed to create child for '%s': %v", name, err))
+			return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to create child for '%s': %v", name, err))
 		}
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
-		return successResult(name, timeToDeploy, false)
+		return successResult(gto.GetNamespacedName(), timeToDeploy, false)
 	} else if err != nil {
-		return errorResult(name, fmt.Errorf("failed to get child for '%s': %v", name, err))
+		return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to get child for '%s': %v", name, err))
 	}
 
 	err = checkOwner(owner, found, r.scheme)
 	if err != nil {
 		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "ControllerMismatch", "Child '%s' is owned by another controller: %v", name, err)
-		return ignoreResult(name)
+		return ignoreResult(gto.GetNamespacedName())
 	}
 
 	inSync := childInSync(found)
 	childUpdated, err := r.updateChild(found, gto)
 	if err != nil {
-		return errorResult(name, fmt.Errorf("failed to update child resource: %v", err))
+		return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to update child resource: %v", err))
 	}
 	if childUpdated {
 		inSync = false
@@ -364,11 +377,11 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		log.Printf("Updating child for '%s'\n", name)
 		if err = r.Update(context.TODO(), found); err != nil {
 			r.recorder.Eventf(owner, apiv1.EventTypeWarning, "UpdateFailed", "Failed to update child '%s'", name)
-			return errorResult(name, fmt.Errorf("failed to update child for '%s': %v", name, err))
+			return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to update child for '%s': %v", name, err))
 		}
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
-	return successResult(name, timeToDeploy, inSync)
+	return successResult(gto.GetNamespacedName(), timeToDeploy, inSync)
 }
 
 func childInSync(child farosv1alpha1.GitTrackObjectInterface) bool {
@@ -422,10 +435,10 @@ func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO farosv1alpha1.GitTrac
 }
 
 // deleteResources deletes any resources that are present in the given map
-func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.GitTrackObject) error {
-	for name, gto := range leftovers {
+func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.GitTrackObjectInterface) error {
+	for name, obj := range leftovers {
 		log.Printf("Deleting child '%s'\n", name)
-		if err := r.Delete(context.TODO(), &gto); err != nil {
+		if err := r.Delete(context.TODO(), obj); err != nil {
 			return fmt.Errorf("failed to delete child for '%s': '%s'", name, err)
 		}
 	}
@@ -568,7 +581,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		if res.InSync {
 			sOpts.inSync++
 		}
-		delete(objectsByName, res.Name)
+		delete(objectsByName, res.NamespacedName)
 		if res.Error != nil {
 			handlerErrors = append(handlerErrors, res.Error.Error())
 		}

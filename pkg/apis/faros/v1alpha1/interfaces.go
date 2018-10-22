@@ -27,6 +27,7 @@ import (
 type GitTrackObjectInterface interface {
 	runtime.Object
 	v1.Object
+	GetNamespacedName() string
 	GetSpec() GitTrackObjectSpec
 	SetSpec(GitTrackObjectSpec)
 	GetStatus() GitTrackObjectStatus

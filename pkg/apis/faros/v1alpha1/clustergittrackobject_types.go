@@ -34,6 +34,11 @@ type ClusterGitTrackObject struct {
 	Status GitTrackObjectStatus `json:"status,omitempty"`
 }
 
+// GetNamespacedName implementes the GitTrackObject interface
+func (g *ClusterGitTrackObject) GetNamespacedName() string {
+	return g.Name
+}
+
 // GetSpec implements the GitTrackObject interface
 func (g *ClusterGitTrackObject) GetSpec() GitTrackObjectSpec {
 	return g.Spec
