@@ -32,6 +32,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,8 +47,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
-
-const ownedByLabel = "faros.pusher.com/owned-by"
 
 // Add creates a new GitTrack Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -234,34 +233,30 @@ func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1
 // and returns a map of names to GitTrackObject mappings
 func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (map[string]farosv1alpha1.GitTrackObjectInterface, error) {
 	result := make(map[string]farosv1alpha1.GitTrackObjectInterface)
-	opts := client.MatchingLabels(makeLabels(owner))
 
 	gtos := &farosv1alpha1.GitTrackObjectList{}
-	err := r.List(context.TODO(), opts, gtos)
+	err := r.List(context.TODO(), &client.ListOptions{}, gtos)
 	if err != nil {
 		return nil, err
 	}
 	for _, gto := range gtos.Items {
-		result[gto.GetNamespacedName()] = &gto
+		if metav1.IsControlledBy(&gto, owner) {
+			result[gto.GetNamespacedName()] = &gto
+		}
 	}
 
 	cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
-	err = r.List(context.TODO(), opts, cgtos)
+	err = r.List(context.TODO(), &client.ListOptions{}, cgtos)
 	if err != nil {
 		return nil, err
 	}
 	for _, cgto := range cgtos.Items {
-		result[cgto.GetNamespacedName()] = &cgto
+		if metav1.IsControlledBy(&cgto, owner) {
+			result[cgto.GetNamespacedName()] = &cgto
+		}
 	}
 
 	return result, nil
-}
-
-// makeLabels returns a map of labels that are used for tracking ownership
-// without having to list all of the GitTrackObjects every time (but rather
-// filter by labels)
-func makeLabels(g *farosv1alpha1.GitTrack) map[string]string {
-	return map[string]string{ownedByLabel: g.Name}
 }
 
 // result represents the result of creating or updating a GitTrackObject
@@ -288,7 +283,7 @@ func successResult(namespacedName string, timeToDeploy time.Duration, inSync boo
 	return result{NamespacedName: namespacedName, TimeToDeploy: timeToDeploy, InSync: inSync}
 }
 
-func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructured.Unstructured, labels map[string]string) (farosv1alpha1.GitTrackObjectInterface, error) {
+func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructured.Unstructured) (farosv1alpha1.GitTrackObjectInterface, error) {
 	var instance farosv1alpha1.GitTrackObjectInterface
 	_, namespaced, err := utils.GetAPIResource(r.restMapper, u.GetObjectKind().GroupVersionKind())
 	if err != nil {
@@ -301,7 +296,6 @@ func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructu
 	}
 	instance.SetName(name)
 	instance.SetNamespace(u.GetNamespace())
-	instance.SetLabels(labels)
 
 	data, err := u.MarshalJSON()
 	if err != nil {
@@ -324,7 +318,7 @@ func objectName(u *unstructured.Unstructured) string {
 // handleObject either creates or updates a GitTrackObject
 func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
 	name := objectName(u)
-	gto, err := r.newGitTrackObjectInterface(name, u, makeLabels(owner))
+	gto, err := r.newGitTrackObjectInterface(name, u)
 	if err != nil {
 		namespacedName := strings.TrimLeft(fmt.Sprintf("%s/%s", u.GetNamespace(), name), "/")
 		return errorResult(namespacedName, err)

@@ -228,19 +228,6 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(len(serviceGto.OwnerReferences)).To(Equal(1))
 			})
 
-			It("adds a label for tracking owned GitTrackObjects", func() {
-				deployGto := &farosv1alpha1.GitTrackObject{}
-				serviceGto := &farosv1alpha1.GitTrackObject{}
-				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployGto)
-				}, timeout).Should(Succeed())
-				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceGto)
-				}, timeout).Should(Succeed())
-				Expect(deployGto.Labels).To(HaveKeyWithValue("faros.pusher.com/owned-by", "example"))
-				Expect(serviceGto.Labels).To(HaveKeyWithValue("faros.pusher.com/owned-by", "example"))
-			})
-
 			It("sends events about checking out configured Git repository", func() {
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
