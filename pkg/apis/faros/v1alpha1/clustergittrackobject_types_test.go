@@ -26,11 +26,10 @@ import (
 )
 
 func TestStorageClusterGitTrackObject(t *testing.T) {
-	key := types.NamespacedName{Name: "foo", Namespace: "default"}
+	key := types.NamespacedName{Name: "foo"}
 	created := &ClusterGitTrackObject{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: "default",
+			Name: "foo",
 		},
 		Spec: GitTrackObjectSpec{
 			Data: []byte("test"),

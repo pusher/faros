@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -79,6 +81,11 @@ type GitTrackObject struct {
 
 	Spec   GitTrackObjectSpec   `json:"spec,omitempty"`
 	Status GitTrackObjectStatus `json:"status,omitempty"`
+}
+
+// GetNamespacedName implementes the GitTrackObject interface
+func (g *GitTrackObject) GetNamespacedName() string {
+	return fmt.Sprintf("%s/%s", g.Namespace, g.Name)
 }
 
 // GetSpec implements the GitTrackObject interface
