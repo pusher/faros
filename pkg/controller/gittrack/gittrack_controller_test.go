@@ -1014,6 +1014,55 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(instance.Status.ObjectsIgnored).To(Equal(int64(1)))
 		})
 	})
+
+	Context("listObjectsByName", func() {
+		var reconciler *ReconcileGitTrack
+		var children map[string]farosv1alpha1.GitTrackObjectInterface
+
+		BeforeEach(func() {
+			var ok bool
+			reconciler, ok = r.(*ReconcileGitTrack)
+			Expect(ok).To(BeTrue())
+
+			createInstance(instance, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42")
+			// Wait for client cache to expire
+			waitForInstanceCreated(key)
+
+			var err error
+			children, err = reconciler.listObjectsByName(instance)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should return 6 child objects", func() {
+			Expect(children).Should(HaveLen(6))
+		})
+
+		It("should return 5 namespaced objects", func() {
+			var count int
+			for _, obj := range children {
+				if _, ok := obj.(*farosv1alpha1.GitTrackObject); ok {
+					count++
+				}
+			}
+			Expect(count).To(Equal(5))
+		})
+
+		It("should return 1 non-namespaced resource", func() {
+			var count int
+			for _, obj := range children {
+				if _, ok := obj.(*farosv1alpha1.ClusterGitTrackObject); ok {
+					count++
+				}
+			}
+			Expect(count).To(Equal(1))
+		})
+
+		It("should key all items by their NamespacedName", func() {
+			for key, obj := range children {
+				Expect(key).Should(Equal(obj.GetNamespacedName()))
+			}
+		})
+	})
 })
 
 var getsFilesFromRepo = func(path string, count int) {
