@@ -520,54 +520,38 @@ var _ = Describe("GitTrack Suite", func() {
 				createInstance(instance, "4532b487a5aaf651839f5401371556aa16732a6e")
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
-			})
 
-			It("deletes the removed resources", func() {
-				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				// Check the instance created
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
 
-				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, before)
-				}, timeout).Should(Succeed())
-
-				instance.Spec.Reference = "28928ccaeb314b96293e18cc8889997f0f46b79b"
-				err := c.Update(context.TODO(), instance)
-				Expect(err).ToNot(HaveOccurred())
-				// Wait for reconcile for update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for status update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-
-				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, after)
-				}, timeout).ShouldNot(Succeed())
-			})
-
-			It("doesn't delete any other resources", func() {
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Spec.Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
-
+				// Check the configmap to be deleted was created
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
 				}, timeout).Should(Succeed())
 
+				// Update the repository
 				instance.Spec.Reference = "28928ccaeb314b96293e18cc8889997f0f46b79b"
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
-				// Wait for reconcile for update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for status update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
+				// Wait for cache to sync
+				waitForInstanceCreated(key)
+			})
+
+			It("deletes the removed resources", func() {
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
+				}, timeout).ShouldNot(Succeed())
+			})
+
+			It("doesn't delete any other resources", func() {
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
 				}, timeout).ShouldNot(Succeed())
 
 				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
+				err := c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(gtos.Items)).To(Equal(2))
 			})
