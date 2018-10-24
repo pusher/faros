@@ -291,6 +291,8 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 	if updateStrategy == gittrackobjectutils.NeverUpdateStrategy {
 		log.Printf("Update strategy for %s set to never, ignoring", found.GetName())
+		// If we aren't updating the resource we should assume the resource is in sync
+		mOpts.inSync = true
 		return reconcile.Result{}, nil
 	}
 
