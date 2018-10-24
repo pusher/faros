@@ -520,54 +520,38 @@ var _ = Describe("GitTrack Suite", func() {
 				createInstance(instance, "4532b487a5aaf651839f5401371556aa16732a6e")
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
-			})
 
-			It("deletes the removed resources", func() {
-				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
+				// Check the instance created
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Spec.Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
 
-				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, before)
-				}, timeout).Should(Succeed())
-
-				instance.Spec.Reference = "28928ccaeb314b96293e18cc8889997f0f46b79b"
-				err := c.Update(context.TODO(), instance)
-				Expect(err).ToNot(HaveOccurred())
-				// Wait for reconcile for update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for status update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-
-				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, after)
-				}, timeout).ShouldNot(Succeed())
-			})
-
-			It("doesn't delete any other resources", func() {
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Spec.Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
-
+				// Check the configmap to be deleted was created
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
 				}, timeout).Should(Succeed())
 
+				// Update the repository
 				instance.Spec.Reference = "28928ccaeb314b96293e18cc8889997f0f46b79b"
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
-				// Wait for reconcile for update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for status update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
+				// Wait for cache to sync
+				waitForInstanceCreated(key)
+			})
+
+			It("deletes the removed resources", func() {
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
+				}, timeout).ShouldNot(Succeed())
+			})
+
+			It("doesn't delete any other resources", func() {
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
 				}, timeout).ShouldNot(Succeed())
 
 				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err = c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
+				err := c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(gtos.Items)).To(Equal(2))
 			})
@@ -1028,6 +1012,55 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
 
 			Expect(instance.Status.ObjectsIgnored).To(Equal(int64(1)))
+		})
+	})
+
+	Context("listObjectsByName", func() {
+		var reconciler *ReconcileGitTrack
+		var children map[string]farosv1alpha1.GitTrackObjectInterface
+
+		BeforeEach(func() {
+			var ok bool
+			reconciler, ok = r.(*ReconcileGitTrack)
+			Expect(ok).To(BeTrue())
+
+			createInstance(instance, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42")
+			// Wait for client cache to expire
+			waitForInstanceCreated(key)
+
+			var err error
+			children, err = reconciler.listObjectsByName(instance)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should return 6 child objects", func() {
+			Expect(children).Should(HaveLen(6))
+		})
+
+		It("should return 5 namespaced objects", func() {
+			var count int
+			for _, obj := range children {
+				if _, ok := obj.(*farosv1alpha1.GitTrackObject); ok {
+					count++
+				}
+			}
+			Expect(count).To(Equal(5))
+		})
+
+		It("should return 1 non-namespaced resource", func() {
+			var count int
+			for _, obj := range children {
+				if _, ok := obj.(*farosv1alpha1.ClusterGitTrackObject); ok {
+					count++
+				}
+			}
+			Expect(count).To(Equal(1))
+		})
+
+		It("should key all items by their NamespacedName", func() {
+			for key, obj := range children {
+				Expect(key).Should(Equal(obj.GetNamespacedName()))
+			}
 		})
 	})
 })

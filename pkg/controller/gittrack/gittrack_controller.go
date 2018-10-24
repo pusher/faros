@@ -241,7 +241,7 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 	}
 	for _, gto := range gtos.Items {
 		if metav1.IsControlledBy(&gto, owner) {
-			result[gto.GetNamespacedName()] = &gto
+			result[gto.GetNamespacedName()] = gto.DeepCopy()
 		}
 	}
 
@@ -252,7 +252,7 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 	}
 	for _, cgto := range cgtos.Items {
 		if metav1.IsControlledBy(&cgto, owner) {
-			result[cgto.GetNamespacedName()] = &cgto
+			result[cgto.GetNamespacedName()] = cgto.DeepCopy()
 		}
 	}
 
