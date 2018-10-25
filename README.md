@@ -47,11 +47,12 @@ By providing Faros with a reference to a Git repository (URL and Git Reference
 the repository, Faros will load all Kubernetes resource definitions from the
 repository and synchronise these with the Kubernetes cluster.
 
-Faros then watches the child resources and, if they are ever modified,
-immediately reverts the change back to the state of the Git repository.
-This forces users to make changes to their deployment configuration in Git,
-which in turn allows for auditing, peer review and a canonical history of what
-was deployed and when.
+Faros then watches the child resources (resources created from the repository)
+and, if they are ever modified, reverts the change back to the state of the Git
+repository.
+This allows users to make changes to their deployment configuration exclusively
+in Git, which in turn enables them to audit and peer review those changes as
+well as providing a canonical history of what was deployed and when.
 
 ## Installation
 
@@ -156,10 +157,46 @@ is queued for reconciliation by the controller.
 Therefore, by setting the following flag;
 
 ```
---sync-period=5m
+--sync-period=5m // Default value of 5m (5 minutes)
 ```
 
 You can ensure that every resource will be reconciled at least every 5 minutes.
+
+#### Metrics
+
+The controller exposes a number of metrics in a prometheus format at a
+`/metrics` endpoint.
+By default, the metrics serving are bound to the address port `8080` on all
+interfaces.
+
+Change this with the following flag:
+
+```
+--metrics-bind-address=127.0.0.1:8080 // Bind the metrics to localhost only
+```
+
+Serving metrics can be disabled by setting the flag to `0`:
+
+```
+--metrics-bind-address=0 // Disable serving all metrics
+```
+
+##### Available Metrics
+
+- `faros_gittrack_child_status` - Exposes the count of GitTrack child objects
+  by status (applied,discovered,ignored,inSync).
+- `faros_gittrack_time_to_deploy_seconds_{bucket, count, sum}` - Measures the
+  time from updating a repository to the update being propagated to the child
+  object.
+- `faros_gittrackobject_in_sync` - Indicates whether individual children are in
+  sync with their desired state.
+
+- `controller_runtime_reconcile_errors_total` - Counts the total number of
+  errors produced by the controller.
+- `controller_runtime_reconcile_queue_length` - Counts how many items are
+  currently queued for reconciliation by the controller.
+- `controller_runtime_reconcile_time_second_{bucket, count, sum}` - Measures how
+  long each reconciliation takes within the controller.
 
 ## Quick Start
 
