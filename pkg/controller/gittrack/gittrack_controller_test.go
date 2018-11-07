@@ -31,6 +31,7 @@ import (
 	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
+	"github.com/pusher/faros/pkg/utils"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	gitstore "github.com/pusher/git-store"
@@ -226,6 +227,19 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 				Expect(len(deployGto.OwnerReferences)).To(Equal(1))
 				Expect(len(serviceGto.OwnerReferences)).To(Equal(1))
+			})
+
+			It("sets LastAppliedAnnotations for created GitTrackObjects", func() {
+				deployGto := &farosv1alpha1.GitTrackObject{}
+				serviceGto := &farosv1alpha1.GitTrackObject{}
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, deployGto)
+				}, timeout).Should(Succeed())
+				Eventually(func() error {
+					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceGto)
+				}, timeout).Should(Succeed())
+				Expect(deployGto.GetAnnotations()).To(HaveKey(utils.LastAppliedAnnotation))
+				Expect(serviceGto.GetAnnotations()).To(HaveKey(utils.LastAppliedAnnotation))
 			})
 
 			It("sends events about checking out configured Git repository", func() {
