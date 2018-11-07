@@ -342,14 +342,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	found := gto.DeepCopyInterface()
 	err = r.Get(context.TODO(), types.NamespacedName{Name: gto.GetName(), Namespace: gto.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating child for '%s'\n", name)
-		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
-		if err = r.Create(context.TODO(), gto); err != nil {
-			r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
-			return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to create child for '%s': %v", name, err))
-		}
-		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
-		return successResult(gto.GetNamespacedName(), timeToDeploy, false)
+		return r.createChild(name, timeToDeploy, owner, found, gto)
 	} else if err != nil {
 		return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to get child for '%s': %v", name, err))
 	}
@@ -385,6 +378,36 @@ func childInSync(child farosv1alpha1.GitTrackObjectInterface) bool {
 		}
 	}
 	return false
+}
+
+func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration, owner *farosv1alpha1.GitTrack, foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) result {
+	// Convert the GitTrackObjects to unstructured
+	found := &unstructured.Unstructured{}
+	err := r.scheme.Convert(foundGTO, found, nil)
+	if err != nil {
+		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to convert found to Unstructured '%s'", name)
+		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to convert found to Unstructured '%s': %v", name, err))
+	}
+	child := &unstructured.Unstructured{}
+	err = r.scheme.Convert(childGTO, child, nil)
+	if err != nil {
+		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to convert child to Unstructured '%s'", name)
+		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to convert child to Unstructured '%s': %v", name, err))
+	}
+
+	err = utils.SetLastAppliedAnnotation(found, child)
+	if err != nil {
+		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to set last applied annotation '%s'", name)
+		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to set last applied annotation for '%s': %v", name, err))
+	}
+	log.Printf("Creating child for '%s'\n", name)
+	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
+	if err = r.Create(context.TODO(), found); err != nil {
+		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
+		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to create child for '%s': %v", name, err))
+	}
+	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
+	return successResult(childGTO.GetNamespacedName(), timeToDeploy, false)
 }
 
 // UpdateChild compares the two GitTrackObjects and updates the foundGTO if the
