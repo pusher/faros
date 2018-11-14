@@ -25,6 +25,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
+const (
+	farosGroupVersion = "faros.pusher.com/v1alpha1"
+)
+
 // OwnerInNamespacePredicate filters events to check the owner of the event
 // object is in the controller's namespace
 type OwnerInNamespacePredicate struct {
@@ -66,7 +70,7 @@ func (p OwnerInNamespacePredicate) ownerInNamespace(ownerRefs []metav1.OwnerRefe
 		return false
 	}
 	for _, ref := range ownerRefs {
-		if ref.Kind == "GitTrack" && ref.APIVersion == "faros.pusher.com/v1alpha1" {
+		if ref.Kind == "GitTrack" && ref.APIVersion == farosGroupVersion {
 			for _, gt := range gtList.Items {
 				if ref.UID == gt.UID {
 					return true
@@ -81,5 +85,80 @@ func (p OwnerInNamespacePredicate) ownerInNamespace(ownerRefs []metav1.OwnerRefe
 func NewOwnerInNamespacePredicate(client client.Client) OwnerInNamespacePredicate {
 	return OwnerInNamespacePredicate{
 		client: client,
+	}
+}
+
+// OwnersOwnerInNamespacePredicate filters events to check the owners owner of
+// the event object is in the controller's namespace
+type OwnersOwnerInNamespacePredicate struct {
+	client                    client.Client
+	ownerInNamespacePredicate OwnerInNamespacePredicate
+}
+
+// Create returns true if the event object owners owner is in the same namespace
+func (p OwnersOwnerInNamespacePredicate) Create(e event.CreateEvent) bool {
+	return p.ownersOwnerInNamespace(e.Meta.GetOwnerReferences())
+}
+
+// Update returns true if the event object owners owner is in the same namespace
+func (p OwnersOwnerInNamespacePredicate) Update(e event.UpdateEvent) bool {
+	return p.ownersOwnerInNamespace(e.MetaNew.GetOwnerReferences())
+}
+
+// Delete returns true if the event object owners owner is in the same namespace
+func (p OwnersOwnerInNamespacePredicate) Delete(e event.DeleteEvent) bool {
+	return p.ownersOwnerInNamespace(e.Meta.GetOwnerReferences())
+}
+
+// Generic returns true if the event object owners owner is in the same namespace
+func (p OwnersOwnerInNamespacePredicate) Generic(e event.GenericEvent) bool {
+	return p.ownersOwnerInNamespace(e.Meta.GetOwnerReferences())
+}
+
+// ownersOwnerInNamespace returns true if the the GitTrackObject's GitTrack
+// owner of the event object is in the namespace  managed by the controller
+//
+// This works on the premise that listing objects from the client will only
+// return those in its cache.
+// When it is restricted to a namespace this should only be the GitTracks
+// in the namespace the controller is managing.
+func (p OwnersOwnerInNamespacePredicate) ownersOwnerInNamespace(ownerRefs []metav1.OwnerReference) bool {
+	cgtoList := &farosv1alpha1.ClusterGitTrackObjectList{}
+	err := p.client.List(context.TODO(), &client.ListOptions{}, cgtoList)
+	if err != nil {
+		// We can't list CGTOs so fail closed and ignore the requests
+		return false
+	}
+	gtoList := &farosv1alpha1.GitTrackObjectList{}
+	err = p.client.List(context.TODO(), &client.ListOptions{}, gtoList)
+	if err != nil {
+		// We can't list GTOs so fail closed and ignore the requests
+		return false
+	}
+
+	for _, ref := range ownerRefs {
+		if ref.Kind == "GitTrackObject" && ref.APIVersion == farosGroupVersion {
+			for _, gto := range gtoList.Items {
+				if ref.UID == gto.UID {
+					return p.ownerInNamespacePredicate.ownerInNamespace(gto.GetOwnerReferences())
+				}
+			}
+		}
+		if ref.Kind == "ClusterGitTrackObject" && ref.APIVersion == farosGroupVersion {
+			for _, cgto := range cgtoList.Items {
+				if ref.UID == cgto.UID {
+					return p.ownerInNamespacePredicate.ownerInNamespace(cgto.GetOwnerReferences())
+				}
+			}
+		}
+	}
+	return false
+}
+
+// NewOwnersOwnerInNamespacePredicate constructs a new OwnersOwnerInNamespacePredicate
+func NewOwnersOwnerInNamespacePredicate(client client.Client) OwnersOwnerInNamespacePredicate {
+	return OwnersOwnerInNamespacePredicate{
+		client: client,
+		ownerInNamespacePredicate: NewOwnerInNamespacePredicate(client),
 	}
 }
