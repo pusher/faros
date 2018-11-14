@@ -391,6 +391,14 @@ var (
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "example",
 				Namespace: "default",
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "faros.pusher.com/v1alpha1",
+						Kind:       "GitTrack",
+						UID:        gitTrack.UID,
+						Name:       gitTrack.Name,
+					},
+				},
 			},
 			Spec: farosv1alpha1.GitTrackObjectSpec{
 				Name: "deployment-example",
@@ -650,6 +658,10 @@ var (
 		var ns *v1.Namespace
 		var gt *farosv1alpha1.GitTrack
 		BeforeEach(func() {
+			CreateClusterInstance([]byte(exampleClusterRoleBinding))
+			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+
 			ns = &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "not-default",
@@ -669,34 +681,32 @@ var (
 			}
 			Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
 
-			clusterInstance = &farosv1alpha1.ClusterGitTrackObject{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "example",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: "faros.pusher.com/v1alpha1",
-							Kind:       "GitTrack",
-							UID:        gt.UID,
-							Name:       gt.Name,
-						},
-					},
+			key := types.NamespacedName{Name: "example"}
+			Expect(c.Get(context.TODO(), key, clusterInstance)).NotTo(HaveOccurred())
+			clusterInstance.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: "faros.pusher.com/v1alpha1",
+					Kind:       "GitTrack",
+					Name:       gt.Name,
+					UID:        gt.UID,
 				},
-				Spec: farosv1alpha1.GitTrackObjectSpec{
-					Name: "clusterrolebinding-example",
-					Kind: "ClusterRoleBinding",
-					Data: []byte(exampleClusterRoleBinding),
-				},
-			}
-			Expect(c.Create(context.TODO(), clusterInstance)).NotTo(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			Expect(c.Delete(context.TODO(), gt)).NotTo(HaveOccurred())
-			Expect(c.Delete(context.TODO(), clusterInstance)).NotTo(HaveOccurred())
+			})
+			Expect(c.Update(context.TODO(), clusterInstance)).NotTo(HaveOccurred())
 		})
 
 		It("should not reconcile it", func() {
-			Eventually(requests, timeout).ShouldNot(Receive())
+			Consistently(requests).ShouldNot(Receive())
+		})
+
+		It("should not reconcile when the child is modified", func() {
+			crb := &rbacv1.ClusterRoleBinding{}
+			key := types.NamespacedName{Name: "example"}
+			Expect(c.Get(context.TODO(), key, crb)).NotTo(HaveOccurred())
+
+			crb.SetLabels(map[string]string{})
+			Expect(c.Update(context.TODO(), crb)).NotTo(HaveOccurred())
+
+			Consistently(requests).ShouldNot(Receive())
 		})
 	}
 
