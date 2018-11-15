@@ -136,6 +136,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				},
 				RestMapper: restMapper,
 			},
+			utils.NewOwnersOwnerInNamespacePredicate(mgr.GetClient()),
 		)
 		if err != nil {
 			msg := fmt.Sprintf("unable to watch channel: %v", err)
