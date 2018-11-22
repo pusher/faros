@@ -66,6 +66,12 @@ examples of how to install the controller in the [config](config) folder.
 You **must** manually install the [CRDs](config/crds) before the controller will
 be fully functional, it will not install them for you.
 
+A public docker image is available on [Quay](https://quay.io/repository/pusher/faros).
+
+```
+quay.io/pusher/faros
+```
+
 #### RBAC
 
 If you are using [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
