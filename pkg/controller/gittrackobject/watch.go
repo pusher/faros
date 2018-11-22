@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 
+	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -41,8 +42,8 @@ func (r *ReconcileGitTrackObject) watch(obj unstructured.Unstructured) error {
 	}
 
 	// Add event handlers
-	informer.AddEventHandler(&eventToChannelHandler{
-		eventsChan: r.eventStream,
+	informer.AddEventHandler(&gittrackobjectutils.EventToChannelHandler{
+		EventsChan: r.eventStream,
 	})
 
 	// Store and run informer
