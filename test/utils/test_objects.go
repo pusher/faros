@@ -17,11 +17,78 @@ limitations under the License.
 package utils
 
 import (
+	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// ExampleGitTrackObject is an example GitTrackObject object for use within test suites
+var ExampleGitTrackObject = &farosv1alpha1.GitTrackObject{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: "faros.pusher.com/v1",
+		Kind:       "GitTrackObject",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "example",
+		Namespace: "default",
+	},
+	Spec: farosv1alpha1.GitTrackObjectSpec{
+		Name: "deployment-example",
+		Kind: "Deployment",
+		Data: []byte(`apiVersion: apps/v1
+		kind: Deployment
+		metadata:
+		  name: example
+		  namespace: default
+		  labels:
+		    app: nginx
+		spec:
+		  selector:
+		    matchLabels:
+		      app: nginx
+		  template:
+		    metadata:
+		     labels:
+		       app: nginx
+		    spec:
+		      containers:
+		      - name: nginx
+		        image: nginx
+		`),
+	},
+}
+
+// ExampleClusterGitTrackObject is an example ClusterGitTrackObject object for use within test suites
+var ExampleClusterGitTrackObject = &farosv1alpha1.ClusterGitTrackObject{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: "faros.pusher.com/v1",
+		Kind:       "ClusterGitTrackObject",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "example",
+	},
+	Spec: farosv1alpha1.GitTrackObjectSpec{
+		Name: "clusterrolebinding-example",
+		Kind: "ClusterRoleBinding",
+		Data: []byte(`apiVersion: rbac.authorization.k8s.io/v1
+		kind: ClusterRoleBinding
+		metadata:
+		  name: example
+		  labels:
+		    app: nginx
+		roleRef:
+		  apiGroup: rbac.authorization.k8s.io
+		  kind: ClusterRole
+		  name: nginx-ingress-controller
+		subjects:
+		- kind: ServiceAccount
+		  name: nginx-ingress-controller
+		  namespace: example
+		`),
+	},
+}
 
 var appNginx = map[string]string{
 	"app": "nginx",
