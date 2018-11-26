@@ -17,12 +17,43 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
+
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+// SetGitTrackObjectInterfaceSpec updates the spec of a GitTrackObjectInterface
+// to match the given Object
+func SetGitTrackObjectInterfaceSpec(gto farosv1alpha1.GitTrackObjectInterface, obj Object) error {
+	content, err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).ToUnstructured(obj.DeepCopyObject())
+	if err != nil {
+		return fmt.Errorf("unable to create unstructured content from object: %v", err)
+	}
+	u := unstructured.Unstructured{
+		Object: content,
+	}
+	json, err := u.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("unable to marshal unstructured json: %v", err)
+	}
+	if obj.GetObjectKind().GroupVersionKind().Kind == "" {
+		return fmt.Errorf("kind not set on object")
+	}
+
+	gto.SetSpec(farosv1alpha1.GitTrackObjectSpec{
+		Kind: obj.GetObjectKind().GroupVersionKind().Kind,
+		Name: obj.GetName(),
+		Data: json,
+	})
+	return nil
+}
 
 // ExampleGitTrackObject is an example GitTrackObject object for use within test suites
 var ExampleGitTrackObject = &farosv1alpha1.GitTrackObject{

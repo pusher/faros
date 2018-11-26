@@ -70,6 +70,27 @@ func (m *Matcher) Get(obj Object, intervals ...interface{}) gomega.GomegaAsyncAs
 	return gomega.Eventually(get, intervals...)
 }
 
+// Consistently continually gets the object from the API for comparison
+func (m *Matcher) Consistently(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
+	return m.consistentlyObject(obj, intervals...)
+}
+
+// consistentlyObject gets an individual object from the API server
+func (m *Matcher) consistentlyObject(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
+	key := types.NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}
+	get := func() Object {
+		err := m.Client.Get(context.TODO(), key, obj)
+		if err != nil {
+			panic(err)
+		}
+		return obj
+	}
+	return gomega.Consistently(get, intervals...)
+}
+
 // Eventually continually gets the object from the API for comparison
 func (m *Matcher) Eventually(obj runtime.Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
 	// If the object is a list, return a list
@@ -109,6 +130,34 @@ func (m *Matcher) eventuallyList(obj runtime.Object, intervals ...interface{}) g
 		return obj
 	}
 	return gomega.Eventually(list, intervals...)
+}
+
+// WithAnnotations returns the object's Annotations
+func WithAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) map[string]string {
+		return obj.GetAnnotations()
+	}, matcher)
+}
+
+// WithOwnerReferences returns the object's OwnerReferences
+func WithOwnerReferences(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) []metav1.OwnerReference {
+		return obj.GetOwnerReferences()
+	}, matcher)
+}
+
+// WithResourceVersion returns the object's ResourceVersion
+func WithResourceVersion(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) string {
+		return obj.GetResourceVersion()
+	}, matcher)
+}
+
+// WithUID returns the object's UID
+func WithUID(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) types.UID {
+		return obj.GetUID()
+	}, matcher)
 }
 
 // WithUnstructuredObject returns the objects inner object
