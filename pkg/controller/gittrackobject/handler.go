@@ -17,7 +17,18 @@ limitations under the License.
 package gittrackobject
 
 import (
+	"context"
+	"fmt"
+	"log"
+
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
+	"github.com/pusher/faros/pkg/utils"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // handlerResult is the single return object from handleGitTrackObject
@@ -25,7 +36,7 @@ import (
 // the (Cluster)GitTrackObject passed to it
 type handlerResult struct {
 	inSyncError  error
-	inSyncReason string
+	inSyncReason gittrackobjectutils.ConditionReason
 }
 
 // handleGitTrackObject handles the management of the child of the GitTrackObjectInterface
@@ -35,5 +46,185 @@ type handlerResult struct {
 // It reads the child object from the instance and udpates the API if the object
 // is out of sync
 func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrackObjectInterface) handlerResult {
+	// Generate the child from the spec
+	child, reason, err := r.getChildFromGitTrackObject(gto)
+	if err != nil {
+		return handlerResult{
+			inSyncReason: reason,
+			inSyncError:  fmt.Errorf("error reading child: %v", err),
+		}
+	}
+
+	// Add an owner reference to the child object
+	err = controllerutil.SetControllerReference(gto, child, r.scheme)
+	if err != nil {
+		return handlerResult{
+			inSyncReason: gittrackobjectutils.ErrorAddingOwnerReference,
+			inSyncError:  fmt.Errorf("unable to add owner reference: %v", err),
+		}
+	}
+
+	// Construct holder for API copy of child
+	found := &unstructured.Unstructured{}
+	found.SetKind(child.GetKind())
+	found.SetAPIVersion(child.GetAPIVersion())
+
+	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
+	if err != nil && errors.IsNotFound(err) {
+		reason, err := r.handleCreate(gto, child)
+		if err != nil {
+			return handlerResult{
+				inSyncReason: reason,
+				inSyncError:  fmt.Errorf("error creating child: %v", err),
+			}
+		}
+
+		// Successfully error creating child
+		return handlerResult{}
+	} else if err != nil {
+		return handlerResult{
+			inSyncReason: gittrackobjectutils.ErrorGettingChild,
+			inSyncError:  fmt.Errorf("unable to get child: %v", err),
+		}
+	}
+
+	reason, err = r.handleUpdate(gto, found, child)
+	if err != nil {
+		return handlerResult{
+			inSyncReason: reason,
+			inSyncError:  fmt.Errorf("error updating child: %v", err),
+		}
+	}
+
 	return handlerResult{}
+}
+
+// getChildFromGitTrackObject reads the Data from a GitTrackObjectSpec and
+// converts it into and unstructured.unstructured runtime object
+func (r *ReconcileGitTrackObject) getChildFromGitTrackObject(gto farosv1alpha1.GitTrackObjectInterface) (*unstructured.Unstructured, gittrackobjectutils.ConditionReason, error) {
+	child, err := utils.YAMLToUnstructured(gto.GetSpec().Data)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "UnmarshalFailed", "Couldn't unmarshal object from JSON/YAML")
+		return nil, gittrackobjectutils.ErrorUnmarshallingData, fmt.Errorf("unable to unmarshal data: %v", err)
+	}
+
+	// If the child has no name then we can't use it
+	if child.GetName() == "" {
+		return nil, gittrackobjectutils.ErrorGettingChild, fmt.Errorf("unable to get child: name cannot be empty")
+	}
+
+	return &child, "", nil
+}
+
+// handleCreate takes an unstructured object sends it to the API to create it
+func (r *ReconcileGitTrackObject) handleCreate(gto farosv1alpha1.GitTrackObjectInterface, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
+	found := child.DeepCopy()
+
+	// Update the last applied annotation
+	err := utils.SetLastAppliedAnnotation(found, child)
+	if err != nil {
+		return gittrackobjectutils.ErrorCreatingChild, fmt.Errorf("unable to set annotation: %v", err)
+	}
+
+	// Log and send event that we are attempting to create the child resource
+	log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
+	r.sendEvent(gto, corev1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+
+	err = r.Create(context.TODO(), found)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		return gittrackobjectutils.ErrorCreatingChild, fmt.Errorf("unable to create child: %v", err)
+	}
+
+	// Successfully created the child object
+	r.sendEvent(gto, corev1.EventTypeNormal, "CreateSuccessful", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+	return "", nil
+}
+
+func (r *ReconcileGitTrackObject) handleUpdate(gto farosv1alpha1.GitTrackObjectInterface, found, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
+	updateStrategy, err := gittrackobjectutils.GetUpdateStrategy(child)
+	if err != nil {
+		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to get update strategy: %v", err)
+	}
+
+	switch updateStrategy {
+	case gittrackobjectutils.RecreateUpdateStrategy:
+		return r.handleRecreateUpdateStrategy(gto, found, child)
+	case gittrackobjectutils.NeverUpdateStrategy:
+		return r.handleNeverUpdateStrategy(gto, found)
+	default:
+		return r.handleDefaultUpdateStrategy(gto, found, child)
+	}
+}
+
+// handleDefaultUpdateStrategy compares the existing and desired state of the
+// child resource and updates the object in-place if required
+func (r *ReconcileGitTrackObject) handleDefaultUpdateStrategy(gto farosv1alpha1.GitTrackObjectInterface, found, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
+	childUpdated, err := utils.UpdateChildResource(found, child)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to update child: %v", err)
+	}
+	if !childUpdated {
+		return "", nil
+	}
+
+	err = utils.SetLastAppliedAnnotation(found, child)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("error setting last applied annotation: %v", err)
+	}
+	// Update the child resource on the API
+	log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
+	err = r.Update(context.TODO(), found)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to update child resource: %v", err)
+	}
+
+	return "", nil
+}
+
+// handleNeverUpdateStrategy compares the existing object to the existing object
+// with the correct owner references applied and updates if necessary
+func (r *ReconcileGitTrackObject) handleNeverUpdateStrategy(gto farosv1alpha1.GitTrackObjectInterface, found *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
+	child := found.DeepCopy()
+	err := controllerutil.SetControllerReference(gto, child, r.scheme)
+	if err != nil {
+		return gittrackobjectutils.ErrorAddingOwnerReference, fmt.Errorf("unable to add owner reference: %v", err)
+	}
+	return r.handleDefaultUpdateStrategy(gto, found, child)
+}
+
+// handleRecreateUpdateStrategy compares the existing and desired state of the
+// resources and then deletes and recreates the child object if an update is
+// required
+func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1.GitTrackObjectInterface, found, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
+	childUpdated, err := utils.UpdateChildResource(found, child)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to update child: %v", err)
+	}
+	if !childUpdated {
+		return "", nil
+	}
+
+	// Delete the existing child object
+	log.Printf("Deleting child %s %s/%s\n", found.GetKind(), found.GetNamespace(), found.GetName())
+	err = r.Delete(context.TODO(), found)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to delete child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to delete child: %v", err)
+	}
+
+	// Create the new child object
+	reason, err := r.handleCreate(gto, child)
+	if err != nil {
+		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+		return reason, fmt.Errorf("unable to create child: %v", err)
+	}
+
+	// Update was successful
+	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+	return "", nil
 }
