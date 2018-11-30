@@ -17,6 +17,15 @@ limitations under the License.
 // Generate deepcopy for apis
 //go:generate go run ../../vendor/k8s.io/code-generator/cmd/deepcopy-gen/main.go -O zz_generated.deepcopy -i ./... -h ../../hack/boilerplate.go.txt
 
+// Generate clientset for apis
+//go:generate go run ../../vendor/k8s.io/code-generator/cmd/client-gen/main.go --input-base=github.com/pusher/faros/pkg/apis --input="faros/v1alpha1" -n clientset -p github.com/pusher/faros/pkg/client -h ../../hack/boilerplate.go.txt
+
+// Generate listers for apis
+//go:generate go run ../../vendor/k8s.io/code-generator/cmd/lister-gen/main.go --input-dirs=github.com/pusher/faros/pkg/apis/faros/v1alpha1 -p github.com/pusher/faros/pkg/client/listers -h ../../hack/boilerplate.go.txt
+
+// Generate infromers for apis
+//go:generate go run ../../vendor/k8s.io/code-generator/cmd/informer-gen/main.go --input-dirs=github.com/pusher/faros/pkg/apis/faros/v1alpha1 -p github.com/pusher/faros/pkg/client/informers --listers-package github.com/pusher/faros/pkg/client/listers --versioned-clientset-package github.com/pusher/faros/pkg/client/clientset -h ../../hack/boilerplate.go.txt
+
 // Package apis contains Kubernetes API groups.
 package apis
 
