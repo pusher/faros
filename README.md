@@ -62,6 +62,7 @@ Faros is a [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) based
 project, as such we have auto-generated [CRDs](config/crds) and
 [Kustomize](https://github.com/kubernetes-sigs/kustomize) configuration as
 examples of how to install the controller in the [config](config) folder.
+To quickly install the controller and CRDs on a cluster you can run `make deploy`.
 
 You **must** manually install the [CRDs](config/crds) before the controller will
 be fully functional, it will not install them for you.
