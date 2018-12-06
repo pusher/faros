@@ -22,11 +22,11 @@ required = [
 
 [[constraint]]
 name="github.com/pusher/git-store"
-version="v0.4.3"
+branch="update-go-git"
 
 [[override]]
 name="gopkg.in/src-d/go-git.v4"
-version="v4.7.1"
+version="v4.8.1"
 
 [[override]]
 name = "github.com/Azure/go-autorest"

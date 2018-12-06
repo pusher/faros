@@ -510,12 +510,12 @@
   revision = "418d78d0b9a7b7de3a6bbc8a23def624cc977bb2"
 
 [[projects]]
-  digest = "1:ff19b0fcfd7cc1f3118157b84831817fdeab0217aaee2693dbb2f7893408f4d6"
+  branch = "update-go-git"
+  digest = "1:c28a2f524d4043ac56074dd79f390d02352f8e18f06b932a9a3b71942318da8b"
   name = "github.com/pusher/git-store"
   packages = ["."]
   pruneopts = "T"
-  revision = "92aa25f7ccb9a47d31eb0963e9369ddc308d9b4f"
-  version = "v0.4.3"
+  revision = "62da0be5b0bf718f40a0d68ab90d9d85f14885b8"
 
 [[projects]]
   digest = "1:c85dd9a95433394aa8ec4949b5de91398c3e3895db5a341fa27f9e7b251a8cb9"
@@ -776,7 +776,7 @@
   version = "v4.2.0"
 
 [[projects]]
-  digest = "1:6c7ce2b452674b40622f1fe37606ac0ef79ecca7cc42e97ce4c149dab32fe31a"
+  digest = "1:fd5b7c326afa1a67e0f09d971f22c17d640ac7151ed8b3fdcfbd2b294dea7d7c"
   name = "gopkg.in/src-d/go-git.v4"
   packages = [
     ".",
@@ -821,8 +821,8 @@
     "utils/merkletrie/noder",
   ]
   pruneopts = "T"
-  revision = "cd64b4d630b6c2d2b3d72e9615e14f9d58bb5787"
-  version = "v4.7.1"
+  revision = "3dbfb89e0f5bce0008724e547b999fe3af9f60db"
+  version = "v4.8.1"
 
 [[projects]]
   digest = "1:0caa92e17bc0b65a98c63e5bc76a9e844cd5e56493f8fdbb28fad101a16254d9"
@@ -957,6 +957,7 @@
   name = "k8s.io/client-go"
   packages = [
     "discovery",
+    "discovery/fake",
     "dynamic",
     "informers",
     "informers/admissionregistration",
@@ -1068,6 +1069,7 @@
     "rest",
     "rest/watch",
     "restmapper",
+    "testing",
     "third_party/forked/golang/template",
     "tools/auth",
     "tools/cache",
@@ -1236,16 +1238,22 @@
     "k8s.io/apimachinery/pkg/api/meta/testrestmapper",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+    "k8s.io/apimachinery/pkg/labels",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
+    "k8s.io/apimachinery/pkg/runtime/serializer",
     "k8s.io/apimachinery/pkg/types",
+    "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/yaml",
+    "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/discovery",
+    "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/restmapper",
+    "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/record",
     "k8s.io/client-go/util/flowcontrol",
