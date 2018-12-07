@@ -69,6 +69,8 @@ be fully functional, it will not install them for you.
 
 A public docker image is available on [Quay](https://quay.io/repository/pusher/faros).
 
+[![Docker Repository on Quay](https://quay.io/repository/pusher/faros/status "Docker Repository on Quay")](https://quay.io/repository/pusher/faros)
+
 ```
 quay.io/pusher/faros
 ```
