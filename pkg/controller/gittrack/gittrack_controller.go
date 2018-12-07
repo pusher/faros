@@ -328,9 +328,11 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 
 	ignored, err := r.ignoreObject(u)
 	if err != nil {
+		log.Printf("error checking if we should ignore %+v: %+v", u, err)
 		return errorResult(gto.GetNamespacedName(), err)
 	}
 	if ignored {
+		log.Printf("ignoring %+v", gto)
 		return ignoreResult(gto.GetNamespacedName())
 	}
 
