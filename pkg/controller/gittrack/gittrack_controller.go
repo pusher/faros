@@ -200,7 +200,12 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 		return nil, err
 	}
 
-	globbedSubPath := strings.TrimPrefix(gt.Spec.SubPath, "/") + "{**/*,*}.{yaml,yml,json}"
+	subPath := gt.Spec.SubPath
+	if !strings.HasSuffix(subPath, "/") {
+		subPath += "/"
+	}
+
+	globbedSubPath := strings.TrimPrefix(subPath, "/") + "{**/*,*}.{yaml,yml,json}"
 	files, err := repo.GetAllFiles(globbedSubPath, true)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to get files for SubPath '%s'", gt.Spec.SubPath)
