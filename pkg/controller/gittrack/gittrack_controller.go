@@ -208,6 +208,8 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 	} else if len(files) == 0 {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "No files for SubPath '%s'", gt.Spec.SubPath)
 		return nil, fmt.Errorf("no files for subpath '%s'", gt.Spec.SubPath)
+	} else {
+		log.Printf("found %d files: %+v", len(files), files)
 	}
 
 	return files, nil
@@ -569,6 +571,8 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	} else {
 		sOpts.parseReason = gittrackutils.FileParseSuccess
 	}
+
+	log.Printf("%+v", objects)
 
 	// Update status with the number of objects discovered
 	sOpts.discovered = int64(len(objects))
