@@ -510,12 +510,12 @@
   revision = "418d78d0b9a7b7de3a6bbc8a23def624cc977bb2"
 
 [[projects]]
-  branch = "update-go-git"
-  digest = "1:c28a2f524d4043ac56074dd79f390d02352f8e18f06b932a9a3b71942318da8b"
+  digest = "1:dc16a6f5bdd6af17ace824614da4838c43765bfa7fe1602be9c57655cd2fe0db"
   name = "github.com/pusher/git-store"
   packages = ["."]
   pruneopts = "T"
-  revision = "62da0be5b0bf718f40a0d68ab90d9d85f14885b8"
+  revision = "3cb07ab547c04aee81bc79acd85de16af9709c62"
+  version = "v0.5.0"
 
 [[projects]]
   digest = "1:c85dd9a95433394aa8ec4949b5de91398c3e3895db5a341fa27f9e7b251a8cb9"
