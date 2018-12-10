@@ -994,6 +994,8 @@ var _ = Describe("GitTrack Suite", func() {
 		getsFilesFromRepo("foo/", 3)
 		getsFilesFromRepo("/foo/", 3)
 		getsFilesFromRepo("foo/bar", 1)
+		getsFilesFromRepo("foobar", 2)
+		getsFilesFromRepo("foobar/", 2)
 	})
 
 	Context("When a list of ignored GVRs is supplied", func() {
@@ -1099,7 +1101,7 @@ var getsFilesFromRepo = func(path string, count int) {
 					SubPath:    path,
 					Repository: repositoryURL,
 					DeployKey:  farosv1alpha1.GitTrackDeployKey{},
-					Reference:  "4c31dbdd7103dc209c8bb21b75d78b3efafadc31",
+					Reference:  "51798af1c1374d1d375a0eb7a3e53dd67ac5d135",
 				},
 			}
 
