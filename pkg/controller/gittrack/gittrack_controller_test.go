@@ -160,8 +160,6 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.Update(context.TODO(), deployGto)).ToNot(HaveOccurred())
 				// Wait for reconcile for update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for status update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Status.ObjectsInSync).To(Equal(int64(1)))
 			})
@@ -653,17 +651,15 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout*2).Should(Succeed())
 				events := &v1.EventList{}
 				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
-				startEvents := testevents.Select(events.Items, reasonFilter("UpdateStarted"))
 				successEvents := testevents.Select(events.Items, reasonFilter("UpdateSuccessful"))
 				failedEvents := testevents.Select(events.Items, reasonFilter("UpdateFailed"))
-				Expect(startEvents).ToNot(BeEmpty())
 				Expect(successEvents).ToNot(BeEmpty())
 				Expect(failedEvents).To(BeEmpty())
-				for _, e := range append(startEvents, successEvents...) {
+				for _, e := range successEvents {
 					Expect(e.InvolvedObject.Kind).To(Equal("GitTrack"))
 					Expect(e.InvolvedObject.Name).To(Equal("example"))
 					Expect(e.Type).To(Equal(string(v1.EventTypeNormal)))
-					Expect(e.Reason).To(SatisfyAny(Equal("UpdateStarted"), Equal("UpdateSuccessful")))
+					Expect(e.Reason).To(Equal("UpdateSuccessful"))
 				}
 			})
 

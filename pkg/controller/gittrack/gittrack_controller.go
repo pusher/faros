@@ -28,6 +28,7 @@ import (
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	utils "github.com/pusher/faros/pkg/utils"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	gitstore "github.com/pusher/git-store"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -68,6 +69,11 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to parse ignored resources: %v", err))
 	}
 
+	applier, err := farosclient.NewApplier(mgr.GetConfig(), farosclient.Options{})
+	if err != nil {
+		panic(fmt.Errorf("unable to create applier: %v", err))
+	}
+
 	return &ReconcileGitTrack{
 		Client:          mgr.GetClient(),
 		scheme:          mgr.GetScheme(),
@@ -77,6 +83,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		ignoredGVRs:     gvrs,
 		lastUpdateTimes: make(map[string]time.Time),
 		mutex:           sync.RWMutex{},
+		applier:         applier,
 	}
 }
 
@@ -125,6 +132,7 @@ type ReconcileGitTrack struct {
 	ignoredGVRs     map[schema.GroupVersionResource]interface{}
 	lastUpdateTimes map[string]time.Time
 	mutex           sync.RWMutex
+	applier         farosclient.Client
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
@@ -295,9 +303,19 @@ func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructu
 		return nil, fmt.Errorf("error getting API resource: %v", err)
 	}
 	if namespaced {
-		instance = &farosv1alpha1.GitTrackObject{}
+		instance = &farosv1alpha1.GitTrackObject{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "GitTrackObject",
+				APIVersion: "faros.pusher.com/v1alpha1",
+			},
+		}
 	} else {
-		instance = &farosv1alpha1.ClusterGitTrackObject{}
+		instance = &farosv1alpha1.ClusterGitTrackObject{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ClusterGitTrackObject",
+				APIVersion: "faros.pusher.com/v1alpha1",
+			},
+		}
 	}
 	instance.SetName(name)
 	instance.SetNamespace(u.GetNamespace())
@@ -361,16 +379,12 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	inSync := childInSync(found)
 	childUpdated, err := r.updateChild(found, gto)
 	if err != nil {
+		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "UpdateFailed", "Failed to update child '%s'", name)
 		return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to update child resource: %v", err))
 	}
 	if childUpdated {
 		inSync = false
-		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateStarted", "Updating child '%s'", name)
-		log.Printf("Updating child for '%s'\n", name)
-		if err = r.Update(context.TODO(), found); err != nil {
-			r.recorder.Eventf(owner, apiv1.EventTypeWarning, "UpdateFailed", "Failed to update child '%s'", name)
-			return errorResult(gto.GetNamespacedName(), fmt.Errorf("failed to update child for '%s': %v", name, err))
-		}
+		log.Printf("Updated child for '%s'\n", name)
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
 	return successResult(gto.GetNamespacedName(), timeToDeploy, inSync)
@@ -386,28 +400,9 @@ func childInSync(child farosv1alpha1.GitTrackObjectInterface) bool {
 }
 
 func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration, owner *farosv1alpha1.GitTrack, foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) result {
-	// Convert the GitTrackObjects to unstructured
-	found := &unstructured.Unstructured{}
-	err := r.scheme.Convert(foundGTO, found, nil)
-	if err != nil {
-		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to convert found to Unstructured '%s'", name)
-		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to convert found to Unstructured '%s': %v", name, err))
-	}
-	child := &unstructured.Unstructured{}
-	err = r.scheme.Convert(childGTO, child, nil)
-	if err != nil {
-		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to convert child to Unstructured '%s'", name)
-		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to convert child to Unstructured '%s': %v", name, err))
-	}
-
-	err = utils.SetLastAppliedAnnotation(found, child)
-	if err != nil {
-		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to set last applied annotation '%s'", name)
-		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to set last applied annotation for '%s': %v", name, err))
-	}
 	log.Printf("Creating child for '%s'\n", name)
 	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
-	if err = r.Create(context.TODO(), found); err != nil {
+	if err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, childGTO); err != nil {
 		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
 		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to create child for '%s': %v", name, err))
 	}
@@ -418,39 +413,15 @@ func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration,
 // UpdateChild compares the two GitTrackObjects and updates the foundGTO if the
 // childGTO
 func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) (bool, error) {
-	// Convert the GitTrackObjects to unstructured
-	found := &unstructured.Unstructured{}
-	err := r.scheme.Convert(foundGTO, found, nil)
-	if err != nil {
-		return false, fmt.Errorf("failed to convert found child to Unstructured: %v", err)
-	}
-	child := &unstructured.Unstructured{}
-	err = r.scheme.Convert(childGTO, child, nil)
-	if err != nil {
-		return false, fmt.Errorf("failed to convert child child to Unstructured: %v", err)
-	}
-
-	// Compare and update the resources
-	childUpdated, err := utils.UpdateChildResource(found, child)
+	originalResourceVersion := foundGTO.GetResourceVersion()
+	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, childGTO)
 	if err != nil {
 		return false, fmt.Errorf("error updating child resource: %v", err)
 	}
 
-	// Child wasn't updated, nothing to do now
-	if !childUpdated {
+	// Not updated if the resource version hasn't changed
+	if originalResourceVersion == childGTO.GetResourceVersion() {
 		return false, nil
-	}
-
-	// Set the last applied annotation
-	err = utils.SetLastAppliedAnnotation(found, child)
-	if err != nil {
-		return false, fmt.Errorf("error applying last applied annotation: %v", err)
-	}
-
-	// Convert Found back to a structured GTO
-	err = r.scheme.Convert(found, foundGTO, nil)
-	if err != nil {
-		return false, fmt.Errorf("error converting object to structured: %v", err)
 	}
 
 	return true, nil
