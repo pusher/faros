@@ -683,19 +683,21 @@ var _ = Describe("GitTrack Suite", func() {
 				// Wait for reconcile for status update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 
-				var hist prometheus.Histogram
 				Eventually(func() error {
-					var err error
-					hist, err = metrics.TimeToDeploy.GetMetricWith(map[string]string{
+					labels := map[string]string{
 						"name":       instance.GetName(),
 						"namespace":  instance.GetNamespace(),
 						"repository": instance.Spec.Repository,
-					})
-					return err
+					}
+					histObserver := metrics.TimeToDeploy.With(labels)
+					hist := histObserver.(prometheus.Histogram)
+					var timeToDeploy dto.Metric
+					hist.Write(&timeToDeploy)
+					if timeToDeploy.GetHistogram().GetSampleCount() != uint64(4) {
+						return fmt.Errorf("metrics not updated")
+					}
+					return nil
 				}, timeout).Should(Succeed())
-				var metric dto.Metric
-				Expect(hist.Write(&metric)).NotTo(HaveOccurred())
-				Expect(metric.GetHistogram().GetSampleCount()).To(Equal(uint64(4)))
 			})
 		})
 
