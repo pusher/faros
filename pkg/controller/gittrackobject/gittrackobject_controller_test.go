@@ -213,6 +213,7 @@ var stop chan struct{}
 var stopInformers chan struct{}
 
 const timeout = time.Second * 5
+const consistentlyTimeout = time.Second
 
 var _ = Describe("GitTrackObject Suite", func() {
 	BeforeEach(func() {
@@ -736,10 +737,12 @@ var (
 
 		AfterEach(func() {
 			Expect(c.Delete(context.TODO(), instance)).NotTo(HaveOccurred())
+			key := types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}
+			Eventually(c.Get(context.TODO(), key, instance), timeout).ShouldNot(Succeed())
 		})
 
 		It("should not reconcile it", func() {
-			Eventually(requests, timeout).ShouldNot(Receive())
+			Consistently(requests, consistentlyTimeout).ShouldNot(Receive())
 		})
 
 	}
