@@ -109,17 +109,45 @@ func NewApplier(config *rest.Config, options Options) (*Applier, error) {
 
 // ApplyOptions defines the possible options for the Apply command
 type ApplyOptions struct {
-	Overwrite           bool
-	ForceDeletion       bool
-	CascadeDeletion     bool
-	DeletionTimeout     time.Duration
-	DeletionGracePeriod int
-	// ServerDryRun        bool
+	Overwrite           *bool // Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration
+	ForceDeletion       *bool
+	CascadeDeletion     *bool
+	DeletionTimeout     *time.Duration
+	DeletionGracePeriod *int
+}
+
+// Complete defaults valus within the ApplyOptions struct
+func (a *ApplyOptions) Complete() {
+	// setup option defaults
+	overwrite := true
+	forceDeletion := false
+	cascadeDeletion := true
+	deletionTimeout := time.Duration(0)
+	deletionGracePeriod := -1
+
+	if a.Overwrite == nil {
+		a.Overwrite = &overwrite
+	}
+	if a.ForceDeletion == nil {
+		a.ForceDeletion = &forceDeletion
+	}
+	if a.CascadeDeletion == nil {
+		a.CascadeDeletion = &cascadeDeletion
+	}
+	if a.DeletionTimeout == nil {
+		a.DeletionTimeout = &deletionTimeout
+	}
+	if a.DeletionGracePeriod == nil {
+		a.DeletionGracePeriod = &deletionGracePeriod
+	}
 }
 
 // Apply performs a strategic three way merge update to the resource if it exists,
 // else it creates the resource
 func (a *Applier) Apply(ctx context.Context, opts *ApplyOptions, modified runtime.Object) error {
+	// Default option values
+	opts.Complete()
+
 	current := newUnstructuredFor(modified)
 
 	objectKey, err := getNamespacedName(modified)
@@ -198,12 +226,12 @@ func (a *Applier) newPatcher(opts *ApplyOptions, obj runtime.Object) (*Patcher, 
 		Mapping:       mapping,
 		Helper:        helper,
 		DynamicClient: a.dynamicClient,
-		Overwrite:     opts.Overwrite,
+		Overwrite:     *opts.Overwrite,
 		BackOff:       clockwork.NewRealClock(),
-		Force:         opts.ForceDeletion,
-		Cascade:       opts.CascadeDeletion,
-		Timeout:       opts.DeletionTimeout,
-		GracePeriod:   opts.DeletionGracePeriod,
+		Force:         *opts.ForceDeletion,
+		Cascade:       *opts.CascadeDeletion,
+		Timeout:       *opts.DeletionTimeout,
+		GracePeriod:   *opts.DeletionGracePeriod,
 		ServerDryRun:  false, // TODO(JoelSpeed): Implement ServerDryRun in Apply
 		OpenapiSchema: nil,   // Not supporting OpenapiSchema patching
 		Retries:       maxPatchRetry,
