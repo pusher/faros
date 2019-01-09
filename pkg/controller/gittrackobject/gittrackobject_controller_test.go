@@ -33,6 +33,7 @@ import (
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	"github.com/pusher/faros/pkg/utils"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
@@ -794,7 +795,7 @@ var (
 			Should(Succeed())
 
 		annotations := deploy.ObjectMeta.Annotations
-		_, ok := annotations[utils.LastAppliedAnnotation]
+		_, ok := annotations[farosclient.LastAppliedAnnotation]
 		Expect(ok).To(BeTrue())
 	}
 
@@ -805,7 +806,7 @@ var (
 			Should(Succeed())
 
 		annotations := crb.ObjectMeta.Annotations
-		_, ok := annotations[utils.LastAppliedAnnotation]
+		_, ok := annotations[farosclient.LastAppliedAnnotation]
 		Expect(ok).To(BeTrue())
 	}
 

@@ -31,7 +31,7 @@ import (
 	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
-	"github.com/pusher/faros/pkg/utils"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
 	gitstore "github.com/pusher/git-store"
@@ -236,8 +236,8 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, serviceGto)
 				}, timeout).Should(Succeed())
-				Expect(deployGto.GetAnnotations()).To(HaveKey(utils.LastAppliedAnnotation))
-				Expect(serviceGto.GetAnnotations()).To(HaveKey(utils.LastAppliedAnnotation))
+				Expect(deployGto.GetAnnotations()).To(HaveKey(farosclient.LastAppliedAnnotation))
+				Expect(serviceGto.GetAnnotations()).To(HaveKey(farosclient.LastAppliedAnnotation))
 			})
 
 			It("sends events about checking out configured Git repository", func() {
