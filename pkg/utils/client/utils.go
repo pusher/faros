@@ -121,6 +121,9 @@ func getModifiedConfiguration(obj runtime.Object, annotate bool, codec runtime.E
 	// then add that serialization to it as the annotation and serialize it again.
 	var modified []byte
 
+	// Take a copy of the original object to restore later
+	original := obj.DeepCopyObject()
+
 	// Otherwise, use the server side version of the object.
 	// Get the current annotations from the object.
 	annots, err := metadataAccessor.Annotations(obj)
@@ -132,9 +135,14 @@ func getModifiedConfiguration(obj runtime.Object, annotate bool, codec runtime.E
 		annots = map[string]string{}
 	}
 
-	original := annots[LastAppliedAnnotation]
 	delete(annots, LastAppliedAnnotation)
 	err = metadataAccessor.SetAnnotations(obj, annots)
+	if err != nil {
+		return nil, err
+	}
+
+	// Clear read-only metadata as it interferes with the merging process
+	err = clearReadOnlyMeta(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -158,12 +166,24 @@ func getModifiedConfiguration(obj runtime.Object, annotate bool, codec runtime.E
 	}
 
 	// Restore the object to its original condition.
-	annots[LastAppliedAnnotation] = original
-	if err := metadataAccessor.SetAnnotations(obj, annots); err != nil {
-		return nil, err
-	}
+	obj = original
 
 	return modified, nil
+}
+
+// clearReadOnlyMeta sets null values to the object's ResourceVersion, UID,
+// SelfLink and Generation
+func clearReadOnlyMeta(obj runtime.Object) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+
+	accessor.SetResourceVersion("")
+	accessor.SetUID(types.UID(""))
+	accessor.SetSelfLink("")
+	accessor.SetGeneration(0)
+	return nil
 }
 
 // addSourceToErr adds handleResourcePrefix and source string to error message.
