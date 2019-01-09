@@ -258,7 +258,8 @@ func (a *Applier) configFor(gv schema.GroupVersion) (*rest.Config, error) {
 		config.APIPath = "apis/"
 	}
 
-	config.NegotiatedSerializer = a.codecs
+	codec := runtime.NoopEncoder{Decoder: scheme.Codecs.UniversalDecoder(gv)}
+	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 	return config, nil
 }
 
