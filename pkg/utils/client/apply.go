@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -64,6 +66,7 @@ type Applier struct {
 	client        client.Client
 	dynamicClient dynamic.Interface
 	config        *rest.Config
+	codecs        serializer.CodecFactory
 }
 
 // NewApplier constucts a new Applier client
@@ -99,6 +102,7 @@ func NewApplier(config *rest.Config, options Options) (*Applier, error) {
 	a := &Applier{
 		mapper:        options.Mapper,
 		scheme:        options.Scheme,
+		codecs:        serializer.NewCodecFactory(options.Scheme),
 		client:        cachingClient,
 		dynamicClient: dynamicClient,
 		config:        config,
@@ -211,17 +215,16 @@ func (a *Applier) newPatcher(opts *ApplyOptions, obj runtime.Object) (*Patcher, 
 		return nil, fmt.Errorf("couldn't construct rest mapping from GVK %s: %v", gvk.String(), err)
 	}
 
-	config := *a.config
-	gv := gvk.GroupVersion()
-	config.GroupVersion = &gv
-	config.NegotiatedSerializer = scheme.Codecs
-	restClient, err := rest.RESTClientFor(&config)
+	restConfig, err := a.configFor(gvk.GroupVersion())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error constructing config for Group Version %+v: %v", gvk.GroupVersion(), err)
+	}
+	restClient, err := rest.RESTClientFor(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialise rest client: %v", err)
 	}
 
 	helper := resource.NewHelper(restClient, mapping)
-
 	p := &Patcher{
 		Mapping:       mapping,
 		Helper:        helper,
@@ -237,6 +240,26 @@ func (a *Applier) newPatcher(opts *ApplyOptions, obj runtime.Object) (*Patcher, 
 		Retries:       maxPatchRetry,
 	}
 	return p, nil
+}
+
+func (a *Applier) configFor(gv schema.GroupVersion) (*rest.Config, error) {
+	config := rest.CopyConfig(a.config)
+	err := rest.SetKubernetesDefaults(config)
+	if err != nil {
+		return nil, fmt.Errorf("error defaulting config: %v", err)
+	}
+
+	config.GroupVersion = &gv
+
+	// Set correct APIPath for core API group
+	if gv.String() == "v1" {
+		config.APIPath = "api/"
+	} else {
+		config.APIPath = "apis/"
+	}
+
+	config.NegotiatedSerializer = a.codecs
+	return config, nil
 }
 
 func newUnstructuredFor(obj runtime.Object) *unstructured.Unstructured {
