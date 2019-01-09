@@ -168,7 +168,13 @@ func (a *Applier) Apply(ctx context.Context, opts *ApplyOptions, modified runtim
 		return fmt.Errorf("unable to get current resource: %v", err)
 	}
 	// Update the object
-	return a.update(ctx, opts, current, modified)
+	err = a.update(ctx, opts, current, modified)
+	if err != nil {
+		return fmt.Errorf("error applying update: %v", err)
+	}
+
+	// Fetch the updated resource so that users copy is up to date
+	return a.client.Get(context.TODO(), objectKey, modified)
 }
 
 func (a *Applier) create(ctx context.Context, obj runtime.Object) error {
