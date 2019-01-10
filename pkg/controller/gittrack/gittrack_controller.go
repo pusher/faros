@@ -304,17 +304,11 @@ func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructu
 	}
 	if namespaced {
 		instance = &farosv1alpha1.GitTrackObject{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "GitTrackObject",
-				APIVersion: "faros.pusher.com/v1alpha1",
-			},
+			TypeMeta: farosv1alpha1.GitTrackObjectTypeMeta,
 		}
 	} else {
 		instance = &farosv1alpha1.ClusterGitTrackObject{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ClusterGitTrackObject",
-				APIVersion: "faros.pusher.com/v1alpha1",
-			},
+			TypeMeta: farosv1alpha1.ClusterGitTrackObjectTypeMeta,
 		}
 	}
 	instance.SetName(name)
