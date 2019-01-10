@@ -264,7 +264,11 @@ func (a *Applier) configFor(gv schema.GroupVersion) (*rest.Config, error) {
 		config.APIPath = "apis/"
 	}
 
-	codec := runtime.NoopEncoder{Decoder: scheme.Codecs.UniversalDecoder(gv)}
+	ns := scheme.Codecs
+	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	encoder := ns.EncoderForVersion(info.Serializer, gv)
+	// Use universal decoder so we don't attempt conversion
+	codec := runtime.NewCodec(encoder, scheme.Codecs.UniversalDecoder(gv))
 	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 	return config, nil
 }
