@@ -178,7 +178,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nginx-ingress-controller
+  name: {{ .Name }}
 subjects:
 - kind: ServiceAccount
   name: nginx-ingress-controller
@@ -344,7 +344,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		})
 
 		Context("and the value is `recreate`", func() {
-			It("recreates the resource", UpdateStrategyShouldRecreate)
+			It("patches resources with no conflicts", UpdateStrategyRecreateShouldPatch)
 		})
 
 		Context("and the value is `never`", func() {
@@ -358,7 +358,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 	Context("When a ClusterGitTrackObject has an `update-strategy` annotation", func() {
 		BeforeEach(func() {
-			values := map[string]string{"UpdateStrategy": "update", "Namespace": "default"}
+			values := map[string]string{"UpdateStrategy": "update", "Namespace": "default", "Name": "nginx-ingress-controller"}
 			CreateClusterInstance(renderExample(clusterAnnotationExample, values))
 			// wait for create reconcile
 			Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
@@ -373,7 +373,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 		})
 
 		Context("and the value is `recreate`", func() {
-			It("recreates the resource", ClusterUpdateStrategyShouldRecreate)
+			It("patches resources without conflicts", ClusterUpdateStrategyRecreateShouldPatch)
+			It("recreates resources with conflicts", ClusterUpdateStrategyRecreateShouldRecreate)
 		})
 
 		Context("and the value is `never`", func() {
@@ -1149,7 +1150,7 @@ var (
 		Expect(container.Image).To(Equal("nginx:v2.0.0"))
 	}
 
-	UpdateStrategyShouldRecreate = func() {
+	UpdateStrategyRecreateShouldPatch = func() {
 		values := map[string]string{"UpdateStrategy": "recreate", "Tag": "v2.0.0"}
 		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
 		deploy := &appsv1.Deployment{}
@@ -1163,7 +1164,7 @@ var (
 		afterUID := deploy.ObjectMeta.UID
 		container = deploy.Spec.Template.Spec.Containers[0]
 		Expect(container.Image).To(Equal("nginx:v2.0.0"))
-		Expect(beforeUID).ToNot(Equal(afterUID))
+		Expect(beforeUID).To(Equal(afterUID))
 	}
 
 	UpdateStrategyShouldNever = func() {
@@ -1198,7 +1199,7 @@ var (
 	}
 
 	ClusterUpdateStrategyShouldUpdate = func() {
-		values := map[string]string{"UpdateStrategy": "update", "Namespace": "other"}
+		values := map[string]string{"UpdateStrategy": "update", "Namespace": "other", "Name": "nginx-ingress-controller"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		crb := &rbacv1.ClusterRoleBinding{}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
@@ -1219,8 +1220,8 @@ var (
 		Expect(crb.Subjects[0].Namespace).To(Equal("other"))
 	}
 
-	ClusterUpdateStrategyShouldRecreate = func() {
-		values := map[string]string{"UpdateStrategy": "recreate", "Namespace": "other"}
+	ClusterUpdateStrategyRecreateShouldPatch = func() {
+		values := map[string]string{"UpdateStrategy": "recreate", "Namespace": "other", "Name": "nginx-ingress-controller"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		crb := &rbacv1.ClusterRoleBinding{}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
@@ -1241,11 +1242,53 @@ var (
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
 		afterUID := crb.ObjectMeta.UID
 		Expect(crb.Subjects[0].Namespace).To(Equal("other"))
+		Expect(beforeUID).To(Equal(afterUID))
+	}
+
+	ClusterUpdateStrategyRecreateShouldRecreate = func() {
+		crb := &rbacv1.ClusterRoleBinding{}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		beforeUID := crb.ObjectMeta.UID
+		Expect(crb.RoleRef.Name).To(Equal("nginx-ingress-controller"))
+
+		// Make sure to clear the foregroundDeletion finalizer
+		go func() {
+			Eventually(func() error {
+				err := c.Get(context.TODO(), crbKey, crb)
+				if err != nil {
+					return err
+				}
+				if len(crb.Finalizers) == 0 {
+					return fmt.Errorf("Not deleted yet")
+				}
+				crb.Finalizers = []string{}
+				return c.Update(context.TODO(), crb)
+			}, timeout).Should(Succeed())
+		}()
+
+		// Role reference is immutable so should cause a conflict, causing the clusterrolebinding to be re-createad
+		values := map[string]string{"UpdateStrategy": "recreate", "Namespace": "default", "Name": "other"}
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
+		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), true)
+		Eventually(func() error {
+			crb = &rbacv1.ClusterRoleBinding{}
+			err := c.Get(context.TODO(), crbKey, crb)
+			if err != nil {
+				return err
+			}
+			if crb.RoleRef.Name != "other" {
+				return fmt.Errorf("namespace hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
+		afterUID := crb.ObjectMeta.UID
+		Expect(crb.RoleRef.Name).To(Equal("other"))
 		Expect(beforeUID).ToNot(Equal(afterUID))
 	}
 
 	ClusterUpdateStrategyShouldNever = func() {
-		values := map[string]string{"UpdateStrategy": "never", "Namespace": "other"}
+		values := map[string]string{"UpdateStrategy": "never", "Namespace": "other", "Name": "nginx-ingress-controller"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		crb := &rbacv1.ClusterRoleBinding{}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, crb) }, timeout).Should(Succeed())
@@ -1256,7 +1299,7 @@ var (
 	}
 
 	ClusterUpdateStrategyError = func() {
-		values := map[string]string{"UpdateStrategy": "anything-else", "Namespace": "other"}
+		values := map[string]string{"UpdateStrategy": "anything-else", "Namespace": "other", "Name": "nginx-ingress-controller"}
 		Eventually(func() error { return c.Get(context.TODO(), crbKey, clusterInstance) }, timeout).Should(Succeed())
 		UpdateClusterInstance(clusterInstance, renderExample(clusterAnnotationExample, values), true)
 		Eventually(func() error {

@@ -298,11 +298,11 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, nil
 	}
 
-	r.sendEvent(instance, apiv1.EventTypeNormal, "UpdateStarted", "Starting update of child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+	var childUpdated bool
 	if updateStrategy == gittrackobjectutils.RecreateUpdateStrategy {
-		err = r.recreateChild(found, child)
+		childUpdated, err = r.recreateChild(found, child)
 	} else {
-		err = r.updateChild(child)
+		childUpdated, err = r.updateChild(found, child)
 	}
 	if err != nil {
 		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
@@ -310,7 +310,9 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		r.sendEvent(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		return reconcile.Result{}, sOpts.inSyncError
 	}
-	r.sendEvent(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+	if childUpdated {
+		r.sendEvent(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+	}
 
 	// If we got here everything is good so the object must be in-sync
 	mOpts.inSync = true
@@ -318,31 +320,36 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 }
 
 // recreateChild first deletes and then creates a child resource for a (Cluster)GitTrackObject
-func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) error {
-	log.Printf("Deleting child %s %s/%s\n", found.GetKind(), found.GetNamespace(), found.GetName())
-	err := r.Delete(context.TODO(), found)
+func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) (bool, error) {
+	originalResourceVersion := found.GetResourceVersion()
+	force := true
+	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
 	if err != nil {
-		return fmt.Errorf("unable to delete child: %v", err)
+		return false, fmt.Errorf("unable to re-create child: %v", err)
 	}
 
-	log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-	err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
-	if err != nil {
-		return fmt.Errorf("unable to create child: %v", err)
+	// Not updated if the resource version hasn't changed
+	if originalResourceVersion == child.GetResourceVersion() {
+		return false, nil
 	}
 
-	return nil
+	return true, nil
 }
 
 // updateChild updates the given child resource of a (Cluster)GitTrackObject
-func (r *ReconcileGitTrackObject) updateChild(child *unstructured.Unstructured) error {
+func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) (bool, error) {
 	// Update the child resource on the API
-	log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
+	originalResourceVersion := found.GetResourceVersion()
 	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
 	if err != nil {
-		return fmt.Errorf("unable to update child resource: %v", err)
+		return false, fmt.Errorf("unable to update child resource: %v", err)
 	}
-	return nil
+
+	// Not updated if the resource version hasn't changed
+	if originalResourceVersion == child.GetResourceVersion() {
+		return false, nil
+	}
+	return true, nil
 }
 
 // getInstance fetches the requested (Cluster)GitTrackObject from the API server
