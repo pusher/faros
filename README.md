@@ -352,9 +352,9 @@ of the following values:
   This is equivalent to a `kubectl apply`.
 - `never`: Faros will ensure that the Resource exists within Kubernetes but will
   never update it if the Resource is modified.
-- `recreate`: Faros will delete the existing Resource and create a new copy of
-  the Resource. This is equivalent to a `kubectl delete` followed by a
-  `kubectl create`.
+- `recreate`: Faros will first attempt to patch the resource, if this fails it
+  will delete the existing Resource and create a new copy.
+  This is equivalent to a `kubectl apply --force`.
 
 For example:
 
