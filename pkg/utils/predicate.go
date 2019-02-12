@@ -158,8 +158,7 @@ func (p OwnersOwnerInNamespacePredicate) ownersOwnerInNamespace(ownerRefs []meta
 // NewOwnersOwnerInNamespacePredicate constructs a new OwnersOwnerInNamespacePredicate
 func NewOwnersOwnerInNamespacePredicate(client client.Client) OwnersOwnerInNamespacePredicate {
 	return OwnersOwnerInNamespacePredicate{
-		client: client,
-
+		client:                    client,
 		ownerInNamespacePredicate: NewOwnerInNamespacePredicate(client),
 	}
 }
