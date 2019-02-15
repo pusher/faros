@@ -136,9 +136,13 @@ type ReconcileGitTrack struct {
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
-func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, privateKey []byte) (*gitstore.Repo, error) {
+func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCredentials) (*gitstore.Repo, error) {
 	log.Printf("Getting repository '%s'\n", url)
-	repo, err := r.store.Get(&gitstore.RepoRef{URL: url, PrivateKey: privateKey})
+	repoRef, err := createRepoRefFromCreds(url, gitCreds)
+	if err != nil {
+		return &gitstore.Repo{}, err
+	}
+	repo, err := r.store.Get(repoRef)
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
 	}
@@ -161,16 +165,16 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, privateKey []by
 	return repo, nil
 }
 
-// fetchPrivateyKey extracts a given key's data from a given deployKey secret reference
-func (r *ReconcileGitTrack) fetchPrivateKey(namespace string, deployKey farosv1alpha1.GitTrackDeployKey) ([]byte, error) {
+// fetchGitCredentials creates git credentials data from a given deployKey secret reference
+func (r *ReconcileGitTrack) fetchGitCredentials(namespace string, deployKey farosv1alpha1.GitTrackDeployKey) (*gitCredentials, error) {
 	// Check if the deployKey is empty, do nothing if it is
 	emptyKey := farosv1alpha1.GitTrackDeployKey{}
 	if deployKey == emptyKey {
-		return []byte{}, nil
+		return nil, nil
 	}
 	// Check the deployKey fields are both non-empty
 	if deployKey.SecretName == "" || deployKey.Key == "" {
-		return []byte{}, fmt.Errorf("if using a deploy key, both SecretName and Key must be set")
+		return nil, fmt.Errorf("if using a deploy key, both SecretName and Key must be set")
 	}
 
 	// Fetch the secret from the API
@@ -180,29 +184,30 @@ func (r *ReconcileGitTrack) fetchPrivateKey(namespace string, deployKey farosv1a
 		Name:      deployKey.SecretName,
 	}, secret)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to look up secret %s: %v", deployKey.SecretName, err)
+		return nil, fmt.Errorf("failed to look up secret %s: %v", deployKey.SecretName, err)
 	}
 
 	// Extract the data from the secret
 	var ok bool
-	var privateKey []byte
-	if privateKey, ok = secret.Data[deployKey.Key]; !ok {
-		return []byte{}, fmt.Errorf("invalid deploy key reference. Secret %s does not have key %s", deployKey.SecretName, deployKey.Key)
+	var secretData []byte
+	if secretData, ok = secret.Data[deployKey.Key]; !ok {
+		return nil, fmt.Errorf("invalid deploy key reference. Secret %s does not have key %s", deployKey.SecretName, deployKey.Key)
 	}
-	return privateKey, nil
+
+	return &gitCredentials{secret: secretData, credType: deployKey.CredType}, nil
 }
 
 // getFiles checks out the Spec.Repository at Spec.Reference and returns a map of filename to
 // gitstore.File pointers
 func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gitstore.File, error) {
 	r.recorder.Eventf(gt, apiv1.EventTypeNormal, "CheckoutStarted", "Checking out '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
-	privateKey, err := r.fetchPrivateKey(gt.Namespace, gt.Spec.DeployKey)
+	gitCreds, err := r.fetchGitCredentials(gt.Namespace, gt.Spec.DeployKey)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
 		return nil, fmt.Errorf("unable to retrieve private key: %v", err)
 	}
 
-	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference, privateKey)
+	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference, gitCreds)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
 		return nil, err

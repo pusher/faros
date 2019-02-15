@@ -50,3 +50,6 @@ docker-build: test
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+
+ginkgo:
+	ginkgo -v -race -randomizeAllSpecs ./pkg/... ./cmd/...

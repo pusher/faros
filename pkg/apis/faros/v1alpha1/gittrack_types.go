@@ -21,6 +21,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// CredTypeSSH defines a private SSH key credential type
+	CredTypeSSH = "SSH"
+	// CredTypeOauthToken defines an oauth token credential type
+	CredTypeOauthToken = "OAuthToken"
+)
+
 // GitTrackSpec defines the desired state of GitTrack
 type GitTrackSpec struct {
 	// Reference contains the git reference this GitTrack tracks
@@ -33,17 +40,20 @@ type GitTrackSpec struct {
 	// SubPath is the subpath within the repository underneath which files are considered
 	SubPath string `json:"subPath,omitempty"`
 
-	// DeployKey holds a reference to an SSH key needed to access the repository
+	// DeployKey holds a reference to an SSH key needed to access the repository.
 	DeployKey GitTrackDeployKey `json:"deployKey,omitempty"`
 }
 
-// GitTrackDeployKey holds a reference to an SSH key needed to access the repository
+// GitTrackDeployKey holds a reference to a a secret such as an SSH key or OAuthToken needed to access the repository
 type GitTrackDeployKey struct {
 	// SecretName is the name of the Secret object containins the key
 	SecretName string `json:"secretName"`
 
-	// Key is the key within the Secret object that contains the deploy key
+	// Key is the key within the Secret object that contains the deploy secret
 	Key string `json:"key"`
+
+	// CredType is the type of credential. Accepted values are "SSH", "OAuthToken". Defaults to "SSH".
+	CredType string `json:"credType,omitempty"`
 }
 
 // GitTrackStatus defines the observed state of GitTrack
