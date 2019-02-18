@@ -85,10 +85,16 @@ func NewApplier(config *rest.Config, options Options) (*Applier, error) {
 	// Init a Mapper if none provided
 	if options.Mapper == nil {
 		var err error
-		options.Mapper, err = apiutil.NewDiscoveryRESTMapper(config)
+
+		drm, err := apiutil.NewDiscoveryRESTMapper(config)
 		if err != nil {
 			return nil, err
 		}
+		lrm := meta.NewLazyRESTMapperLoader(func() (meta.RESTMapper, error) {
+			return apiutil.NewDiscoveryRESTMapper(config)
+		})
+
+		options.Mapper = meta.FirstHitRESTMapper{MultiRESTMapper: meta.MultiRESTMapper{drm, lrm}}
 	}
 
 	cachingClient, err := client.New(config, client.Options{Scheme: options.Scheme, Mapper: options.Mapper})
