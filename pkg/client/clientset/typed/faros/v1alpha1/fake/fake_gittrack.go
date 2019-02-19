@@ -131,7 +131,7 @@ func (c *FakeGitTracks) DeleteCollection(options *v1.DeleteOptions, listOptions 
 // Patch applies the patch and returns the patched gitTrack.
 func (c *FakeGitTracks) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.GitTrack, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(gittracksResource, c.ns, name, data, subresources...), &v1alpha1.GitTrack{})
+		Invokes(testing.NewPatchSubresourceAction(gittracksResource, c.ns, name, pt, data, subresources...), &v1alpha1.GitTrack{})
 
 	if obj == nil {
 		return nil, err
