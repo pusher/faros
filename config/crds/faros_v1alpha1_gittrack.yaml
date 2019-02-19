@@ -32,10 +32,6 @@ spec:
               description: DeployKey holds a reference to an SSH key needed to access
                 the repository.
               properties:
-                credType:
-                  description: CredType is the type of credential. Accepted values
-                    are "SSH", "OAuthToken". Defaults to "SSH".
-                  type: string
                 key:
                   description: Key is the key within the Secret object that contains
                     the deploy secret
@@ -43,6 +39,10 @@ spec:
                 secretName:
                   description: SecretName is the name of the Secret object containins
                     the key
+                  type: string
+                type:
+                  description: Type is the type of credential. Accepted values are
+                    "SSH", "OAuthToken". Defaults to "SSH".
                   type: string
               required:
               - secretName

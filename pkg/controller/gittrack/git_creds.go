@@ -8,9 +8,8 @@ import (
 )
 
 type gitCredentials struct {
-	secret []byte
-	// credType should be either a farosv1alpha1 SecretTypeSSH or SecretTypeOAuthToken
-	credType string
+	secret     []byte
+	deployType farosv1alpha1.GitTrackDeployKeyType
 }
 
 // createRepoRef creates a git repo ref configured depending on the credentialType
@@ -18,15 +17,15 @@ func createRepoRefFromCreds(url string, creds *gitCredentials) (*gitstore.RepoRe
 	if creds == nil {
 		creds = &gitCredentials{}
 	}
-	switch creds.credType {
+	switch creds.deployType {
 	// default to SSH
 	case "":
 		fallthrough
-	case farosv1alpha1.CredTypeSSH:
+	case farosv1alpha1.DeployKeyTypeSSH:
 		return &gitstore.RepoRef{URL: url, PrivateKey: creds.secret}, nil
-	case farosv1alpha1.CredTypeOauthToken:
+	case farosv1alpha1.DeployKeyTypeOAuthToken:
 		return &gitstore.RepoRef{URL: url, User: "x-oauth-token", Pass: string(creds.secret)}, nil
 	default:
-		return nil, fmt.Errorf("Unable to create repo ref: invalid secretType \"%s\"", creds.credType)
+		return nil, fmt.Errorf("Unable to create repo ref: invalid type \"%s\"", creds.deployType)
 	}
 }
