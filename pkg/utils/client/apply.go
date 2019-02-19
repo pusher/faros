@@ -126,7 +126,7 @@ func (a *ApplyOptions) Complete() {
 	overwrite := true
 	forceDeletion := false
 	cascadeDeletion := true
-	deletionTimeout := time.Duration(0)
+	deletionTimeout := time.Duration(30 * time.Second)
 	deletionGracePeriod := -1
 
 	if a.Overwrite == nil {

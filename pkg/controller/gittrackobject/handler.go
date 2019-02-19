@@ -24,6 +24,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"github.com/pusher/faros/pkg/utils"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -71,7 +72,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 
 	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
 	if err != nil && errors.IsNotFound(err) {
-		reason, err := r.handleCreate(gto, child)
+		reason, err = r.handleCreate(gto, child)
 		if err != nil {
 			return handlerResult{
 				inSyncReason: reason,
@@ -118,19 +119,11 @@ func (r *ReconcileGitTrackObject) getChildFromGitTrackObject(gto farosv1alpha1.G
 
 // handleCreate takes an unstructured object sends it to the API to create it
 func (r *ReconcileGitTrackObject) handleCreate(gto farosv1alpha1.GitTrackObjectInterface, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
-	found := child.DeepCopy()
-
-	// Update the last applied annotation
-	err := utils.SetLastAppliedAnnotation(found, child)
-	if err != nil {
-		return gittrackobjectutils.ErrorCreatingChild, fmt.Errorf("unable to set annotation: %v", err)
-	}
-
 	// Log and send event that we are attempting to create the child resource
 	log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 	r.sendEvent(gto, corev1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 
-	err = r.Create(context.TODO(), found)
+	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
 	if err != nil {
 		r.sendEvent(gto, corev1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		return gittrackobjectutils.ErrorCreatingChild, fmt.Errorf("unable to create child: %v", err)
@@ -160,7 +153,7 @@ func (r *ReconcileGitTrackObject) handleUpdate(gto farosv1alpha1.GitTrackObjectI
 // handleDefaultUpdateStrategy compares the existing and desired state of the
 // child resource and updates the object in-place if required
 func (r *ReconcileGitTrackObject) handleDefaultUpdateStrategy(gto farosv1alpha1.GitTrackObjectInterface, found, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
-	childUpdated, err := utils.UpdateChildResource(found, child)
+	childUpdated, err := r.updateChild(found, child)
 	if err != nil {
 		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to update child: %v", err)
@@ -169,19 +162,8 @@ func (r *ReconcileGitTrackObject) handleDefaultUpdateStrategy(gto farosv1alpha1.
 		return "", nil
 	}
 
-	err = utils.SetLastAppliedAnnotation(found, child)
-	if err != nil {
-		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("error setting last applied annotation: %v", err)
-	}
-	// Update the child resource on the API
-	log.Printf("Updating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-	err = r.Update(context.TODO(), found)
-	if err != nil {
-		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to update child resource: %v", err)
-	}
-
+	// Update was successful
+	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 	return "", nil
 }
 
@@ -200,7 +182,7 @@ func (r *ReconcileGitTrackObject) handleNeverUpdateStrategy(gto farosv1alpha1.Gi
 // resources and then deletes and recreates the child object if an update is
 // required
 func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1.GitTrackObjectInterface, found, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
-	childUpdated, err := utils.UpdateChildResource(found, child)
+	childUpdated, err := r.recreateChild(found, child)
 	if err != nil {
 		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to update child: %v", err)
@@ -209,22 +191,40 @@ func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1
 		return "", nil
 	}
 
-	// Delete the existing child object
-	log.Printf("Deleting child %s %s/%s\n", found.GetKind(), found.GetNamespace(), found.GetName())
-	err = r.Delete(context.TODO(), found)
-	if err != nil {
-		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to delete child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		return gittrackobjectutils.ErrorUpdatingChild, fmt.Errorf("unable to delete child: %v", err)
-	}
-
-	// Create the new child object
-	reason, err := r.handleCreate(gto, child)
-	if err != nil {
-		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		return reason, fmt.Errorf("unable to create child: %v", err)
-	}
-
 	// Update was successful
 	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 	return "", nil
+}
+
+// recreateChild first deletes and then creates a child resource for a (Cluster)GitTrackObject
+func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) (bool, error) {
+	originalResourceVersion := found.GetResourceVersion()
+	force := true
+	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
+	if err != nil {
+		return false, fmt.Errorf("unable to re-create child: %v", err)
+	}
+
+	// Not updated if the resource version hasn't changed
+	if originalResourceVersion == child.GetResourceVersion() {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// updateChild updates the given child resource of a (Cluster)GitTrackObject
+func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) (bool, error) {
+	// Update the child resource on the API
+	originalResourceVersion := found.GetResourceVersion()
+	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
+	if err != nil {
+		return false, fmt.Errorf("unable to update child resource: %v", err)
+	}
+
+	// Not updated if the resource version hasn't changed
+	if originalResourceVersion == child.GetResourceVersion() {
+		return false, nil
+	}
+	return true, nil
 }

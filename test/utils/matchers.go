@@ -22,7 +22,10 @@ import (
 	"github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,7 +37,8 @@ import (
 
 // Matcher has Gomega Matchers that use the controller-runtime client
 type Matcher struct {
-	Client client.Client
+	Client      client.Client
+	FarosClient farosclient.Client
 }
 
 // Object is the combination of two interfaces as a helper for passing
@@ -42,6 +46,12 @@ type Matcher struct {
 type Object interface {
 	runtime.Object
 	metav1.Object
+}
+
+// Apply creates or updates the object on the API server
+func (m *Matcher) Apply(obj Object, opts *farosclient.ApplyOptions, extras ...interface{}) gomega.GomegaAssertion {
+	err := m.FarosClient.Apply(context.TODO(), opts, obj)
+	return gomega.Expect(err, extras)
 }
 
 // Create creates the object on the API server
@@ -139,6 +149,20 @@ func WithAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	}, matcher)
 }
 
+// WithPodTemplateAnnotations returns the object's Annotations
+func WithPodTemplateAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj *appsv1.Deployment) map[string]string {
+		return obj.Spec.Template.GetAnnotations()
+	}, matcher)
+}
+
+// WithFinalizers returns the object's Annotations
+func WithFinalizers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) []string {
+		return obj.GetFinalizers()
+	}, matcher)
+}
+
 // WithOwnerReferences returns the object's OwnerReferences
 func WithOwnerReferences(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) []metav1.OwnerReference {
@@ -203,5 +227,12 @@ func WithGitTrackObjectConditionReason(matcher gtypes.GomegaMatcher) gtypes.Gome
 func WithGitTrackObjectConditionMessage(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) string {
 		return c.Message
+	}, matcher)
+}
+
+// WithSubjects returns the ClusterRoleBindings subjects
+func WithSubjects(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(crb *rbacv1.ClusterRoleBinding) []rbacv1.Subject {
+		return crb.Subjects
 	}, matcher)
 }

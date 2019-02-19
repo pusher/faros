@@ -310,39 +310,6 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	return reconcile.Result{}, nil
 }
 
-// recreateChild first deletes and then creates a child resource for a (Cluster)GitTrackObject
-func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) (bool, error) {
-	originalResourceVersion := found.GetResourceVersion()
-	force := true
-	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
-	if err != nil {
-		return false, fmt.Errorf("unable to re-create child: %v", err)
-	}
-
-	// Not updated if the resource version hasn't changed
-	if originalResourceVersion == child.GetResourceVersion() {
-		return false, nil
-	}
-
-	return true, nil
-}
-
-// updateChild updates the given child resource of a (Cluster)GitTrackObject
-func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) (bool, error) {
-	// Update the child resource on the API
-	originalResourceVersion := found.GetResourceVersion()
-	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
-	if err != nil {
-		return false, fmt.Errorf("unable to update child resource: %v", err)
-	}
-
-	// Not updated if the resource version hasn't changed
-	if originalResourceVersion == child.GetResourceVersion() {
-		return false, nil
-	}
-	return true, nil
-}
-
 // getInstance fetches the requested (Cluster)GitTrackObject from the API server
 func (r *ReconcileGitTrackObject) getInstance(request reconcile.Request) (farosv1alpha1.GitTrackObjectInterface, error) {
 	var instance farosv1alpha1.GitTrackObjectInterface

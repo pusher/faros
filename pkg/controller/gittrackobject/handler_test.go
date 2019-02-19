@@ -24,12 +24,11 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
-	"github.com/pusher/faros/pkg/utils"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -56,7 +55,10 @@ var _ = Describe("Handler Suite", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		m = testutils.Matcher{Client: mgr.GetClient()}
+		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
+		Expect(err).NotTo(HaveOccurred())
+
+		m = testutils.Matcher{Client: mgr.GetClient(), FarosClient: applier}
 
 		recFn := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
@@ -113,7 +115,7 @@ var _ = Describe("Handler Suite", func() {
 				It("should add a last applied annotation to the child", func() {
 					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).
-						Should(testutils.WithAnnotations(HaveKey(utils.LastAppliedAnnotation)))
+						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
 				})
 			})
 
@@ -134,7 +136,7 @@ var _ = Describe("Handler Suite", func() {
 
 				It("should add a last applied annotation to the child", func() {
 					m.Eventually(child, timeout).
-						Should(testutils.WithAnnotations(HaveKey(utils.LastAppliedAnnotation)))
+						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
 				})
 			})
 
@@ -145,14 +147,8 @@ var _ = Describe("Handler Suite", func() {
 				BeforeEach(func() {
 					child.Spec.Template.SetAnnotations(map[string]string{"updated": "annotations"})
 					child.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackObjectOwnerRef(gto)})
-					u := unstructured.Unstructured{}
-					Expect(r.scheme.Convert(child, &u, nil)).To(Succeed())
-					utils.SetLastAppliedAnnotation(&u, u.DeepCopy())
-					m.Create(&u).Should(Succeed())
+					m.Apply(child, &farosclient.ApplyOptions{}).Should(Succeed())
 					m.Get(child, timeout).Should(Succeed())
-
-					// Required until controller-runtime#212 gets released
-					child.SetGroupVersionKind(u.GroupVersionKind())
 
 					originalVersion = child.GetResourceVersion()
 					originalUID = child.GetUID()
@@ -175,7 +171,7 @@ var _ = Describe("Handler Suite", func() {
 					})
 
 					It("should not replace the child", func() {
-						m.Consistently(child).Should(testutils.WithUID(Equal(originalUID)))
+						m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
 					})
 				})
 
@@ -192,28 +188,34 @@ var _ = Describe("Handler Suite", func() {
 					})
 
 					It("should not update the child", func() {
-						m.Consistently(child).Should(testutils.WithResourceVersion(Equal(originalVersion)))
+						m.Consistently(child, consistentlyTimeout).Should(testutils.WithPodTemplateAnnotations(HaveKeyWithValue("updated", "annotations")))
 					})
 
 					It("should not replace the child", func() {
-						m.Consistently(child).Should(testutils.WithUID(Equal(originalUID)))
+						m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
 					})
 				})
 
 				Context("recreate", func() {
-					BeforeEach(func() {
-						specData := testutils.ExampleDeployment.DeepCopy()
-						annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
-						specData.SetAnnotations(annotations)
-						Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+					Context("without conflicts", func() {
+						BeforeEach(func() {
+							specData := testutils.ExampleDeployment.DeepCopy()
+							annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
+							specData.SetAnnotations(annotations)
+							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
 
-						m.Update(gto, timeout).Should(Succeed())
-						result = r.handleGitTrackObject(gto)
-						Expect(result.inSyncError).To(BeNil())
-					})
+							m.Update(gto, timeout).Should(Succeed())
+							result = r.handleGitTrackObject(gto)
+							Expect(result.inSyncError).To(BeNil())
+						})
 
-					It("should replace the child", func() {
-						m.Eventually(child, timeout).Should(testutils.WithUID(Not(Equal(originalUID))))
+						It("should update the child", func() {
+							m.Eventually(child, timeout).Should(testutils.WithResourceVersion(Not(Equal(originalVersion))))
+						})
+
+						It("should not replace the child", func() {
+							m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
+						})
 					})
 				})
 			})
@@ -253,7 +255,7 @@ var _ = Describe("Handler Suite", func() {
 				It("should add a last applied annotation to the child", func() {
 					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).
-						Should(testutils.WithAnnotations(HaveKey(utils.LastAppliedAnnotation)))
+						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
 				})
 			})
 
@@ -274,7 +276,7 @@ var _ = Describe("Handler Suite", func() {
 
 				It("should add a last applied annotation to the child", func() {
 					m.Eventually(child, timeout).
-						Should(testutils.WithAnnotations(HaveKey(utils.LastAppliedAnnotation)))
+						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
 				})
 			})
 
@@ -285,14 +287,8 @@ var _ = Describe("Handler Suite", func() {
 				BeforeEach(func() {
 					child.Subjects = []rbacv1.Subject{}
 					child.SetOwnerReferences([]metav1.OwnerReference{testutils.GetClusterGitTrackObjectOwnerRef(gto)})
-					u := unstructured.Unstructured{}
-					Expect(r.scheme.Convert(child, &u, nil)).To(Succeed())
-					utils.SetLastAppliedAnnotation(&u, u.DeepCopy())
-					m.Create(&u).Should(Succeed())
-					m.Get(child, timeout).Should(Succeed())
-
-					// Required until controller-runtime#212 gets released
-					child.SetGroupVersionKind(u.GroupVersionKind())
+					m.Apply(child, &farosclient.ApplyOptions{}).Should(Succeed())
+					m.Eventually(child, timeout).Should(testutils.WithSubjects(BeEmpty()))
 
 					originalVersion = child.GetResourceVersion()
 					originalUID = child.GetUID()
@@ -315,7 +311,7 @@ var _ = Describe("Handler Suite", func() {
 					})
 
 					It("should not replace the child", func() {
-						m.Consistently(child).Should(testutils.WithUID(Equal(originalUID)))
+						m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
 					})
 				})
 
@@ -332,28 +328,41 @@ var _ = Describe("Handler Suite", func() {
 					})
 
 					It("should not update the child", func() {
-						m.Consistently(child).Should(testutils.WithResourceVersion(Equal(originalVersion)))
+						m.Consistently(child, consistentlyTimeout).Should(testutils.WithSubjects(BeEmpty()))
 					})
 
 					It("should not replace the child", func() {
-						m.Consistently(child).Should(testutils.WithUID(Equal(originalUID)))
+						m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
 					})
 				})
 
 				Context("recreate", func() {
-					BeforeEach(func() {
-						specData := testutils.ExampleClusterRoleBinding.DeepCopy()
-						annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
-						specData.SetAnnotations(annotations)
-						Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+					Context("with conflicts", func() {
+						BeforeEach(func() {
+							specData := testutils.ExampleClusterRoleBinding.DeepCopy()
+							// Create a conflict (this field is immutable)
+							specData.RoleRef.Name = "changed"
+							annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
+							specData.SetAnnotations(annotations)
+							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
 
-						m.Update(gto, timeout).Should(Succeed())
-						result = r.handleGitTrackObject(gto)
-						Expect(result.inSyncError).To(BeNil())
-					})
+							go func() {
+								defer GinkgoRecover()
+								// We are expecting a delete but we have no GC so have to do it manually
+								m.Eventually(child, timeout).Should(testutils.WithFinalizers(ContainElement("foregroundDeletion")))
+								child.SetFinalizers([]string{})
+								m.Update(child).Should(Succeed())
+								m.Get(child, timeout).ShouldNot(Succeed())
+							}()
 
-					It("should replace the child", func() {
-						m.Eventually(child, timeout).Should(testutils.WithUID(Not(Equal(originalUID))))
+							m.Update(gto, timeout).Should(Succeed())
+							result = r.handleGitTrackObject(gto)
+							Expect(result.inSyncError).To(BeNil())
+						})
+
+						It("should replace the child", func() {
+							m.Eventually(child, timeout).Should(testutils.WithUID(Not(Equal(originalUID))))
+						})
 					})
 				})
 			})
