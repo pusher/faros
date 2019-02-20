@@ -76,9 +76,7 @@ var _ = Describe("Status Suite", func() {
 		var opts *statusOpts
 
 		BeforeEach(func() {
-			opts = &statusOpts{
-				inSyncReason: gittrackobjectutils.ChildAppliedSuccess,
-			}
+			opts = &statusOpts{}
 		})
 
 		Context("with a GitTrackObject", func() {

@@ -43,6 +43,7 @@ var _ = Describe("Handler Suite", func() {
 	var stopInformers chan struct{}
 
 	const timeout = time.Second * 5
+	const consistentlyTimeout = time.Second
 
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a

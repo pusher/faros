@@ -23,6 +23,7 @@ import (
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	"github.com/pusher/faros/pkg/utils"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	corev1 "k8s.io/api/core/v1"
@@ -56,6 +57,16 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 		}
 	}
 
+	// Make sure to watch the child resource (does nothing if the resource is
+	// already being watched)
+	err = r.watch(*child)
+	if err != nil {
+		return handlerResult{
+			inSyncReason: gittrackobjectutils.ErrorWatchingChild,
+			inSyncError:  fmt.Errorf("unable to create watch: %v", err),
+		}
+	}
+
 	// Add an owner reference to the child object
 	err = controllerutil.SetControllerReference(gto, child, r.scheme)
 	if err != nil {
@@ -80,7 +91,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 			}
 		}
 
-		// Successfully error creating child
+		// Successfully created child
 		return handlerResult{}
 	} else if err != nil {
 		return handlerResult{
@@ -227,4 +238,15 @@ func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstruc
 		return false, nil
 	}
 	return true, nil
+}
+
+// sendEvent wraps event recording to make sure the namespace is set correctly
+// on all events
+func (r *ReconcileGitTrackObject) sendEvent(gto farosv1alpha1.GitTrackObjectInterface, eventType, reason, messageFmt string, args ...interface{}) {
+	instance := gto.DeepCopyInterface()
+	if instance.GetNamespace() == "" {
+		instance.SetNamespace(farosflags.Namespace)
+	}
+
+	r.recorder.Eventf(instance, eventType, reason, messageFmt, args...)
 }

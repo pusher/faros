@@ -26,21 +26,17 @@ import (
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
-	farosflags "github.com/pusher/faros/pkg/flags"
+
 	"github.com/pusher/faros/pkg/utils"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -186,26 +182,7 @@ func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 // +kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	var instance farosv1alpha1.GitTrackObjectInterface
-	sOpts := newStatusOpts()
-	mOpts := newMetricOpts()
-
-	// Update the GitTrackObject status when we leave this function
-	defer func() {
-		err := r.updateStatus(instance, sOpts)
-		mErr := r.updateMetrics(instance, mOpts)
-		// Print out any errors that may have occurred
-		for _, e := range []error{
-			err,
-			mErr,
-			sOpts.inSyncError,
-		} {
-			if e != nil {
-				log.Printf("%v", e)
-			}
-		}
-	}()
-
+	// Fetch the GTO requested
 	instance, err := r.getInstance(request)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -217,97 +194,13 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
-	// Generate the child from the spec
-	child := &unstructured.Unstructured{}
-	*child, err = utils.YAMLToUnstructured(instance.GetSpec().Data)
-	if err != nil {
-		sOpts.inSyncReason = gittrackobjectutils.ErrorUnmarshallingData
-		sOpts.inSyncError = fmt.Errorf("unable to unmarshal data: %v", err)
-		r.sendEvent(instance, apiv1.EventTypeWarning, "UnmarshalFailed", "Couldn't unmarshal object from JSON/YAML")
-		return reconcile.Result{}, sOpts.inSyncError
-	}
-	if child.GetName() == "" {
-		sOpts.inSyncReason = gittrackobjectutils.ErrorGettingChild
-		sOpts.inSyncError = fmt.Errorf("unable to get child: name cannot be empty")
-		return reconcile.Result{}, nil
-	}
+	// Create new opts structs for updating status and metrics
+	result := r.handleGitTrackObject(instance)
+	r.updateStatus(instance, &statusOpts{inSyncError: result.inSyncError, inSyncReason: result.inSyncReason})
+	inSync := result.inSyncError == nil
+	r.updateMetrics(instance, &metricsOpts{inSync: inSync})
 
-	// Make sure to watch the child resource (does nothing if the resource is
-	// already being watched
-	err = r.watch(*child)
-	if err != nil {
-		sOpts.inSyncReason = gittrackobjectutils.ErrorWatchingChild
-		sOpts.inSyncError = fmt.Errorf("unable to create watch: %v", err)
-		return reconcile.Result{}, sOpts.inSyncError
-	}
-
-	err = controllerutil.SetControllerReference(instance, child, r.scheme)
-	if err != nil {
-		sOpts.inSyncReason = gittrackobjectutils.ErrorAddingOwnerReference
-		sOpts.inSyncError = fmt.Errorf("unable to add owner reference: %v", err)
-		return reconcile.Result{}, sOpts.inSyncError
-	}
-
-	// Construct holder for API copy of child
-	found := &unstructured.Unstructured{}
-	found.SetKind(child.GetKind())
-	found.SetAPIVersion(child.GetAPIVersion())
-
-	// Check if the Child already exists
-	err = r.Get(context.TODO(), types.NamespacedName{Name: child.GetName(), Namespace: child.GetNamespace()}, found)
-	if err != nil && errors.IsNotFound(err) {
-		// Not found, so create child
-		log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
-		r.sendEvent(instance, apiv1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
-		if err != nil {
-			sOpts.inSyncReason = gittrackobjectutils.ErrorCreatingChild
-			sOpts.inSyncError = fmt.Errorf("unable to create child: %v", err)
-			r.sendEvent(instance, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-			return reconcile.Result{}, sOpts.inSyncError
-		}
-		r.sendEvent(instance, apiv1.EventTypeNormal, "CreateSuccessful", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		// Just created the object from the child, no need to check for update
-		return reconcile.Result{}, nil
-	} else if err != nil {
-		sOpts.inSyncReason = gittrackobjectutils.ErrorGettingChild
-		sOpts.inSyncError = fmt.Errorf("unable to get child: %v", err)
-		return reconcile.Result{}, sOpts.inSyncError
-	}
-
-	updateStrategy, err := gittrackobjectutils.GetUpdateStrategy(child)
-	if err != nil {
-		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-		sOpts.inSyncError = fmt.Errorf("unable to get update strategy: %v", err)
-		return reconcile.Result{}, sOpts.inSyncError
-	}
-
-	if updateStrategy == gittrackobjectutils.NeverUpdateStrategy {
-		log.Printf("Update strategy for %s set to never, ignoring", found.GetName())
-		// If we aren't updating the resource we should assume the resource is in sync
-		mOpts.inSync = true
-		return reconcile.Result{}, nil
-	}
-
-	var childUpdated bool
-	if updateStrategy == gittrackobjectutils.RecreateUpdateStrategy {
-		childUpdated, err = r.recreateChild(found, child)
-	} else {
-		childUpdated, err = r.updateChild(found, child)
-	}
-	if err != nil {
-		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-		sOpts.inSyncError = err
-		r.sendEvent(instance, apiv1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-		return reconcile.Result{}, sOpts.inSyncError
-	}
-	if childUpdated {
-		r.sendEvent(instance, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-	}
-
-	// If we got here everything is good so the object must be in-sync
-	mOpts.inSync = true
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, result.inSyncError
 }
 
 // getInstance fetches the requested (Cluster)GitTrackObject from the API server
@@ -325,15 +218,4 @@ func (r *ReconcileGitTrackObject) getInstance(request reconcile.Request) (farosv
 		return nil, err
 	}
 	return instance, nil
-}
-
-// sendEvent wraps event recording to make sure the namespace is set correctly
-// on all events
-func (r *ReconcileGitTrackObject) sendEvent(gto farosv1alpha1.GitTrackObjectInterface, eventType, reason, messageFmt string, args ...interface{}) {
-	instance := gto.DeepCopyInterface()
-	if instance.GetNamespace() == "" {
-		instance.SetNamespace(farosflags.Namespace)
-	}
-
-	r.recorder.Eventf(instance, eventType, reason, messageFmt, args...)
 }
