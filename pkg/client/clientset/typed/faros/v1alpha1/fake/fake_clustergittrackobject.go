@@ -123,7 +123,7 @@ func (c *FakeClusterGitTrackObjects) DeleteCollection(options *v1.DeleteOptions,
 // Patch applies the patch and returns the patched clusterGitTrackObject.
 func (c *FakeClusterGitTrackObjects) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterGitTrackObject, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustergittrackobjectsResource, name, data, subresources...), &v1alpha1.ClusterGitTrackObject{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustergittrackobjectsResource, name, pt, data, subresources...), &v1alpha1.ClusterGitTrackObject{})
 	if obj == nil {
 		return nil, err
 	}

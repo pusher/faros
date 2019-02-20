@@ -159,6 +159,7 @@ func (p OwnersOwnerInNamespacePredicate) ownersOwnerInNamespace(ownerRefs []meta
 func NewOwnersOwnerInNamespacePredicate(client client.Client) OwnersOwnerInNamespacePredicate {
 	return OwnersOwnerInNamespacePredicate{
 		client: client,
+
 		ownerInNamespacePredicate: NewOwnerInNamespacePredicate(client),
 	}
 }
