@@ -19,7 +19,6 @@ package test
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,30 +53,6 @@ var ExampleDeployment = &appsv1.Deployment{
 					},
 				},
 			},
-		},
-	},
-}
-
-// ExampleClusterRoleBinding is an example ClusterRoleBinding object for use within test suites
-var ExampleClusterRoleBinding = &rbacv1.ClusterRoleBinding{
-	TypeMeta: metav1.TypeMeta{
-		APIVersion: "rbac.authorization.k8s.io/v1",
-		Kind:       "ClusterRoleBinding",
-	},
-	ObjectMeta: metav1.ObjectMeta{
-		Name:   "example",
-		Labels: appNginx,
-	},
-	RoleRef: rbacv1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
-		Kind:     "ClusterRole",
-		Name:     "nginx-ingress-controller",
-	},
-	Subjects: []rbacv1.Subject{
-		{
-			Kind:      "ServiceAccount",
-			Name:      "nginx-ingress-controller",
-			Namespace: "example",
 		},
 	},
 }

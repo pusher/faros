@@ -21,18 +21,13 @@ import (
 
 	"github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
-	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 // Matcher has Gomega Matchers that use the controller-runtime client
@@ -54,20 +49,6 @@ func (m *Matcher) Create(obj Object, extras ...interface{}) gomega.GomegaAsserti
 	return gomega.Expect(err, extras)
 }
 
-// Delete deletes the object from the API server
-func (m *Matcher) Delete(obj Object, extras ...interface{}) gomega.GomegaAssertion {
-	err := m.Client.Delete(context.TODO(), obj)
-	return gomega.Expect(err, extras)
-}
-
-// Update udpates the object on the API server
-func (m *Matcher) Update(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	update := func() error {
-		return m.Client.Update(context.TODO(), obj)
-	}
-	return gomega.Eventually(update, intervals...)
-}
-
 // Get gets the object from the API server
 func (m *Matcher) Get(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
 	key := types.NamespacedName{
@@ -78,96 +59,6 @@ func (m *Matcher) Get(obj Object, intervals ...interface{}) gomega.GomegaAsyncAs
 		return m.Client.Get(context.TODO(), key, obj)
 	}
 	return gomega.Eventually(get, intervals...)
-}
-
-// Consistently continually gets the object from the API for comparison
-func (m *Matcher) Consistently(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	return m.consistentlyObject(obj, intervals...)
-}
-
-// consistentlyObject gets an individual object from the API server
-func (m *Matcher) consistentlyObject(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	key := types.NamespacedName{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}
-	get := func() Object {
-		err := m.Client.Get(context.TODO(), key, obj)
-		if err != nil {
-			panic(err)
-		}
-		return obj
-	}
-	return gomega.Consistently(get, intervals...)
-}
-
-// Eventually continually gets the object from the API for comparison
-func (m *Matcher) Eventually(obj runtime.Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	// If the object is a list, return a list
-	if meta.IsListType(obj) {
-		return m.eventuallyList(obj, intervals...)
-	}
-	if o, ok := obj.(Object); ok {
-		return m.eventuallyObject(o, intervals...)
-	}
-	//Should not get here
-	panic("Unknown object.")
-}
-
-// eventuallyObject gets an individual object from the API server
-func (m *Matcher) eventuallyObject(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	key := types.NamespacedName{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}
-	get := func() Object {
-		err := m.Client.Get(context.TODO(), key, obj)
-		if err != nil {
-			panic(err)
-		}
-		return obj
-	}
-	return gomega.Eventually(get, intervals...)
-}
-
-// eventuallyList gets a list type  from the API server
-func (m *Matcher) eventuallyList(obj runtime.Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	list := func() runtime.Object {
-		err := m.Client.List(context.TODO(), &client.ListOptions{}, obj)
-		if err != nil {
-			panic(err)
-		}
-		return obj
-	}
-	return gomega.Eventually(list, intervals...)
-}
-
-// WithAnnotations returns the object's Annotations
-func WithAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(obj Object) map[string]string {
-		return obj.GetAnnotations()
-	}, matcher)
-}
-
-// WithPodTemplateAnnotations returns the object's Annotations
-func WithPodTemplateAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(obj *appsv1.Deployment) map[string]string {
-		return obj.Spec.Template.GetAnnotations()
-	}, matcher)
-}
-
-// WithPodTemplateLabels returns the object's Labels
-func WithPodTemplateLabels(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(obj *appsv1.Deployment) map[string]string {
-		return obj.Spec.Template.GetLabels()
-	}, matcher)
-}
-
-// WithFinalizers returns the object's Annotations
-func WithFinalizers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(obj Object) []string {
-		return obj.GetFinalizers()
-	}, matcher)
 }
 
 // WithKind returns the objects TypeMeta
@@ -183,13 +74,6 @@ func WithAPIVersion(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) string {
 		apiVersion, _ := obj.GroupVersionKind().ToAPIVersionAndKind()
 		return apiVersion
-	}, matcher)
-}
-
-// WithOwnerReferences returns the object's OwnerReferences
-func WithOwnerReferences(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(obj Object) []metav1.OwnerReference {
-		return obj.GetOwnerReferences()
 	}, matcher)
 }
 
@@ -218,105 +102,6 @@ func WithSelfLink(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 func WithUID(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) types.UID {
 		return obj.GetUID()
-	}, matcher)
-}
-
-// WithUnstructuredObject returns the objects inner object
-func WithUnstructuredObject(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(ev event.GenericEvent) unstructured.Unstructured {
-		u, ok := ev.Object.(*unstructured.Unstructured)
-		if !ok {
-			panic("Non unstructured object")
-		}
-		return *u
-	}, matcher)
-}
-
-// WithGitTrackObjectStatusConditions returns the GitTrackObjects status conditions
-func WithGitTrackObjectStatusConditions(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(gto farosv1alpha1.GitTrackObjectInterface) []farosv1alpha1.GitTrackObjectCondition {
-		return gto.GetStatus().Conditions
-	}, matcher)
-}
-
-// WithGitTrackObjectConditionType returns the GitTrackObjectsCondition's type
-func WithGitTrackObjectConditionType(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) farosv1alpha1.GitTrackObjectConditionType {
-		return c.Type
-	}, matcher)
-}
-
-// WithGitTrackObjectConditionStatus returns the GitTrackObjectsCondition's status
-func WithGitTrackObjectConditionStatus(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) corev1.ConditionStatus {
-		return c.Status
-	}, matcher)
-}
-
-// WithGitTrackObjectConditionReason returns the GitTrackObjectsCondition's reason
-func WithGitTrackObjectConditionReason(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) string {
-		return c.Reason
-	}, matcher)
-}
-
-// WithGitTrackObjectConditionMessage returns the GitTrackObjectsCondition's message
-func WithGitTrackObjectConditionMessage(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) string {
-		return c.Message
-	}, matcher)
-}
-
-// WithItems returns the lists Items
-func WithItems(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(obj runtime.Object) []runtime.Object {
-		items, err := meta.ExtractList(obj)
-		if err != nil {
-			panic(err)
-		}
-		return items
-	}, matcher)
-}
-
-// WithSubjects returns the ClusterRoleBindings subjects
-func WithSubjects(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(crb *rbacv1.ClusterRoleBinding) []rbacv1.Subject {
-		return crb.Subjects
-	}, matcher)
-}
-
-// WithInvolvedObjectKind returns the event's InvolvedObject's Kind
-func WithInvolvedObjectKind(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(ev *corev1.Event) string {
-		return ev.InvolvedObject.Kind
-	}, matcher)
-}
-
-// WithInvolvedObjectName returns the event's InvolvedObject's Name
-func WithInvolvedObjectName(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(ev *corev1.Event) string {
-		return ev.InvolvedObject.Name
-	}, matcher)
-}
-
-// WithInvolvedObjectNamespace returns the event's InvolvedObject's Namespace
-func WithInvolvedObjectNamespace(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(ev *corev1.Event) string {
-		return ev.InvolvedObject.Namespace
-	}, matcher)
-}
-
-// WithReason returns the event's Reason
-func WithReason(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(ev *corev1.Event) string {
-		return ev.Reason
-	}, matcher)
-}
-
-// WithEventType returns the event's Type
-func WithEventType(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
-	return gomega.WithTransform(func(ev *corev1.Event) string {
-		return ev.Type
 	}, matcher)
 }
 
