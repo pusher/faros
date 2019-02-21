@@ -118,6 +118,7 @@ type ApplyOptions struct {
 	CascadeDeletion     *bool
 	DeletionTimeout     *time.Duration
 	DeletionGracePeriod *int
+	ServerDryRun        *bool
 }
 
 // Complete defaults valus within the ApplyOptions struct
@@ -128,6 +129,7 @@ func (a *ApplyOptions) Complete() {
 	cascadeDeletion := true
 	deletionTimeout := time.Duration(30 * time.Second)
 	deletionGracePeriod := -1
+	serverDryRun := false
 
 	if a.Overwrite == nil {
 		a.Overwrite = &overwrite
@@ -143,6 +145,9 @@ func (a *ApplyOptions) Complete() {
 	}
 	if a.DeletionGracePeriod == nil {
 		a.DeletionGracePeriod = &deletionGracePeriod
+	}
+	if a.ServerDryRun == nil {
+		a.ServerDryRun = &serverDryRun
 	}
 }
 

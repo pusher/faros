@@ -182,6 +182,20 @@ func WithResourceVersion(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	}, matcher)
 }
 
+// WithCreationTimestamp returns the object's CreationTimestamp
+func WithCreationTimestamp(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) metav1.Time {
+		return obj.GetCreationTimestamp()
+	}, matcher)
+}
+
+// WithSelfLink returns the object's SelfLink
+func WithSelfLink(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) string {
+		return obj.GetSelfLink()
+	}, matcher)
+}
+
 // WithUID returns the object's UID
 func WithUID(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) types.UID {

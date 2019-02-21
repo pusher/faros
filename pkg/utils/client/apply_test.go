@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/pkg/utils/client/test"
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -68,11 +69,37 @@ var _ = Describe("Applier Suite", func() {
 
 	Describe("when the deployment does not exist", func() {
 		BeforeEach(func() {
-			a.Apply(context.TODO(), o, deployment)
+			Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
 		})
 
 		It("creates the deployment", func() {
 			m.Get(deployment, timeout).Should(Succeed())
+		})
+
+		It("should default the deployment object", func() {
+			Expect(deployment).ShouldNot(test.WithUID(BeEmpty()))
+			Expect(deployment).ShouldNot(test.WithResourceVersion(BeEmpty()))
+			Expect(deployment).ShouldNot(test.WithCreationTimestamp(Equal(metav1.Time{})))
+			Expect(deployment).ShouldNot(test.WithSelfLink(BeEmpty()))
+		})
+
+		Context("with ServerDryRun true", func() {
+			BeforeEach(func() {
+				serverDryRun := true
+				o.ServerDryRun = &serverDryRun
+				Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
+			})
+
+			It("not to create the deployment", func() {
+				m.Get(deployment, timeout).ShouldNot(Succeed())
+			})
+
+			It("should default the deployment object", func() {
+				Expect(deployment).ShouldNot(test.WithUID(BeEmpty()))
+				Expect(deployment).ShouldNot(test.WithResourceVersion(BeEmpty()))
+				Expect(deployment).ShouldNot(test.WithCreationTimestamp(Equal(metav1.Time{})))
+				Expect(deployment).ShouldNot(test.WithSelfLink(BeEmpty()))
+			})
 		})
 	})
 })
