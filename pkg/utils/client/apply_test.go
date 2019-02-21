@@ -68,19 +68,35 @@ var _ = Describe("Applier Suite", func() {
 	})
 
 	Describe("when the deployment does not exist", func() {
-		BeforeEach(func() {
-			Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
-		})
+		Context("with default options", func() {
+			BeforeEach(func() {
+				Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
+			})
 
-		It("creates the deployment", func() {
-			m.Get(deployment, timeout).Should(Succeed())
-		})
+			It("creates the deployment", func() {
+				m.Get(deployment, timeout).Should(Succeed())
+			})
 
-		It("should default the deployment object", func() {
-			Expect(deployment).ShouldNot(test.WithUID(BeEmpty()))
-			Expect(deployment).ShouldNot(test.WithResourceVersion(BeEmpty()))
-			Expect(deployment).ShouldNot(test.WithCreationTimestamp(Equal(metav1.Time{})))
-			Expect(deployment).ShouldNot(test.WithSelfLink(BeEmpty()))
+			It("the local deployment matches the server deployment", func() {
+				serverDeployment := test.ExampleDeployment.DeepCopy()
+				m.Get(serverDeployment, timeout).Should(Succeed())
+				Expect(serverDeployment).To(Equal(deployment))
+			})
+
+			It("should default the deployment object", func() {
+				Expect(deployment).ShouldNot(test.WithUID(BeEmpty()))
+				Expect(deployment).ShouldNot(test.WithResourceVersion(BeEmpty()))
+				Expect(deployment).ShouldNot(test.WithCreationTimestamp(Equal(metav1.Time{})))
+				Expect(deployment).ShouldNot(test.WithSelfLink(BeEmpty()))
+			})
+
+			It("sets the correct Kind on the deployment", func() {
+				Expect(deployment).Should(test.WithKind(Equal("Deployment")))
+			})
+
+			It("sets the correct APIVersion on the deployment", func() {
+				Expect(deployment).Should(test.WithAPIVersion(Equal("apps/v1")))
+			})
 		})
 
 		Context("with ServerDryRun true", func() {
@@ -96,9 +112,80 @@ var _ = Describe("Applier Suite", func() {
 
 			It("should default the deployment object", func() {
 				Expect(deployment).ShouldNot(test.WithUID(BeEmpty()))
-				Expect(deployment).ShouldNot(test.WithResourceVersion(BeEmpty()))
 				Expect(deployment).ShouldNot(test.WithCreationTimestamp(Equal(metav1.Time{})))
 				Expect(deployment).ShouldNot(test.WithSelfLink(BeEmpty()))
+			})
+		})
+	})
+
+	Describe("when the deployment already exists", func() {
+		BeforeEach(func() {
+			m.Create(deployment.DeepCopy()).Should(Succeed())
+		})
+
+		Context("and the deployment is modified", func() {
+			BeforeEach(func() {
+				Expect(deployment).Should(test.WithContainers(HaveLen(1)))
+				Expect(deployment).Should(test.WithContainers(ContainElement(test.WithImage(Equal("nginx")))))
+				deployment.Spec.Template.Spec.Containers[0].Image = "nginx:latest"
+			})
+
+			Context("with default options", func() {
+				BeforeEach(func() {
+					Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
+				})
+
+				It("should update the container's image", func() {
+					Expect(deployment).Should(test.WithContainers(SatisfyAll(
+						ContainElement(test.WithImage(Equal("nginx:latest"))),
+						Not(ContainElement(test.WithImage(Equal("nginx")))),
+					)))
+				})
+
+				It("the local deployment matches the server deployment", func() {
+					serverDeployment := test.ExampleDeployment.DeepCopy()
+					m.Get(serverDeployment, timeout).Should(Succeed())
+					Expect(serverDeployment).To(Equal(deployment))
+				})
+
+				It("sets the correct Kind on the deployment", func() {
+					Expect(deployment).Should(test.WithKind(Equal("Deployment")))
+				})
+
+				It("sets the correct APIVersion on the deployment", func() {
+					Expect(deployment).Should(test.WithAPIVersion(Equal("apps/v1")))
+				})
+			})
+
+			Context("with ServerDryRun true", func() {
+				BeforeEach(func() {
+					serverDryRun := true
+					o.ServerDryRun = &serverDryRun
+					Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
+				})
+
+				It("should default the deployment object", func() {
+					Expect(deployment).ShouldNot(test.WithUID(BeEmpty()))
+					Expect(deployment).ShouldNot(test.WithCreationTimestamp(Equal(metav1.Time{})))
+					Expect(deployment).ShouldNot(test.WithSelfLink(BeEmpty()))
+				})
+
+				It("should not modify the local container's image", func() {
+					Expect(deployment).Should(test.WithContainers(SatisfyAll(
+						ContainElement(test.WithImage(Equal("nginx:latest"))),
+						Not(ContainElement(test.WithImage(Equal("nginx")))),
+					)))
+				})
+
+				It("should not update the server container's image", func() {
+					// Get the deployment from the server to check nothing updated
+					m.Get(deployment).Should(Succeed())
+
+					Expect(deployment).Should(test.WithContainers(SatisfyAll(
+						ContainElement(test.WithImage(Equal("nginx"))),
+						Not(ContainElement(test.WithImage(Equal("nginx:latest")))),
+					)))
+				})
 			})
 		})
 	})

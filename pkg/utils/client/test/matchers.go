@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -44,6 +45,7 @@ type Matcher struct {
 type Object interface {
 	runtime.Object
 	metav1.Object
+	schema.ObjectKind
 }
 
 // Create creates the object on the API server
@@ -165,6 +167,22 @@ func WithPodTemplateLabels(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 func WithFinalizers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) []string {
 		return obj.GetFinalizers()
+	}, matcher)
+}
+
+// WithKind returns the objects TypeMeta
+func WithKind(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) string {
+		_, kind := obj.GroupVersionKind().ToAPIVersionAndKind()
+		return kind
+	}, matcher)
+}
+
+// WithAPIVersion returns the objects TypeMeta
+func WithAPIVersion(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj Object) string {
+		apiVersion, _ := obj.GroupVersionKind().ToAPIVersionAndKind()
+		return apiVersion
 	}, matcher)
 }
 
