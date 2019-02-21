@@ -74,16 +74,22 @@ test:
   - script:
       name: Setup Test environment
       code: |
+        export version=1.0.8 # latest stable version
+        export arch=amd64
+
+        # download the release
+        curl -L -O "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_${arch}.tar.gz"
+        tar -zxvf kubebuilder_${version}_linux_${arch}.tar.gz
+
         export TEST_ASSET_DIR=/usr/local/bin
         export TEST_ASSET_KUBECTL=$TEST_ASSET_DIR/kubectl
         export TEST_ASSET_KUBE_APISERVER=$TEST_ASSET_DIR/kube-apiserver
         export TEST_ASSET_ETCD=$TEST_ASSET_DIR/etcd
 
-        # Download test framework binaries
-        export TEST_ASSET_URL=https://storage.googleapis.com/k8s-c10s-test-binaries
-        curl $TEST_ASSET_URL/etcd-Linux-x86_64 --output $TEST_ASSET_ETCD
-        curl $TEST_ASSET_URL/kube-apiserver-Linux-x86_64 --output $TEST_ASSET_KUBE_APISERVER
-        curl https://storage.googleapis.com/kubernetes-release/release/v1.9.2/bin/linux/amd64/kubectl --output $TEST_ASSET_KUBECTL
+        mv kubebuilder_${version}_linux_${arch}/bin/etcd $TEST_ASSET_ETCD
+        mv kubebuilder_${version}_linux_${arch}/bin/kube-apiserver $TEST_ASSET_KUBE_APISERVER
+        mv kubebuilder_${version}_linux_${arch}/bin/kubectl $TEST_ASSET_KUBECTL
+
         chmod +x $TEST_ASSET_ETCD
         chmod +x $TEST_ASSET_KUBE_APISERVER
         chmod +x $TEST_ASSET_KUBECTL
