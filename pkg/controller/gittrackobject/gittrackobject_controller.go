@@ -109,7 +109,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		src := &source.Channel{
 			Source: gtoReconciler.EventStream(),
 		}
-		src.InjectStopChannel(gtoReconciler.StopChan())
 
 		restMapper, err := utils.NewRestMapper(mgr.GetConfig())
 		if err != nil {

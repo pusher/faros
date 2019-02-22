@@ -60,6 +60,12 @@ func (m *Matcher) Create(obj Object, extras ...interface{}) gomega.GomegaAsserti
 	return gomega.Expect(err, extras)
 }
 
+// Delete deletes the object from the API server
+func (m *Matcher) Delete(obj Object, extras ...interface{}) gomega.GomegaAssertion {
+	err := m.Client.Delete(context.TODO(), obj)
+	return gomega.Expect(err, extras)
+}
+
 // Update udpates the object on the API server
 func (m *Matcher) Update(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
 	update := func() error {
@@ -156,10 +162,24 @@ func WithPodTemplateAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatch
 	}, matcher)
 }
 
+// WithPodTemplateLabels returns the object's Labels
+func WithPodTemplateLabels(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj *appsv1.Deployment) map[string]string {
+		return obj.Spec.Template.GetLabels()
+	}, matcher)
+}
+
 // WithFinalizers returns the object's Annotations
 func WithFinalizers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) []string {
 		return obj.GetFinalizers()
+	}, matcher)
+}
+
+// WithNamespaceFinalizers returns the namespace's finazliers
+func WithNamespaceFinalizers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(ns *corev1.Namespace) []corev1.FinalizerName {
+		return ns.Spec.Finalizers
 	}, matcher)
 }
 
@@ -230,9 +250,69 @@ func WithGitTrackObjectConditionMessage(matcher gtypes.GomegaMatcher) gtypes.Gom
 	}, matcher)
 }
 
+// WithItems returns the lists Items
+func WithItems(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(obj runtime.Object) []runtime.Object {
+		items, err := meta.ExtractList(obj)
+		if err != nil {
+			panic(err)
+		}
+		return items
+	}, matcher)
+}
+
 // WithSubjects returns the ClusterRoleBindings subjects
 func WithSubjects(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(crb *rbacv1.ClusterRoleBinding) []rbacv1.Subject {
 		return crb.Subjects
+	}, matcher)
+}
+
+// WithInvolvedObjectKind returns the event's InvolvedObject's Kind
+func WithInvolvedObjectKind(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(ev *corev1.Event) string {
+		return ev.InvolvedObject.Kind
+	}, matcher)
+}
+
+// WithInvolvedObjectName returns the event's InvolvedObject's Name
+func WithInvolvedObjectName(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(ev *corev1.Event) string {
+		return ev.InvolvedObject.Name
+	}, matcher)
+}
+
+// WithInvolvedObjectNamespace returns the event's InvolvedObject's Namespace
+func WithInvolvedObjectNamespace(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(ev *corev1.Event) string {
+		return ev.InvolvedObject.Namespace
+	}, matcher)
+}
+
+// WithReason returns the event's Reason
+func WithReason(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(ev *corev1.Event) string {
+		return ev.Reason
+	}, matcher)
+}
+
+// WithEventType returns the event's Type
+func WithEventType(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(ev *corev1.Event) string {
+		return ev.Type
+	}, matcher)
+}
+
+// WithContainers returns the deployments Containers
+func WithContainers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(dep *appsv1.Deployment) []corev1.Container {
+		return dep.Spec.Template.Spec.Containers
+	}, matcher)
+}
+
+// WithImage returns the container's image
+func WithImage(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	return gomega.WithTransform(func(c corev1.Container) string {
+		return c.Image
 	}, matcher)
 }
