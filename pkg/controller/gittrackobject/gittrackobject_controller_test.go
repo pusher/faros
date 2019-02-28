@@ -412,12 +412,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 				})
 
 				Context("if the child meta is modified", func() {
-					BeforeEach(func() {
-
-					})
-
-					It("should reset the child to the desired state", func() {
-
+					PIt("should reset the child to the desired state", func() {
 					})
 				})
 			})
