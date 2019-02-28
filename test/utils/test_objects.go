@@ -156,37 +156,6 @@ var ExampleDeployment = &appsv1.Deployment{
 	},
 }
 
-// ExampleDeployment2 is an example Deployment object for use within test suites
-var ExampleDeployment2 = &appsv1.Deployment{
-	TypeMeta: metav1.TypeMeta{
-		APIVersion: "apps/v1",
-		Kind:       "Deployment",
-	},
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "example",
-		Namespace: "default",
-		Labels:    appNginx,
-	},
-	Spec: appsv1.DeploymentSpec{
-		Selector: &metav1.LabelSelector{
-			MatchLabels: appNginx,
-		},
-		Template: corev1.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: appNginx,
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  "nginx",
-						Image: "nginx:latest",
-					},
-				},
-			},
-		},
-	},
-}
-
 // ExampleClusterRoleBinding is an example ClusterRoleBinding object for use within test suites
 var ExampleClusterRoleBinding = &rbacv1.ClusterRoleBinding{
 	TypeMeta: metav1.TypeMeta{
@@ -196,32 +165,6 @@ var ExampleClusterRoleBinding = &rbacv1.ClusterRoleBinding{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:   "example",
 		Labels: appNginx,
-	},
-	RoleRef: rbacv1.RoleRef{
-		APIGroup: "rbac.authorization.k8s.io",
-		Kind:     "ClusterRole",
-		Name:     "nginx-ingress-controller",
-	},
-	Subjects: []rbacv1.Subject{
-		{
-			Kind:      "ServiceAccount",
-			Name:      "nginx-ingress-controller",
-			Namespace: "example",
-		},
-	},
-}
-
-// ExampleClusterRoleBinding2 is an example ClusterRoleBinding object for use within test suites
-var ExampleClusterRoleBinding2 = &rbacv1.ClusterRoleBinding{
-	TypeMeta: metav1.TypeMeta{
-		APIVersion: "rbac.authorization.k8s.io/v1",
-		Kind:       "ClusterRoleBinding",
-	},
-	ObjectMeta: metav1.ObjectMeta{
-		Name: "example",
-		Labels: map[string]string{
-			"some.controller/enable-some-feature": "true",
-		},
 	},
 	RoleRef: rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
