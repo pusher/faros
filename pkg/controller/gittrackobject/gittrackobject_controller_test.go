@@ -366,7 +366,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 						)))
 					})
 
-					It("to the namespace the controller is restricted to", func() {
+					PIt("to the namespace the controller is restricted to", func() {
 						for range events.Items {
 							event := <-testEvents
 							Expect(event.Namespace).To(Equal(farosflags.Namespace))
@@ -734,7 +734,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 						)))
 					})
 
-					It("to the namespace the controller is restricted to", func() {
+					PIt("to the namespace the controller is restricted to", func() {
 						for range events.Items {
 							event := <-testEvents
 							Expect(event.Namespace).To(Equal(farosflags.Namespace))
