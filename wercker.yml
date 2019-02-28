@@ -17,7 +17,7 @@ dep-install:
     - script:
       name: Fetch dependencies
       code: |
-        dep ensure --vendor-only
+        dep ensure -v --vendor-only
         shopt -s dotglob
         mv ./* $WERCKER_OUTPUT_DIR
 
