@@ -17,6 +17,7 @@ limitations under the License.
 package gittrackobject
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -369,12 +370,17 @@ var _ = Describe("Handler Suite", func() {
 						})
 
 						It("should replace the child", func() {
-							m.Eventually(child, timeout).Should(testutils.WithUID(Not(Equal(originalUID))))
+							Eventually(func() error {
+								m.Get(child, timeout).Should(Succeed())
+								if child.GetUID() == originalUID {
+									return fmt.Errorf("still the same object")
+								}
+								return nil
+							}, timeout).Should(Succeed())
 						})
 					})
 				})
 			})
 		})
-
 	})
 })
