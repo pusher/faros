@@ -600,24 +600,30 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 					Context("recreate", func() {
 						Context("with conflicts", func() {
+							var childCopy *rbacv1.ClusterRoleBinding
+
 							BeforeEach(func() {
+								m.Get(gto, timeout).Should(Succeed())
 								specData := testutils.ExampleClusterRoleBinding.DeepCopy()
 								// Create a conflict (this field is immutable)
 								specData.RoleRef.Name = "changed"
 								annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
 								specData.SetAnnotations(annotations)
 								Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+								m.Update(gto, timeout).Should(Succeed())
+
+								// Keep a copy of the child, otherwise we'll run into data race issues
+								childCopy = child.DeepCopy()
 
 								go func() {
 									defer GinkgoRecover()
 									// We are expecting a delete but we have no GC so have to do it manually
-									m.Eventually(child, timeout).Should(testutils.WithFinalizers(ContainElement("foregroundDeletion")))
-									child.SetFinalizers([]string{})
-									m.Update(child).Should(Succeed())
-									m.Get(child, timeout).ShouldNot(Succeed())
+									m.Eventually(childCopy, timeout).Should(testutils.WithFinalizers(ContainElement("foregroundDeletion")))
+									childCopy.SetFinalizers([]string{})
+									m.Update(childCopy).Should(Succeed())
+									m.Get(childCopy, timeout).ShouldNot(Succeed())
 								}()
 
-								m.Update(gto, timeout).Should(Succeed())
 								Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
 							})
 

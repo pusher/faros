@@ -339,7 +339,10 @@ var _ = Describe("Handler Suite", func() {
 
 				Context("recreate", func() {
 					Context("with conflicts", func() {
+						var childCopy *rbacv1.ClusterRoleBinding
+
 						BeforeEach(func() {
+							m.Get(gto, timeout).Should(Succeed())
 							specData := testutils.ExampleClusterRoleBinding.DeepCopy()
 							// Create a conflict (this field is immutable)
 							specData.RoleRef.Name = "changed"
@@ -347,13 +350,17 @@ var _ = Describe("Handler Suite", func() {
 							specData.SetAnnotations(annotations)
 							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
 
+							// Need to create a copy here or otherwise we'll run into data race
+							// issues due to the goroutine below
+							childCopy = child.DeepCopy()
+
 							go func() {
 								defer GinkgoRecover()
 								// We are expecting a delete but we have no GC so have to do it manually
-								m.Eventually(child, timeout).Should(testutils.WithFinalizers(ContainElement("foregroundDeletion")))
-								child.SetFinalizers([]string{})
-								m.Update(child).Should(Succeed())
-								m.Get(child, timeout).ShouldNot(Succeed())
+								m.Eventually(childCopy, timeout).Should(testutils.WithFinalizers(ContainElement("foregroundDeletion")))
+								childCopy.SetFinalizers([]string{})
+								m.Update(childCopy).Should(Succeed())
+								m.Get(childCopy, timeout).ShouldNot(Succeed())
 							}()
 
 							m.Update(gto, timeout).Should(Succeed())
