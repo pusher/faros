@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// GetGitTrackObjectOwnerRef constructs an owner reference for the GTO given
+// GetGitTrackObjectOwnerRef constructs an owner reference for the given GTO
 func GetGitTrackObjectOwnerRef(gto *farosv1alpha1.GitTrackObject) metav1.OwnerReference {
 	t := true
 	return metav1.OwnerReference{
@@ -34,7 +34,7 @@ func GetGitTrackObjectOwnerRef(gto *farosv1alpha1.GitTrackObject) metav1.OwnerRe
 	}
 }
 
-// GetClusterGitTrackObjectOwnerRef constructs an owner reference for the GTO given
+// GetClusterGitTrackObjectOwnerRef constructs an owner reference for the given CGTO
 func GetClusterGitTrackObjectOwnerRef(gto *farosv1alpha1.ClusterGitTrackObject) metav1.OwnerReference {
 	t := true
 	return metav1.OwnerReference{

@@ -148,28 +148,28 @@ func (m *Matcher) eventuallyList(obj runtime.Object, intervals ...interface{}) g
 	return gomega.Eventually(list, intervals...)
 }
 
-// WithAnnotations returns the object's Annotations
+// WithAnnotations returns the object's annotations
 func WithAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) map[string]string {
 		return obj.GetAnnotations()
 	}, matcher)
 }
 
-// WithPodTemplateAnnotations returns the object's Annotations
+// WithPodTemplateAnnotations returns the object's annotations
 func WithPodTemplateAnnotations(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj *appsv1.Deployment) map[string]string {
 		return obj.Spec.Template.GetAnnotations()
 	}, matcher)
 }
 
-// WithPodTemplateLabels returns the object's Labels
+// WithPodTemplateLabels returns the object's labels
 func WithPodTemplateLabels(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj *appsv1.Deployment) map[string]string {
 		return obj.Spec.Template.GetLabels()
 	}, matcher)
 }
 
-// WithFinalizers returns the object's Annotations
+// WithFinalizers returns the object's annotations
 func WithFinalizers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) []string {
 		return obj.GetFinalizers()
@@ -183,14 +183,14 @@ func WithNamespaceFinalizers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher 
 	}, matcher)
 }
 
-// WithOwnerReferences returns the object's OwnerReferences
+// WithOwnerReferences returns the object's owner references
 func WithOwnerReferences(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) []metav1.OwnerReference {
 		return obj.GetOwnerReferences()
 	}, matcher)
 }
 
-// WithResourceVersion returns the object's ResourceVersion
+// WithResourceVersion returns the object's resource version
 func WithResourceVersion(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj Object) string {
 		return obj.GetResourceVersion()
@@ -204,7 +204,7 @@ func WithUID(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	}, matcher)
 }
 
-// WithUnstructuredObject returns the objects inner object
+// WithUnstructuredObject returns the object's inner object
 func WithUnstructuredObject(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(ev event.GenericEvent) unstructured.Unstructured {
 		u, ok := ev.Object.(*unstructured.Unstructured)
@@ -215,42 +215,42 @@ func WithUnstructuredObject(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	}, matcher)
 }
 
-// WithGitTrackObjectStatusConditions returns the GitTrackObjects status conditions
+// WithGitTrackObjectStatusConditions returns the GitTrackObject's status conditions
 func WithGitTrackObjectStatusConditions(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(gto farosv1alpha1.GitTrackObjectInterface) []farosv1alpha1.GitTrackObjectCondition {
 		return gto.GetStatus().Conditions
 	}, matcher)
 }
 
-// WithGitTrackObjectConditionType returns the GitTrackObjectsCondition's type
+// WithGitTrackObjectConditionType returns the GitTrackObjectCondition's type
 func WithGitTrackObjectConditionType(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) farosv1alpha1.GitTrackObjectConditionType {
 		return c.Type
 	}, matcher)
 }
 
-// WithGitTrackObjectConditionStatus returns the GitTrackObjectsCondition's status
+// WithGitTrackObjectConditionStatus returns the GitTrackObjectCondition's status
 func WithGitTrackObjectConditionStatus(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) corev1.ConditionStatus {
 		return c.Status
 	}, matcher)
 }
 
-// WithGitTrackObjectConditionReason returns the GitTrackObjectsCondition's reason
+// WithGitTrackObjectConditionReason returns the GitTrackObjectCondition's reason
 func WithGitTrackObjectConditionReason(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) string {
 		return c.Reason
 	}, matcher)
 }
 
-// WithGitTrackObjectConditionMessage returns the GitTrackObjectsCondition's message
+// WithGitTrackObjectConditionMessage returns the GitTrackObjectCondition's message
 func WithGitTrackObjectConditionMessage(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(c farosv1alpha1.GitTrackObjectCondition) string {
 		return c.Message
 	}, matcher)
 }
 
-// WithItems returns the lists Items
+// WithItems returns the items of the list
 func WithItems(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(obj runtime.Object) []runtime.Object {
 		items, err := meta.ExtractList(obj)
@@ -261,49 +261,49 @@ func WithItems(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	}, matcher)
 }
 
-// WithSubjects returns the ClusterRoleBindings subjects
+// WithSubjects returns the ClusterRoleBinding's subjects
 func WithSubjects(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(crb *rbacv1.ClusterRoleBinding) []rbacv1.Subject {
 		return crb.Subjects
 	}, matcher)
 }
 
-// WithInvolvedObjectKind returns the event's InvolvedObject's Kind
+// WithInvolvedObjectKind returns the event's InvolvedObject's kind
 func WithInvolvedObjectKind(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(ev *corev1.Event) string {
 		return ev.InvolvedObject.Kind
 	}, matcher)
 }
 
-// WithInvolvedObjectName returns the event's InvolvedObject's Name
+// WithInvolvedObjectName returns the event's InvolvedObject's name
 func WithInvolvedObjectName(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(ev *corev1.Event) string {
 		return ev.InvolvedObject.Name
 	}, matcher)
 }
 
-// WithInvolvedObjectNamespace returns the event's InvolvedObject's Namespace
+// WithInvolvedObjectNamespace returns the event's InvolvedObject's namespace
 func WithInvolvedObjectNamespace(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(ev *corev1.Event) string {
 		return ev.InvolvedObject.Namespace
 	}, matcher)
 }
 
-// WithReason returns the event's Reason
+// WithReason returns the event's reason
 func WithReason(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(ev *corev1.Event) string {
 		return ev.Reason
 	}, matcher)
 }
 
-// WithEventType returns the event's Type
+// WithEventType returns the event's type
 func WithEventType(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(ev *corev1.Event) string {
 		return ev.Type
 	}, matcher)
 }
 
-// WithContainers returns the deployments Containers
+// WithContainers returns the deployment's containers
 func WithContainers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(dep *appsv1.Deployment) []corev1.Container {
 		return dep.Spec.Template.Spec.Containers
