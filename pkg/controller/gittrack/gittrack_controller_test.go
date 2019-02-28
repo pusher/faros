@@ -912,7 +912,7 @@ var _ = Describe("GitTrack Suite", func() {
 	Context("When a GitTrack resource is deleted", func() {
 	})
 
-	FContext("When a GitTrack has a DeployKey, the Reconciler should", func() {
+	Context("When a GitTrack has a DeployKey, the Reconciler should", func() {
 		var reconciler *ReconcileGitTrack
 		var s *v1.Secret
 		var keyRef farosv1alpha1.GitTrackDeployKey
