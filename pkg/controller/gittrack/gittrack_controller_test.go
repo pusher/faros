@@ -160,6 +160,8 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.Update(context.TODO(), deployGto)).ToNot(HaveOccurred())
 				// Wait for reconcile for update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// Wait for reconcile for status
+				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				Expect(instance.Status.ObjectsInSync).To(Equal(int64(1)))
 			})
