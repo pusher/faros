@@ -144,7 +144,10 @@ var _ = Describe("GitTrackObject Suite", func() {
 					// Wait twice for the extra reconcile for status updates
 					Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 					Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+					// Fetch the updated GTO
 					m.Get(gto, timeout).Should(Succeed())
+					// And an up-to-date reference of the child resource
+					m.Get(child, timeout).Should(Succeed())
 				})
 
 				It("should create the child resource", func() {
@@ -152,13 +155,11 @@ var _ = Describe("GitTrackObject Suite", func() {
 				})
 
 				It("should add an owner reference to the child", func() {
-					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).
 						Should(testutils.WithOwnerReferences(ContainElement(testutils.GetGitTrackObjectOwnerRef(gto))))
 				})
 
 				It("should add a last applied annotation to the child", func() {
-					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).
 						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
 				})
@@ -186,6 +187,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
 
 							m.Update(gto, timeout).Should(Succeed())
+							// Wait for the update reconcile
 							Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 						})
 
@@ -268,6 +270,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 					BeforeEach(func() {
 						// Make sure the first reconcile has happened
 						m.Get(child, timeout).Should(Succeed())
+						// Need to get the GTO as well as it might have been updated
+						m.Get(gto, timeout).Should(Succeed())
 					})
 
 					Context("and the child spec is updated", func() {
@@ -311,12 +315,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 					var originalUID types.UID
 
 					BeforeEach(func() {
-						// Wait for reconcile from child create before deleting
-						Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-
-						m.Get(child, timeout).Should(Succeed())
 						originalUID = child.GetUID()
 						m.Delete(child).Should(Succeed())
+						Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 					})
 
 					It("should be recreated", func() {
@@ -330,7 +331,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 								return fmt.Errorf("child not yet recreated")
 							}
 							return nil
-						}).Should(Succeed())
+						}, timeout).Should(Succeed())
 					})
 				})
 
@@ -404,6 +405,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 						})
 
 						It("should not reset the child", func() {
+							m.Eventually(child, timeout).Should(testutils.WithPodTemplateLabels(HaveKeyWithValue("extra", "label")))
 							m.Consistently(child, consistentlyTimeout).Should(testutils.WithPodTemplateLabels(HaveKeyWithValue("extra", "label")))
 						})
 					})
@@ -518,8 +520,13 @@ var _ = Describe("GitTrackObject Suite", func() {
 				BeforeEach(func() {
 					// Create and fetch the instance to make sure caches are synced
 					m.Create(gto).Should(Succeed())
+					// Wait for the initial reconcile
 					Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+					// And for the status one as well, probably
+					Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+					// Fetch up-to-date objects if we're going to modify them
 					m.Get(gto, timeout).Should(Succeed())
+					m.Get(child, timeout).Should(Succeed())
 				})
 
 				It("should create the child resource", func() {
@@ -527,13 +534,11 @@ var _ = Describe("GitTrackObject Suite", func() {
 				})
 
 				It("should add an owner reference to the child", func() {
-					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).
 						Should(testutils.WithOwnerReferences(ContainElement(testutils.GetClusterGitTrackObjectOwnerRef(gto))))
 				})
 
 				It("should add a last applied annotation to the child", func() {
-					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).
 						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
 				})
@@ -546,7 +551,11 @@ var _ = Describe("GitTrackObject Suite", func() {
 						child.SetAnnotations(map[string]string{"updated": "annotations"})
 						child.SetOwnerReferences([]metav1.OwnerReference{testutils.GetClusterGitTrackObjectOwnerRef(gto)})
 						m.Update(child).Should(Succeed())
+						// Wait for the update reconcile
 						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+						// And for the status update reconcile
+						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+						// Get the latest version of the object
 						m.Get(child, timeout).Should(Succeed())
 
 						originalVersion = child.GetResourceVersion()
@@ -630,6 +639,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 					BeforeEach(func() {
 						// Make sure the first reconcile has happened
 						m.Get(child, timeout).Should(Succeed())
+						// Need to get the updated GTO as well
+						m.Get(gto, timeout).Should(Succeed())
 					})
 
 					Context("and the child spec is updated", func() {
@@ -640,7 +651,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 							specData.SetAnnotations(annotations)
 							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
 
-							m.Update(gto).Should(Succeed())
+							m.Update(gto, timeout).Should(Succeed())
 							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
 						})
 
@@ -673,12 +684,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 					var originalUID types.UID
 
 					BeforeEach(func() {
-						// Wait for reconcile from child create before deleting
-						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-
-						m.Get(child, timeout).Should(Succeed())
 						originalUID = child.GetUID()
 						m.Delete(child).Should(Succeed())
+						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
 					})
 
 					It("should be recreated", func() {
@@ -692,12 +700,13 @@ var _ = Describe("GitTrackObject Suite", func() {
 								return fmt.Errorf("child not yet recreated")
 							}
 							return nil
-						}).Should(Succeed())
+						}, timeout).Should(Succeed())
 					})
 				})
 
 				Context("should send events", func() {
 					var events *corev1.EventList
+
 					BeforeEach(func() {
 						events = &corev1.EventList{}
 						m.Eventually(events, timeout).ShouldNot(testutils.WithItems(BeEmpty()))

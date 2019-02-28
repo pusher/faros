@@ -186,6 +186,5 @@ var _ = Describe("Status Suite", func() {
 				})
 			})
 		})
-
 	})
 })
