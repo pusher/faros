@@ -18,7 +18,7 @@ package utils
 
 import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

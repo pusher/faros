@@ -36,7 +36,7 @@ import (
 	testutils "github.com/pusher/faros/test/utils"
 	gitstore "github.com/pusher/git-store"
 	"golang.org/x/net/context"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -58,6 +58,8 @@ var expectedRequest = reconcile.Request{NamespacedName: key}
 
 const timeout = time.Second * 5
 const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
+const doesNotExistPath = "does-not-exist"
+const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
 
 var _ = Describe("GitTrack Suite", func() {
 	var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
@@ -306,7 +308,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with an invalid Reference", func() {
 			BeforeEach(func() {
-				createInstance(instance, "does-not-exist")
+				createInstance(instance, doesNotExistPath)
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
 			})
@@ -339,7 +341,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with an invalid SubPath", func() {
 			BeforeEach(func() {
-				instance.Spec.SubPath = "does-not-exist"
+				instance.Spec.SubPath = doesNotExistPath
 				createInstance(instance, "master")
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
@@ -407,7 +409,7 @@ var _ = Describe("GitTrack Suite", func() {
 							{
 								APIVersion:         "faros.pusher.com/v1alpha1",
 								Kind:               "GitTrack",
-								Name:               "does-not-exist",
+								Name:               doesNotExistPath,
 								UID:                "12345",
 								Controller:         &truth,
 								BlockOwnerDeletion: &truth,
@@ -587,7 +589,7 @@ var _ = Describe("GitTrack Suite", func() {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, before)
 				}, timeout).Should(Succeed())
 
-				instance.Spec.Reference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+				instance.Spec.Reference = repeatedReference
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -617,7 +619,7 @@ var _ = Describe("GitTrack Suite", func() {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, before)
 				}, timeout).Should(Succeed())
 
-				instance.Spec.Reference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+				instance.Spec.Reference = repeatedReference
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -634,7 +636,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends events about updating resources", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.Reference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+				instance.Spec.Reference = repeatedReference
 				Expect(c.Update(context.TODO(), instance)).ToNot(HaveOccurred())
 				// Wait for reconcile for update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
@@ -673,7 +675,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
 
 				// Update the reference
-				instance.Spec.Reference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+				instance.Spec.Reference = repeatedReference
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -721,7 +723,7 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
-				instance.Spec.Reference = "does-not-exist"
+				instance.Spec.Reference = doesNotExistPath
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -742,7 +744,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("updates the FilesFetched condition", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.Reference = "does-not-exist"
+				instance.Spec.Reference = doesNotExistPath
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -772,7 +774,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends a CheckoutFailed event", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.Reference = "does-not-exist"
+				instance.Spec.Reference = doesNotExistPath
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -821,7 +823,7 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
-				instance.Spec.SubPath = "does-not-exist"
+				instance.Spec.SubPath = doesNotExistPath
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -842,7 +844,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("updates the FilesFetched condition", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.SubPath = "does-not-exist"
+				instance.Spec.SubPath = doesNotExistPath
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -872,7 +874,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends a CheckoutFailed event", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.SubPath = "does-not-exist"
+				instance.Spec.SubPath = doesNotExistPath
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
