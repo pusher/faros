@@ -59,7 +59,7 @@ lint:
           --enable=gofmt \
           --enable=goimports \
           --skip-dirs=pkg/client/ \
-          --deadline=60s \
+          --deadline=120s \
           --verbose \
           --tests ./...
 
