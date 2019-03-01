@@ -1,5 +1,5 @@
 box:
-  id: golang:1.10
+  id: golang:1.11
 
 dep-install:
   steps:
