@@ -14,58 +14,64 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gittrackobject
+package utils
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pusher/faros/pkg/utils"
+	testutils "github.com/pusher/faros/test/utils"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-var (
-	testHandler = &eventToChannelHandler{
-		eventsChan: make(chan event.GenericEvent, 1),
-	}
-	unstructuredEventTest unstructured.Unstructured
-	expectedEvent         = event.GenericEvent{
-		Meta: &metav1.ObjectMeta{
-			Name:      "example",
-			Namespace: "default",
-		},
-		Object: &unstructuredEventTest,
-	}
-)
-
 var _ = Describe("EventHandler Suite", func() {
+	const timeout = 5 * time.Second
+
+	var (
+		testHandler = &EventToChannelHandler{
+			EventsChan: make(chan event.GenericEvent, 1),
+		}
+		eventTest     unstructured.Unstructured
+		expectedEvent = event.GenericEvent{
+			Meta: &metav1.ObjectMeta{
+				Name:      "example",
+				Namespace: "default",
+			},
+			Object: &eventTest,
+		}
+	)
+
 	BeforeEach(func() {
-		var err error
-		unstructuredEventTest, err = utils.YAMLToUnstructured([]byte(exampleDeployment))
-		Expect(err).ToNot(HaveOccurred())
+		content, err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).ToUnstructured(testutils.ExampleDeployment.DeepCopy())
+		Expect(err).NotTo(HaveOccurred())
+		eventTest.SetUnstructuredContent(content)
 	})
 
 	Describe("when OnAdd is called", func() {
 		It("should send an event to the eventStream", func() {
-			testHandler.OnAdd(&unstructuredEventTest)
-			Eventually(testHandler.eventsChan, timeout).
+			testHandler.OnAdd(&eventTest)
+			Eventually(testHandler.EventsChan, timeout).
 				Should(Receive(Equal(expectedEvent)))
 		})
 	})
 
 	Describe("when OnUpdate is called", func() {
 		It("should send an event to the eventStream", func() {
-			testHandler.OnUpdate(nil, &unstructuredEventTest)
-			Eventually(testHandler.eventsChan, timeout).
+			testHandler.OnUpdate(nil, &eventTest)
+			Eventually(testHandler.EventsChan, timeout).
 				Should(Receive(Equal(expectedEvent)))
 		})
 	})
 
 	Describe("when OnDelete is called", func() {
 		It("should send an event to the eventStream", func() {
-			testHandler.OnDelete(&unstructuredEventTest)
-			Eventually(testHandler.eventsChan, timeout).
+			testHandler.OnDelete(&eventTest)
+			Eventually(testHandler.EventsChan, timeout).
 				Should(Receive(Equal(expectedEvent)))
 		})
 	})
@@ -73,7 +79,7 @@ var _ = Describe("EventHandler Suite", func() {
 	Describe("when an invalid object is used", func() {
 		It("no event should be to the eventStream", func() {
 			testHandler.OnAdd(nil)
-			Expect(testHandler.eventsChan).To(BeEmpty())
+			Expect(testHandler.EventsChan).To(BeEmpty())
 		})
 	})
 })

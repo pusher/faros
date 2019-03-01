@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // GitTrackObjectInterface represents an interface implemented by both
@@ -27,6 +28,7 @@ import (
 type GitTrackObjectInterface interface {
 	runtime.Object
 	v1.Object
+	schema.ObjectKind
 	GetNamespacedName() string
 	GetSpec() GitTrackObjectSpec
 	SetSpec(GitTrackObjectSpec)

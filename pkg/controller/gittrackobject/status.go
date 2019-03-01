@@ -32,20 +32,15 @@ type statusOpts struct {
 	inSyncReason gittrackobjectutils.ConditionReason
 }
 
-func newStatusOpts() *statusOpts {
-	return &statusOpts{
-		inSyncReason: gittrackobjectutils.ChildAppliedSuccess,
-	}
+func (s *statusOpts) isEmpty() bool {
+	empty := &statusOpts{}
+	return *s == *empty
 }
 
 // updateGitTrackObjectStatus updates the GitTrackObject's status field if
 // any condition has changed.
 func updateGitTrackObjectStatus(gto farosv1alpha1.GitTrackObjectInterface, opts *statusOpts) bool {
-	if gto == nil {
-		return false
-	}
 	status := gto.GetStatus()
-
 	setCondition(&status, farosv1alpha1.ObjectInSyncType, opts.inSyncError, opts.inSyncReason)
 
 	if !reflect.DeepEqual(gto.GetStatus(), status) {
@@ -81,9 +76,9 @@ func setCondition(status *farosv1alpha1.GitTrackObjectStatus, condType farosv1al
 // updateStatus calculates a new status for the GitTrackObject and then updates
 // the resource on the API if the status differs from before.
 func (r *ReconcileGitTrackObject) updateStatus(original farosv1alpha1.GitTrackObjectInterface, opts *statusOpts) error {
-	// If original object nil, nothing to do.
-	if original == nil {
-		return nil
+	// Default inSyncReason if opts are empty
+	if opts.isEmpty() {
+		opts.inSyncReason = gittrackobjectutils.ChildAppliedSuccess
 	}
 	gto := original.DeepCopyInterface()
 	gtoUpdated := updateGitTrackObjectStatus(gto, opts)

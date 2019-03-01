@@ -1,9 +1,6 @@
 package utils_test
 
 import (
-	"testing"
-
-	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
@@ -20,19 +17,181 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func TestEnqueueRequestForOwner(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t, "EnqueueRequestForOwner Suite", []Reporter{test.NewlineReporter{}})
-}
-
-var queue workqueue.RateLimitingInterface
-var enqueue *EnqueueRequestForOwner
-var createEvt event.CreateEvent
-var updateEvt event.UpdateEvent
-var deleteEvt event.DeleteEvent
-var genericEvt event.GenericEvent
-
 var _ = Describe("EnqueueRequestForOwner Suite", func() {
+	var queue workqueue.RateLimitingInterface
+	var enqueue *EnqueueRequestForOwner
+	var createEvt event.CreateEvent
+	var updateEvt event.UpdateEvent
+	var deleteEvt event.DeleteEvent
+	var genericEvt event.GenericEvent
+
+	var shouldEnqueue = func() {
+		It("should enqueue a request", func() {
+			Expect(queue.Len()).To(Equal(1))
+		})
+	}
+
+	var shouldNotEnqueue = func() {
+		It("should not enqueue a request", func() {
+			Expect(queue.Len()).To(Equal(0))
+		})
+	}
+
+	var enqueuedItemShouldBeReconcileRequest = func() {
+		It("should enqueue a reconcile.Request", func() {
+			item, shutdown := queue.Get()
+			Expect(shutdown).To(BeFalse())
+			_, ok := item.(reconcile.Request)
+			Expect(ok).To(BeTrue())
+		})
+	}
+
+	var nonNamespacedEnqueuedRequestShouldBeFor = func() {
+		It("reconcile.Request should be for test", func() {
+			item, shutdown := queue.Get()
+			Expect(shutdown).To(BeFalse())
+			req := item.(reconcile.Request)
+			Expect(req.Name).To(Equal("test"))
+		})
+	}
+
+	var namespacedEnqueuedRequestShouldBeFor = func() {
+		It("reconcile.Request should be for biz/test", func() {
+			item, shutdown := queue.Get()
+			Expect(shutdown).To(BeFalse())
+			req := item.(reconcile.Request)
+			Expect(req.String()).To(Equal("biz/test"))
+		})
+	}
+
+	var namespacedEvents = func(obj *corev1.Pod, fns ...func()) {
+		BeforeEach(func() {
+			Expect(obj).ToNot(BeNil())
+		})
+
+		Context("with a create event", func() {
+			BeforeEach(func() {
+				createEvt = event.CreateEvent{
+					Object: obj.DeepCopy(),
+					Meta:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Create(createEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+
+		Context("with an update event", func() {
+			BeforeEach(func() {
+				updateEvt = event.UpdateEvent{
+					ObjectNew: obj.DeepCopy(),
+					MetaNew:   obj.DeepCopy().GetObjectMeta(),
+					ObjectOld: obj.DeepCopy(),
+					MetaOld:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Update(updateEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+
+		Context("with a delete event", func() {
+			BeforeEach(func() {
+				deleteEvt = event.DeleteEvent{
+					Object: obj.DeepCopy(),
+					Meta:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Delete(deleteEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+
+		Context("with a generic event", func() {
+			BeforeEach(func() {
+				genericEvt = event.GenericEvent{
+					Object: obj.DeepCopy(),
+					Meta:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Generic(genericEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+	}
+
+	var nonNamespacedEvents = func(obj *rbacv1.ClusterRoleBinding, fns ...func()) {
+		BeforeEach(func() {
+			Expect(obj).ToNot(BeNil())
+		})
+
+		Context("with a create event", func() {
+			BeforeEach(func() {
+				createEvt = event.CreateEvent{
+					Object: obj.DeepCopy(),
+					Meta:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Create(createEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+
+		Context("with an update event", func() {
+			BeforeEach(func() {
+				updateEvt = event.UpdateEvent{
+					ObjectNew: obj.DeepCopy(),
+					MetaNew:   obj.DeepCopy().GetObjectMeta(),
+					ObjectOld: obj.DeepCopy(),
+					MetaOld:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Update(updateEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+
+		Context("with a delete event", func() {
+			BeforeEach(func() {
+				deleteEvt = event.DeleteEvent{
+					Object: obj.DeepCopy(),
+					Meta:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Delete(deleteEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+
+		Context("with a generic event", func() {
+			BeforeEach(func() {
+				genericEvt = event.GenericEvent{
+					Object: obj.DeepCopy(),
+					Meta:   obj.DeepCopy().GetObjectMeta(),
+				}
+				enqueue.Generic(genericEvt, queue)
+			})
+
+			for _, fn := range fns {
+				fn()
+			}
+		})
+	}
+
 	BeforeEach(func() {
 		s := scheme.Scheme
 		s.AddKnownTypes(schema.GroupVersion{
@@ -141,170 +300,3 @@ var _ = Describe("EnqueueRequestForOwner Suite", func() {
 		})
 	})
 })
-
-var shouldEnqueue = func() {
-	It("should enqueue a request", func() {
-		Expect(queue.Len()).To(Equal(1))
-	})
-}
-
-var shouldNotEnqueue = func() {
-	It("should not enqueue a request", func() {
-		Expect(queue.Len()).To(Equal(0))
-	})
-}
-
-var enqueuedItemShouldBeReconcileRequest = func() {
-	It("should enqueue a reconcile.Request", func() {
-		item, shutdown := queue.Get()
-		Expect(shutdown).To(BeFalse())
-		_, ok := item.(reconcile.Request)
-		Expect(ok).To(BeTrue())
-	})
-}
-
-var nonNamespacedEnqueuedRequestShouldBeFor = func() {
-	It("reconcile.Request should be for test", func() {
-		item, shutdown := queue.Get()
-		Expect(shutdown).To(BeFalse())
-		req := item.(reconcile.Request)
-		Expect(req.Name).To(Equal("test"))
-	})
-}
-
-var namespacedEnqueuedRequestShouldBeFor = func() {
-	It("reconcile.Request should be for biz/test", func() {
-		item, shutdown := queue.Get()
-		Expect(shutdown).To(BeFalse())
-		req := item.(reconcile.Request)
-		Expect(req.String()).To(Equal("biz/test"))
-	})
-}
-
-var namespacedEvents = func(obj *corev1.Pod, fns ...func()) {
-	BeforeEach(func() {
-		Expect(obj).ToNot(BeNil())
-	})
-
-	Context("with a create event", func() {
-		BeforeEach(func() {
-			createEvt = event.CreateEvent{
-				Object: obj.DeepCopy(),
-				Meta:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Create(createEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-
-	Context("with an update event", func() {
-		BeforeEach(func() {
-			updateEvt = event.UpdateEvent{
-				ObjectNew: obj.DeepCopy(),
-				MetaNew:   obj.DeepCopy().GetObjectMeta(),
-				ObjectOld: obj.DeepCopy(),
-				MetaOld:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Update(updateEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-
-	Context("with a delete event", func() {
-		BeforeEach(func() {
-			deleteEvt = event.DeleteEvent{
-				Object: obj.DeepCopy(),
-				Meta:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Delete(deleteEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-
-	Context("with a generic event", func() {
-		BeforeEach(func() {
-			genericEvt = event.GenericEvent{
-				Object: obj.DeepCopy(),
-				Meta:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Generic(genericEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-}
-
-var nonNamespacedEvents = func(obj *rbacv1.ClusterRoleBinding, fns ...func()) {
-	BeforeEach(func() {
-		Expect(obj).ToNot(BeNil())
-	})
-
-	Context("with a create event", func() {
-		BeforeEach(func() {
-			createEvt = event.CreateEvent{
-				Object: obj.DeepCopy(),
-				Meta:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Create(createEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-
-	Context("with an update event", func() {
-		BeforeEach(func() {
-			updateEvt = event.UpdateEvent{
-				ObjectNew: obj.DeepCopy(),
-				MetaNew:   obj.DeepCopy().GetObjectMeta(),
-				ObjectOld: obj.DeepCopy(),
-				MetaOld:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Update(updateEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-
-	Context("with a delete event", func() {
-		BeforeEach(func() {
-			deleteEvt = event.DeleteEvent{
-				Object: obj.DeepCopy(),
-				Meta:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Delete(deleteEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-
-	Context("with a generic event", func() {
-		BeforeEach(func() {
-			genericEvt = event.GenericEvent{
-				Object: obj.DeepCopy(),
-				Meta:   obj.DeepCopy().GetObjectMeta(),
-			}
-			enqueue.Generic(genericEvt, queue)
-		})
-
-		for _, fn := range fns {
-			fn()
-		}
-	})
-}

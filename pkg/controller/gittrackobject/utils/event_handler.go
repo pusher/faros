@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gittrackobject
+package utils
 
 import (
 	"log"
@@ -24,29 +24,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-// eventToChannelHandler send all events onto the eventsChan for consumption
+// EventToChannelHandler send all events onto the EventsChan for consumption
 // and filtering by the controller's Watch function
-type eventToChannelHandler struct {
-	eventsChan chan event.GenericEvent
+type EventToChannelHandler struct {
+	EventsChan chan event.GenericEvent
 }
 
 // OnAdd implements the cache.ResoureEventHandler interface
-func (e *eventToChannelHandler) OnAdd(obj interface{}) {
+func (e *EventToChannelHandler) OnAdd(obj interface{}) {
 	e.queueEventForObject(obj)
 }
 
 // OnUpdate implements the cache.ResoureEventHandler interface
-func (e *eventToChannelHandler) OnUpdate(oldobj, obj interface{}) {
+func (e *EventToChannelHandler) OnUpdate(oldobj, obj interface{}) {
 	e.queueEventForObject(obj)
 }
 
 // OnDelete implements the cache.ResoureEventHandler interface
-func (e *eventToChannelHandler) OnDelete(obj interface{}) {
+func (e *EventToChannelHandler) OnDelete(obj interface{}) {
 	e.queueEventForObject(obj)
 }
 
 // queueEventForObject sends the event onto the channel
-func (e *eventToChannelHandler) queueEventForObject(obj interface{}) {
+func (e *EventToChannelHandler) queueEventForObject(obj interface{}) {
 	if obj == nil {
 		// Can't do anything here
 		return
@@ -59,7 +59,7 @@ func (e *eventToChannelHandler) queueEventForObject(obj interface{}) {
 	}
 
 	// Send an event to the events channel
-	e.eventsChan <- event.GenericEvent{
+	e.EventsChan <- event.GenericEvent{
 		Meta: &metav1.ObjectMeta{
 			Name:            u.GetName(),
 			Namespace:       u.GetNamespace(),

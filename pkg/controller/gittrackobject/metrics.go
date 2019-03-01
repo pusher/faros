@@ -27,14 +27,7 @@ type metricsOpts struct {
 	inSync bool
 }
 
-func newMetricOpts() *metricsOpts {
-	return &metricsOpts{}
-}
-
 func (r *ReconcileGitTrackObject) updateMetrics(gto farosv1alpha1.GitTrackObjectInterface, opts *metricsOpts) error {
-	if gto == nil {
-		return nil
-	}
 	labels := map[string]string{
 		"kind":      gto.GetSpec().Kind,
 		"name":      gto.GetSpec().Name,
