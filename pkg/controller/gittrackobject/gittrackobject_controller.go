@@ -241,6 +241,20 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, nil
 	}
 
+	deleteStrategy, err := gittrackobjectutils.GetDeleteStrategy(child)
+	if err != nil {
+		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
+		sOpts.inSyncError = fmt.Errorf("unable to get delete strategy: %v", err)
+		return reconcile.Result{}, sOpts.inSyncError
+	}
+
+	if deleteStrategy == gittrackobjectutils.DeleteResourceStrategy {
+		log.Printf("Delete strategy for %s set to delete resource, deleting", child.GetName())
+		mOpts.inSync = true
+		r.applier.Delete(context.TODO(), child)
+		return reconcile.Result{}, nil
+	}
+
 	// Make sure to watch the child resource (does nothing if the resource is
 	// already being watched
 	err = r.watch(*child)

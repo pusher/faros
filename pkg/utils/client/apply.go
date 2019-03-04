@@ -52,6 +52,7 @@ type Options struct {
 // Client defines the interface for the Applier
 type Client interface {
 	Apply(context.Context, *ApplyOptions, runtime.Object) error
+	Delete(context.Context, runtime.Object) error
 }
 
 // Make sure Applier implements Client
@@ -175,6 +176,31 @@ func (a *Applier) Apply(ctx context.Context, opts *ApplyOptions, modified runtim
 
 	// Fetch the updated resource so that users copy is up to date
 	return a.client.Get(context.TODO(), objectKey, modified)
+}
+
+// Delete removes the resource
+func (a *Applier) Delete(ctx context.Context, delete runtime.Object) error {
+	current := newUnstructuredFor(delete)
+
+	objectKey, err := getNamespacedName(delete)
+	if err != nil {
+		return fmt.Errorf("unable to determine NamespacedName: %v", err)
+	}
+
+	// Check if the resource exists
+	err = a.client.Get(context.TODO(), objectKey, current)
+	if err != nil && errors.IsNotFound(err) {
+		// Object is not found, nothing to do
+	} else if err != nil {
+		return fmt.Errorf("unable to get current resource: %v", err)
+	}
+	// Delete the object
+	err = a.client.Delete(ctx, delete, client.GracePeriodSeconds(60))
+	if err != nil {
+		return fmt.Errorf("error deleting: %v", err)
+	}
+
+	return nil
 }
 
 func (a *Applier) create(ctx context.Context, obj runtime.Object) error {
