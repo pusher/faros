@@ -16,9 +16,7 @@ limitations under the License.
 
 package events
 
-import (
-	"k8s.io/api/core/v1"
-)
+import v1 "k8s.io/api/core/v1"
 
 // Any returns true if any call to `f` evaluates to `true`
 func Any(events []v1.Event, f func(v1.Event) bool) bool {

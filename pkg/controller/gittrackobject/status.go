@@ -24,7 +24,7 @@ import (
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 type statusOpts struct {

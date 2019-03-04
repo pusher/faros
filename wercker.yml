@@ -1,5 +1,5 @@
 box:
-  id: golang:1.10
+  id: golang:1.11
 
 dep-install:
   steps:
@@ -40,26 +40,28 @@ lint:
   - wercker/setup-go-workspace:
       package-dir: github.com/pusher/faros
   - script:
-      name: Install gometalinter
+      name: Install linter
       code: |
-        go get -u github.com/alecthomas/gometalinter
-        gometalinter --install
+        export BIN_DIR=/usr/local/bin
+        export CI_LINT_VERSION=1.15.0
+        export CI_LINT_URI=https://github.com/golangci/golangci-lint/releases/download/v$CI_LINT_VERSION/golangci-lint-$CI_LINT_VERSION-linux-amd64.tar.gz
+        curl -L $CI_LINT_URI | tar -C $BIN_DIR -xzf - --strip-components 1 --wildcards \*/golangci-lint
   - script:
-      name: Run gometalinter
+      name: Run linter(s)
       code: |
-       gometalinter --vendor --disable-all \
-       --enable=vet \
-       --enable=vetshadow \
-       --enable=golint \
-       --enable=ineffassign \
-       --enable=goconst \
-       --enable=deadcode \
-       --enable=gofmt \
-       --enable=goimports \
-       --deadline=60s \
-       --tests ./... \
-       -s pkg/client
-
+        golangci-lint run --disable-all \
+          --enable=vet \
+          --enable=vetshadow \
+          --enable=golint \
+          --enable=ineffassign \
+          --enable=goconst \
+          --enable=deadcode \
+          --enable=gofmt \
+          --enable=goimports \
+          --skip-dirs=pkg/client/ \
+          --deadline=120s \
+          --verbose \
+          --tests ./...
 
 test:
   steps:

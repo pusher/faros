@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/pkg/apis"
 	farosflags "github.com/pusher/faros/pkg/flags"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
