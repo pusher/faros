@@ -194,7 +194,7 @@ func (r *ReconcileGitTrack) fetchGitCredentials(namespace string, deployKey faro
 		return nil, fmt.Errorf("invalid deploy key reference. Secret %s does not have key %s", deployKey.SecretName, deployKey.Key)
 	}
 
-	return &gitCredentials{secret: secretData, deployType: deployKey.Type}, nil
+	return &gitCredentials{secret: secretData, credentialType: deployKey.Type}, nil
 }
 
 // getFiles checks out the Spec.Repository at Spec.Reference and returns a map of filename to

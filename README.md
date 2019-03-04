@@ -241,12 +241,14 @@ spec:
   # Note: Faros loads all .yml/.yaml/.json files recursively within the path.
   subPath: deployments/kube-system
   # (Optional) DeployKey allows you to specify credentials for repository access
-  # over SSH
+  # over SSH or HTTP Basic Auth
   deployKey:
-    # SecretName is the name of the secret containing the private key
+    # SecretName is the name of the secret containing the secret
     secretName: foo-k8s-manifests
-    # Key is the Secret's key containing the private key
+    # Key is the Secret's key containing the secret
     key: id_rsa
+    # (Optional) Type is the type of credential. Accepted values are "SSH", "HTTPBasicAuth". Defaults to "SSH"
+    type: SSH | HTTPBasicAuth
 ```
 
 Deploy the `GitTrack` to your cluster and watch its status as Faros processes

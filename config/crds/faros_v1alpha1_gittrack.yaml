@@ -42,7 +42,10 @@ spec:
                   type: string
                 type:
                   description: Type is the type of credential. Accepted values are
-                    "SSH", "OAuthToken". Defaults to "SSH".
+                    "SSH", "HTTPBasicAuth". Defaults to "SSH".
+                  enum:
+                  - SSH
+                  - HTTPBasicAuth
                   type: string
               required:
               - secretName
