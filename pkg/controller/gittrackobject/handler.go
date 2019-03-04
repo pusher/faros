@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
@@ -209,26 +210,42 @@ func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1
 
 // recreateChild first deletes and then creates a child resource for a (Cluster)GitTrackObject
 func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) (bool, error) {
-	originalResourceVersion := found.GetResourceVersion()
-	force := true
-	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
-	if err != nil {
-		return false, fmt.Errorf("unable to re-create child: %v", err)
+	if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err != nil {
+		return r.applyChildWithDryRun(found, child, true)
 	}
-
-	// Not updated if the resource version hasn't changed
-	if originalResourceVersion == child.GetResourceVersion() {
-		return false, nil
-	}
-
-	return true, nil
+	return r.applyChild(found, child, true)
 }
 
 // updateChild updates the given child resource of a (Cluster)GitTrackObject
 func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) (bool, error) {
-	// Update the child resource on the API
+	return r.applyChildWithDryRun(found, child, false)
+}
+
+// applyChildWithDryRun first applies the child with DryRun and then updates the resource if there is change to persist
+func (r *ReconcileGitTrackObject) applyChildWithDryRun(found, child *unstructured.Unstructured, force bool) (bool, error) {
+	dryRunTrue := true
+	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force, ServerDryRun: &dryRunTrue}, child)
+	if err != nil {
+		return false, fmt.Errorf("unable to update child resource: %v", err)
+	}
+
+	// Not updated if the child now equals the server version
+	if reflect.DeepEqual(child, found) {
+		return false, nil
+	}
+
+	// The DryRun showed a change is required so now update without DryRun
+	err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
+	if err != nil {
+		return false, fmt.Errorf("unable to update child resource: %v", err)
+	}
+	return true, nil
+}
+
+// applyChild uses the applier to update the child
+func (r *ReconcileGitTrackObject) applyChild(found, child *unstructured.Unstructured, force bool) (bool, error) {
 	originalResourceVersion := found.GetResourceVersion()
-	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
+	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
 	if err != nil {
 		return false, fmt.Errorf("unable to update child resource: %v", err)
 	}
