@@ -204,7 +204,7 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 	gitCreds, err := r.fetchGitCredentials(gt.Namespace, gt.Spec.DeployKey)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
-		return nil, fmt.Errorf("unable to retrieve private key: %v", err)
+		return nil, fmt.Errorf("unable to retrieve git credentials from secret: %v", err)
 	}
 
 	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference, gitCreds)

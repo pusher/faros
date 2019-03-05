@@ -248,6 +248,7 @@ spec:
     # Key is the Secret's key containing the secret
     key: id_rsa
     # (Optional) Type is the type of credential. Accepted values are "SSH", "HTTPBasicAuth". Defaults to "SSH"
+    # When set to "HTTPBasicAuth" the expected secret format is "<username>:<password>".
     type: SSH | HTTPBasicAuth
 ```
 

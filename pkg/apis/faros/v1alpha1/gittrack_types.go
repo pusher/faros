@@ -43,7 +43,7 @@ type GitTrackSpec struct {
 	// SubPath is the subpath within the repository underneath which files are considered
 	SubPath string `json:"subPath,omitempty"`
 
-	// DeployKey holds a reference to an SSH key needed to access the repository.
+	// DeployKey holds a reference to an SSH key needed to access the repository
 	DeployKey GitTrackDeployKey `json:"deployKey,omitempty"`
 }
 

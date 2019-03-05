@@ -30,7 +30,7 @@ spec:
           properties:
             deployKey:
               description: DeployKey holds a reference to an SSH key needed to access
-                the repository.
+                the repository
               properties:
                 key:
                   description: Key is the key within the Secret object that contains
