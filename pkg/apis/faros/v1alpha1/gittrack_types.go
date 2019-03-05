@@ -47,7 +47,7 @@ type GitTrackSpec struct {
 	DeployKey GitTrackDeployKey `json:"deployKey,omitempty"`
 }
 
-// GitTrackDeployKey holds a reference to a secret such as an SSH key or OAuthToken needed to access the repository
+// GitTrackDeployKey holds a reference to a secret such as an SSH key or HTTP Basic Auth credentials needed to access the repository
 type GitTrackDeployKey struct {
 	// SecretName is the name of the Secret object containins the key
 	SecretName string `json:"secretName"`
