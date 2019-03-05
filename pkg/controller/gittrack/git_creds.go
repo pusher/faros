@@ -40,16 +40,12 @@ func createRepoRefFromCreds(url string, creds *gitCredentials) (*gitstore.RepoRe
 	case farosv1alpha1.GitCredentialTypeSSH:
 		return &gitstore.RepoRef{URL: url, PrivateKey: creds.secret}, nil
 	case farosv1alpha1.GitCredentialTypeHTTPBasicAuth:
-		credString := string(creds.secret)
-		colenIdx := strings.Index(credString, ":")
-		var username, password string
-		if colenIdx == -1 {
-			password = credString
+		credStringSplit := strings.SplitN(string(creds.secret), ":", 2)
+		if len(credStringSplit) == 2 {
+			return &gitstore.RepoRef{URL: url, User: credStringSplit[0], Pass: credStringSplit[1]}, nil
 		} else {
-			username = credString[0:colenIdx]
-			password = credString[colenIdx+1:]
+			return nil, fmt.Errorf("You must specify the secret as <username>:<password> for credential type %s", creds.credentialType)
 		}
-		return &gitstore.RepoRef{URL: url, User: username, Pass: password}, nil
 	default:
 		return nil, fmt.Errorf("Unable to create repo ref: invalid type \"%s\"", creds.credentialType)
 	}

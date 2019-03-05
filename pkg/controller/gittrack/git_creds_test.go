@@ -49,16 +49,16 @@ var _ = Describe("GitTrack Suite", func() {
 				})
 			})
 
-			Context("When the secret contains no username", func() {
-				repo, _ := createRepoRefFromCreds("https://tempuri.org", &gitCredentials{
+			Context("When the secret contains no colon", func() {
+				repo, err := createRepoRefFromCreds("https://tempuri.org", &gitCredentials{
 					secret:         []byte("password"),
 					credentialType: farosv1alpha1.GitCredentialTypeHTTPBasicAuth,
 				})
 
-				It("sets the  password", func() {
-					Expect(repo.URL).To(Equal("https://tempuri.org"))
-					Expect(repo.User).To(BeEmpty())
-					Expect(repo.Pass).To(Equal("password"))
+				It("returns an error", func() {
+					Expect(repo).To(BeNil())
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(Equal("You must specify the secret as <username>:<password> for credential type HTTPBasicAuth"))
 				})
 			})
 		})
