@@ -22,12 +22,14 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -118,6 +120,7 @@ type ApplyOptions struct {
 	CascadeDeletion     *bool
 	DeletionTimeout     *time.Duration
 	DeletionGracePeriod *int
+	ServerDryRun        *bool
 }
 
 // Complete defaults valus within the ApplyOptions struct
@@ -128,6 +131,7 @@ func (a *ApplyOptions) Complete() {
 	cascadeDeletion := true
 	deletionTimeout := time.Duration(30 * time.Second)
 	deletionGracePeriod := -1
+	serverDryRun := false
 
 	if a.Overwrite == nil {
 		a.Overwrite = &overwrite
@@ -143,6 +147,9 @@ func (a *ApplyOptions) Complete() {
 	}
 	if a.DeletionGracePeriod == nil {
 		a.DeletionGracePeriod = &deletionGracePeriod
+	}
+	if a.ServerDryRun == nil {
+		a.ServerDryRun = &serverDryRun
 	}
 }
 
@@ -163,7 +170,7 @@ func (a *Applier) Apply(ctx context.Context, opts *ApplyOptions, modified runtim
 	err = a.client.Get(context.TODO(), objectKey, current)
 	if err != nil && errors.IsNotFound(err) {
 		// Object is not found, create it
-		return a.create(ctx, modified.DeepCopyObject())
+		return a.create(ctx, opts, modified)
 	} else if err != nil {
 		return fmt.Errorf("unable to get current resource: %v", err)
 	}
@@ -173,17 +180,44 @@ func (a *Applier) Apply(ctx context.Context, opts *ApplyOptions, modified runtim
 		return fmt.Errorf("error applying update: %v", err)
 	}
 
-	// Fetch the updated resource so that users copy is up to date
-	return a.client.Get(context.TODO(), objectKey, modified)
+	return nil
 }
 
-func (a *Applier) create(ctx context.Context, obj runtime.Object) error {
+func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Object) error {
 	err := createApplyAnnotation(obj, unstructured.UnstructuredJSONScheme)
 	if err != nil {
 		return fmt.Errorf("unable to apply LastAppliedAnnotation to object: %v", err)
 	}
 
-	err = a.client.Create(ctx, obj)
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	restClient, err := a.restClientFor(gvk.GroupVersion())
+	if err != nil {
+		return fmt.Errorf("unable to construct REST client for GroupVersion %s: %v", gvk.GroupVersion().String(), err)
+	}
+
+	mapping, err := a.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return fmt.Errorf("unable to get REST mapping for GroupVersionKind %s: %v", gvk.String(), err)
+	}
+
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("unable to get metadata: %v", err)
+	}
+
+	createOptions := &metav1.CreateOptions{}
+	if *opts.ServerDryRun {
+		createOptions.DryRun = []string{metav1.DryRunAll}
+	}
+
+	err = restClient.Post().
+		NamespaceIfScoped(metadata.GetNamespace(), isNamespaced(mapping)).
+		Resource(mapping.Resource.Resource).
+		Body(obj).
+		VersionedParams(createOptions, metav1.ParameterCodec).
+		Context(ctx).
+		Do().
+		Into(obj)
 	if err != nil {
 		return fmt.Errorf("error creating object: %v", err)
 	}
@@ -206,11 +240,16 @@ func (a *Applier) update(ctx context.Context, opts *ApplyOptions, current, modif
 		return fmt.Errorf("unable to construct patcher: %v", err)
 	}
 	source := metadata.GetSelfLink() // This is optional and would normally be the file path
-	_, _, err = patcher.Patch(current, modifiedJSON, source, metadata.GetNamespace(), metadata.GetName(), nil)
+	_, patchedObj, err := patcher.Patch(current, modifiedJSON, source, metadata.GetNamespace(), metadata.GetName(), nil)
 	if err != nil {
 		return fmt.Errorf("unable to patch object: %v", err)
 	}
 
+	// Copy the patchedObj into the modified runtime.Object
+	err = a.copyInto(patchedObj, modified)
+	if err != nil {
+		return fmt.Errorf("error copying response: %v", err)
+	}
 	return nil
 }
 
@@ -221,13 +260,9 @@ func (a *Applier) newPatcher(opts *ApplyOptions, obj runtime.Object) (*Patcher, 
 		return nil, fmt.Errorf("couldn't construct rest mapping from GVK %s: %v", gvk.String(), err)
 	}
 
-	restConfig, err := a.configFor(gvk.GroupVersion())
+	restClient, err := a.restClientFor(gvk.GroupVersion())
 	if err != nil {
-		return nil, fmt.Errorf("error constructing config for Group Version %+v: %v", gvk.GroupVersion(), err)
-	}
-	restClient, err := rest.RESTClientFor(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialise rest client: %v", err)
+		return nil, fmt.Errorf("unable to get REST Client: %v", err)
 	}
 
 	helper := resource.NewHelper(restClient, mapping)
@@ -241,8 +276,8 @@ func (a *Applier) newPatcher(opts *ApplyOptions, obj runtime.Object) (*Patcher, 
 		Cascade:       *opts.CascadeDeletion,
 		Timeout:       *opts.DeletionTimeout,
 		GracePeriod:   *opts.DeletionGracePeriod,
-		ServerDryRun:  false, // TODO(JoelSpeed): Implement ServerDryRun in Apply
-		OpenapiSchema: nil,   // Not supporting OpenapiSchema patching
+		ServerDryRun:  *opts.ServerDryRun,
+		OpenapiSchema: nil, // Not supporting OpenapiSchema patching
 		Retries:       maxPatchRetry,
 	}
 	return p, nil
@@ -282,4 +317,36 @@ func newUnstructuredFor(obj runtime.Object) *unstructured.Unstructured {
 	u.SetAPIVersion(apiVersion)
 
 	return u
+}
+
+func (a *Applier) restClientFor(gv schema.GroupVersion) (*rest.RESTClient, error) {
+	restConfig, err := a.configFor(gv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct config for Group Version %+v: %v", gv, err)
+	}
+	restClient, err := rest.RESTClientFor(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialise rest client: %v", err)
+	}
+	return restClient, nil
+}
+
+func (a *Applier) copyInto(in, out runtime.Object) error {
+	data, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+	gvk := in.GetObjectKind().GroupVersionKind()
+	_, _, err = a.codecs.UniversalDecoder().Decode(data, &gvk, out)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func isNamespaced(mapping *meta.RESTMapping) bool {
+	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+		return false
+	}
+	return true
 }
