@@ -26,10 +26,10 @@ const resourceStateAnnotation = "faros.pusher.com/resource-state"
 
 const (
 	// ActiveResourceState represents the default state of a resource
-	ActiveResourceState ResourceState = "Active"
+	ActiveResourceState ResourceState = "active"
 	// MarkedForDeletionResourceState represents the state of a resource
 	// that is marked for deletion
-	MarkedForDeletionResourceState ResourceState = "MarkedForDeletion"
+	MarkedForDeletionResourceState ResourceState = "marked-for-deletion"
 )
 
 // ResourceState represents a resource state
