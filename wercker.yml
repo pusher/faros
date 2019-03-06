@@ -74,8 +74,8 @@ test:
   - script:
       name: Setup Test environment
       code: |
-        export version=1.0.8 # latest stable version
-        export arch=amd64
+        version=1.0.8 # latest stable version
+        arch=amd64
 
         # download the release
         curl -L -O "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_${arch}.tar.gz"

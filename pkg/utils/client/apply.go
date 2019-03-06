@@ -197,7 +197,7 @@ func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Ob
 
 	mapping, err := a.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return fmt.Errorf("unable to get rest mapping for GroupVersionKind %s: %v", gvk.String(), err)
+		return fmt.Errorf("unable to get REST mapping for GroupVersionKind %s: %v", gvk.String(), err)
 	}
 
 	metadata, err := meta.Accessor(obj)
@@ -322,7 +322,7 @@ func newUnstructuredFor(obj runtime.Object) *unstructured.Unstructured {
 func (a *Applier) restClientFor(gv schema.GroupVersion) (*rest.RESTClient, error) {
 	restConfig, err := a.configFor(gv)
 	if err != nil {
-		return nil, fmt.Errorf("error constructing config for Group Version %+v: %v", gv, err)
+		return nil, fmt.Errorf("failed to construct config for Group Version %+v: %v", gv, err)
 	}
 	restClient, err := rest.RESTClientFor(restConfig)
 	if err != nil {

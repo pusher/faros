@@ -70,12 +70,12 @@ func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 func NewDryRunVerifier(config *rest.Config) (*DryRunVerifier, error) {
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating Dynamic Client: %v", err)
+		return nil, fmt.Errorf("failed to create Dynamic Client: %v", err)
 	}
 
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating Discovery Client: %v", err)
+		return nil, fmt.Errorf("failed to create Discovery Client: %v", err)
 	}
 
 	return &DryRunVerifier{
