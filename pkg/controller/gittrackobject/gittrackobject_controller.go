@@ -241,15 +241,16 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, nil
 	}
 
-	deleteStrategy, err := gittrackobjectutils.GetDeleteStrategy(child)
+	// Check if the resource is marked for deletion
+	resourceState, err := gittrackobjectutils.GetResourceState(child)
 	if err != nil {
 		sOpts.inSyncReason = gittrackobjectutils.ErrorUpdatingChild
-		sOpts.inSyncError = fmt.Errorf("unable to get delete strategy: %v", err)
+		sOpts.inSyncError = fmt.Errorf("unable to get resource state: %v", err)
 		return reconcile.Result{}, sOpts.inSyncError
 	}
 
-	if deleteStrategy == gittrackobjectutils.DeleteResourceStrategy {
-		log.Printf("Delete strategy for %s set to delete resource, deleting", child.GetName())
+	if resourceState == gittrackobjectutils.MarkedForDeletionResourceState {
+		log.Printf("Resource %s marked for deletion, deleting", child.GetName())
 		mOpts.inSync = true
 		r.applier.Delete(context.TODO(), child)
 		return reconcile.Result{}, nil
