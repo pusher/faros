@@ -67,16 +67,22 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create applier: %v", err))
 	}
 
+	dryRunVerifier, err := utils.NewDryRunVerifier(mgr.GetConfig())
+	if err != nil {
+		panic(fmt.Errorf("unable to create dry run verifier: %v", err))
+	}
+
 	return &ReconcileGitTrackObject{
-		Client:      mgr.GetClient(),
-		scheme:      mgr.GetScheme(),
-		eventStream: make(chan event.GenericEvent),
-		cache:       mgr.GetCache(),
-		informers:   make(map[string]toolscache.SharedIndexInformer),
-		config:      mgr.GetConfig(),
-		stop:        stop,
-		recorder:    mgr.GetRecorder("gittrackobject-controller"),
-		applier:     applier,
+		Client:         mgr.GetClient(),
+		scheme:         mgr.GetScheme(),
+		eventStream:    make(chan event.GenericEvent),
+		cache:          mgr.GetCache(),
+		informers:      make(map[string]toolscache.SharedIndexInformer),
+		config:         mgr.GetConfig(),
+		stop:           stop,
+		recorder:       mgr.GetRecorder("gittrackobject-controller"),
+		applier:        applier,
+		dryRunVerifier: dryRunVerifier,
 	}
 }
 
@@ -162,7 +168,8 @@ type ReconcileGitTrackObject struct {
 	stop        chan struct{}
 	recorder    record.EventRecorder
 
-	applier farosclient.Client
+	applier        farosclient.Client
+	dryRunVerifier *utils.DryRunVerifier
 }
 
 // EventStream returns a stream of generic event to trigger reconciles
