@@ -41,7 +41,6 @@ var _ = Describe("Applier Suite", func() {
 	var stopMgr chan struct{}
 
 	const timeout = time.Second * 5
-	const consistentlyTimeout = time.Second
 
 	BeforeEach(func() {
 		mgr, err := manager.New(cfg, manager.Options{})

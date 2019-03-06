@@ -36,7 +36,7 @@ var cfg *rest.Config
 
 func TestMain(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Client Controller Suite")
+	RunSpecs(t, "Client Suite")
 }
 
 var t *envtest.Environment
