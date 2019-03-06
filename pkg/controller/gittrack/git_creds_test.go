@@ -19,6 +19,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	gitstore "github.com/pusher/git-store"
 )
 
 var _ = Describe("GitTrack Suite", func() {
@@ -30,8 +31,11 @@ var _ = Describe("GitTrack Suite", func() {
 			})
 
 			It("sets the private key", func() {
-				Expect(repo.URL).To(Equal("ssh@tempuri.org"))
-				Expect(repo.PrivateKey).To(Equal([]byte("mySecret")))
+				expected := gitstore.RepoRef{
+					URL:        "ssh@tempuri.org",
+					PrivateKey: []byte("mySecret"),
+				}
+				Expect(expected).To(BeEquivalentTo(*repo))
 			})
 		})
 
@@ -43,9 +47,12 @@ var _ = Describe("GitTrack Suite", func() {
 				})
 
 				It("sets the username and password", func() {
-					Expect(repo.URL).To(Equal("https://tempuri.org"))
-					Expect(repo.User).To(Equal("username"))
-					Expect(repo.Pass).To(Equal("password"))
+					expected := gitstore.RepoRef{
+						URL:  "https://tempuri.org",
+						User: "username",
+						Pass: "password",
+					}
+					Expect(expected).To(BeEquivalentTo(*repo))
 				})
 			})
 
