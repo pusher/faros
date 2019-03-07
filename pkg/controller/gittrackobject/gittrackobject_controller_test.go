@@ -167,6 +167,29 @@ spec:
         image: nginx:{{ .Tag }}
 `
 
+var deleteAnnotationExample = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example
+  namespace: default
+  labels:
+    app: nginx
+  annotations:
+    faros.pusher.com/resource-state: "{{ .ResourceState }}"
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:{{ .Tag }}
+`
+
 var clusterAnnotationExample = `apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -383,6 +406,30 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 		Context("and the value is anything else", func() {
 			It("sets an error condition", ClusterUpdateStrategyError)
+		})
+	})
+
+	Context("When a GitTrackObject has a `resource-state` annotation", func() {
+		BeforeEach(func() {
+			CreateInstance([]byte(exampleDeployment2))
+			// wait for create reconcile
+			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			// wait for reconcile of status
+			Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+			// Wait for client cache to expire
+			WaitForStatus(depKey)
+		})
+
+		Context("and the value is `active`", func() {
+			It("does update the resource", ResourceStateShouldActive)
+		})
+
+		Context("and the value is `marked-for-deletion`", func() {
+			It("does delete the resource", ResourceStateShouldMarkedForDeletion)
+		})
+
+		Context("and the value is anything else", func() {
+			It("sets an error condition", ResourceStateError)
 		})
 	})
 })
@@ -1196,6 +1243,47 @@ var (
 		}, timeout).Should(Succeed())
 		condition := instance.Status.Conditions[0]
 		Expect(condition.Message).To(MatchRegexp("unable to get update strategy: invalid update strategy: anything-else"))
+	}
+
+	ResourceStateShouldActive = func() {
+		values := map[string]string{"ResourceState": "active", "Tag": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		container := deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:latest"))
+		UpdateInstance(instance, renderExample(deleteAnnotationExample, values), true)
+		Eventually(func() error { return CheckImageTag("nginx:v2.0.0") }, timeout).Should(Succeed())
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		container = deploy.Spec.Template.Spec.Containers[0]
+		Expect(container.Image).To(Equal("nginx:v2.0.0"))
+	}
+
+	ResourceStateShouldMarkedForDeletion = func() {
+		values := map[string]string{"ResourceState": "marked-for-deletion", "Tag": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		deploy := &appsv1.Deployment{}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).Should(Succeed())
+		UpdateInstance(instance, renderExample(deleteAnnotationExample, values), true)
+		Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).ShouldNot(Succeed())
+	}
+
+	ResourceStateError = func() {
+		values := map[string]string{"ResourceState": "anything-else", "Tag": "v2.0.0"}
+		Eventually(func() error { return c.Get(context.TODO(), depKey, instance) }, timeout).Should(Succeed())
+		UpdateInstance(instance, renderExample(deleteAnnotationExample, values), true)
+		Eventually(func() error {
+			err := c.Get(context.TODO(), depKey, instance)
+			if err != nil {
+				return err
+			}
+			if instance.Status.Conditions[0].Reason != string(gittrackobjectutils.ErrorUpdatingChild) {
+				return fmt.Errorf("condition hasn't been updated")
+			}
+			return nil
+		}, timeout).Should(Succeed())
+		condition := instance.Status.Conditions[0]
+		Expect(condition.Message).To(MatchRegexp("unable to get resource state: invalid resource state: anything-else"))
 	}
 
 	ClusterUpdateStrategyShouldUpdate = func() {
