@@ -25,7 +25,11 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/pkg/utils/client/test"
 	appsv1 "k8s.io/api/apps/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -43,7 +47,11 @@ var _ = Describe("Applier Suite", func() {
 	const timeout = time.Second * 5
 
 	BeforeEach(func() {
-		mgr, err := manager.New(cfg, manager.Options{})
+		schm := scheme.Scheme
+		Expect(apiextensionsv1beta1.AddToScheme(schm)).To(Succeed())
+		mgr, err := manager.New(cfg, manager.Options{
+			Scheme: schm,
+		})
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
 		m = test.Matcher{Client: c}
@@ -63,6 +71,7 @@ var _ = Describe("Applier Suite", func() {
 
 		test.DeleteAll(cfg, timeout,
 			&appsv1.DeploymentList{},
+			&apiextensionsv1beta1.CustomResourceDefinitionList{},
 		)
 	})
 
@@ -185,6 +194,35 @@ var _ = Describe("Applier Suite", func() {
 						Not(ContainElement(test.WithImage(Equal("nginx:latest")))),
 					)))
 				})
+			})
+		})
+	})
+
+	Describe("with CRDs", func() {
+		var foo *unstructured.Unstructured
+		var crd *apiextensionsv1beta1.CustomResourceDefinition
+
+		BeforeEach(func() {
+			foo = test.ExampleFoo.DeepCopy()
+			crd = test.ExampleCRD.DeepCopy()
+		})
+
+		Describe("when the CRD is not installed", func() {
+			It("should return an error when applying the CRD", func() {
+				err := a.Apply(context.TODO(), &ApplyOptions{}, foo)
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).Should(Equal("unable to get current resource: no matches for kind \"Foo\" in version \"example.com/v1\""))
+			})
+		})
+
+		Describe("when the CRD is installed", func() {
+			BeforeEach(func() {
+				m.Create(crd).Should(Succeed())
+				m.Get(crd, timeout).Should(Succeed())
+			})
+
+			It("should not return an error when applying the CRD", func() {
+				Expect(a.Apply(context.TODO(), &ApplyOptions{}, foo)).ToNot(HaveOccurred())
 			})
 		})
 	})
