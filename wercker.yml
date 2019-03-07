@@ -26,6 +26,9 @@ generate:
     - wercker/setup-go-workspace:
         package-dir: github.com/pusher/faros
     - script:
+        name: configure make
+        code: ./configure --ci
+    - script:
         name: Generate code
         code: make generate
     - script:

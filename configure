@@ -15,6 +15,9 @@ declare -A desired=()
 
 for arg in "$@"; do
   case ${arg%%=*} in
+    "--ci")
+      ci=true
+      ;;
     "--with-go")
       desired[go]="${arg##*=}"
       ;;
@@ -169,12 +172,15 @@ check_for tar
 check_for go
 check_go_version
 check_go_env
-check_for dep
-check_for kubectl
-check_for kustomize
-check_for golangci-lint
-check_kubebuilder
-check_kubebuilder_version
+
+if ! [[ ci -eq true ]]; then
+  check_for dep
+  check_for kubectl
+  check_for kustomize
+  check_for golangci-lint
+  check_kubebuilder
+  check_kubebuilder_version
+fi
 
 cat <<- EOF > .env
   MAKE := "${tools[make]}"
