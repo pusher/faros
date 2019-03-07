@@ -56,6 +56,20 @@ well as providing a canonical history of what was deployed and when.
 
 ## Installation
 
+### Building
+
+To build faros locally, run
+```
+./configure
+make build
+```
+
+In order to build all binaries for all supported architectures, you may
+```
+./configure
+make release
+```
+
 ### Deploying to Kubernetes
 
 Faros is a [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) based
