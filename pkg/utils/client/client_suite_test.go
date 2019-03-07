@@ -18,7 +18,6 @@ package client
 
 import (
 	"log"
-	"path/filepath"
 	"sync"
 	"testing"
 
@@ -42,9 +41,7 @@ func TestMain(t *testing.T) {
 var t *envtest.Environment
 
 var _ = BeforeSuite(func() {
-	t = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
-	}
+	t = &envtest.Environment{}
 
 	logf.SetLogger(glogr.New())
 
