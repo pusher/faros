@@ -19,7 +19,9 @@ package test
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var appNginx = map[string]string{
@@ -53,6 +55,41 @@ var ExampleDeployment = &appsv1.Deployment{
 					},
 				},
 			},
+		},
+	},
+}
+
+// ExampleCRD is an example CRD object for use within test suites
+var ExampleCRD = &apiextensionsv1beta1.CustomResourceDefinition{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: "apiextensions.k8s.io/v1beta1",
+		Kind:       "CustomResourceDefinition",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "foos.example.com",
+	},
+	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+		Group: "example.com",
+		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Kind:   "Foo",
+			Plural: "foos",
+		},
+		Scope:   apiextensionsv1beta1.NamespaceScoped,
+		Version: "v1",
+	},
+}
+
+// ExampleFoo is an example Foo object for use within test suites
+var ExampleFoo = &unstructured.Unstructured{
+	Object: map[string]interface{}{
+		"apiVersion": "example.com/v1",
+		"kind":       "Foo",
+		"metadata": map[string]interface{}{
+			"name":      "example",
+			"namespace": "default",
+		},
+		"spec": map[string]interface{}{
+			"foo": "bar",
 		},
 	},
 }
