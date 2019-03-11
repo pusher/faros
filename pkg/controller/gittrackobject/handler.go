@@ -226,6 +226,7 @@ func (r *ReconcileGitTrackObject) applyChildWithDryRun(found, child *unstructure
 	dryRunTrue := true
 	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force, ServerDryRun: &dryRunTrue}, child)
 	if err != nil {
+		fmt.Printf("DryRun failed: %+v\n", err)
 		return false, fmt.Errorf("unable to update child resource: %v", err)
 	}
 
@@ -237,6 +238,7 @@ func (r *ReconcileGitTrackObject) applyChildWithDryRun(found, child *unstructure
 	// The DryRun showed a change is required so now update without DryRun
 	err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
 	if err != nil {
+		fmt.Printf("Apply failed: %+v\n", err)
 		return false, fmt.Errorf("unable to update child resource: %v", err)
 	}
 	return true, nil
