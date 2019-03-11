@@ -210,15 +210,22 @@ func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1
 
 // recreateChild first deletes and then creates a child resource for a (Cluster)GitTrackObject
 func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) (bool, error) {
-	if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err != nil {
+	// HasSupport returns an error if dry run not supported
+	if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err == nil {
 		return r.applyChildWithDryRun(found, child, true)
 	}
+	// Dry run not supported so apply without DryRun
 	return r.applyChild(found, child, true)
 }
 
 // updateChild updates the given child resource of a (Cluster)GitTrackObject
 func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) (bool, error) {
-	return r.applyChildWithDryRun(found, child, false)
+	// HasSupport returns an error if dry run not supported
+	if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err == nil {
+		return r.applyChildWithDryRun(found, child, false)
+	}
+	// Dry run not supported so apply without DryRun
+	return r.applyChild(found, child, false)
 }
 
 // applyChildWithDryRun first applies the child with DryRun and then updates the resource if there is change to persist
