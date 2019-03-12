@@ -183,17 +183,17 @@ if [[ $ci != "true" ]]; then
 fi
 
 cat <<- EOF > .env
-  MAKE := "${tools[make]}"
-  SED := "${tools[sed]}"
-  SHASUM := "${tools[shasum]}"
-  TAR := "${tools[tar]}"
-  GO := "${tools[go]}"
-  GOVERSION := "$GO_VERSION"
-  DEP := "${tools[dep]}"
-  LINTER := "${tools[golangci-lint]}"
-  KUBECTL := "${tools[kubectl]}"
-  KUSTOMIZE := "${tools[kustomize]}"
-  KUBEBUILDER := ${tools[kubebuilder]}
+MAKE := ${tools[make]}
+SED := ${tools[sed]}
+SHASUM := ${tools[shasum]}
+TAR := ${tools[tar]}
+GO := ${tools[go]}
+GOVERSION := $GO_VERSION
+DEP := ${tools[dep]}
+LINTER := ${tools[golangci-lint]}
+KUBECTL := ${tools[kubectl]}
+KUSTOMIZE := ${tools[kustomize]}
+KUBEBUILDER := ${tools[kubebuilder]}
 EOF
 
 echo "Environment configuration written to .env"
