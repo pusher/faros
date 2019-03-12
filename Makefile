@@ -8,37 +8,37 @@ IMG := faros-gittrack-controller:latest
 
 .NOTPARALLEL:
 
-.PHONEY: all
+.PHONY: all
 all: test build
 
-.PHONEY: build
+.PHONY: build
 build: clean $(BINARY)
 
-.PHONEY: clean
+.PHONY: clean
 clean:
 	rm -f $(BINARY)
 
-.PHONEY: distclean
+.PHONY: distclean
 distclean: clean
 	rm -rf vendor
 	rm -rf release
 
 # Generate code
-.PHONEY: generate
+.PHONY: generate
 generate: vendor
 	$(GO) generate ./pkg/... ./cmd/...
 
 # Run go fmt against code
-.PHONEY: fmt
+.PHONY: fmt
 fmt:
 	$(GO) fmt ./pkg/... ./cmd/...
 
 # Run go vet against code
-.PHONEY: vet
+.PHONY: vet
 vet:
 	$(GO) vet ./pkg/... ./cmd/...
 
-.PHONEY: lint
+.PHONY: lint
 lint:
 	$(LINTER) run --disable-all \
           --enable=vet \
@@ -62,7 +62,7 @@ export TEST_ASSET_ETCD := $(KUBEBUILDER)/bin/etcd
 vendor:
 	$(DEP) ensure --vendor-only
 
-.PHONEY: test
+.PHONY: test
 test: vendor generate fmt vet lint manifests
 	$(GO) test ./pkg/... ./cmd/... -coverprofile cover.out
 
