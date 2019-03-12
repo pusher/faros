@@ -72,7 +72,7 @@ $(BINARY): generate fmt vet
 
 # Build all arch binaries
 release: test
-	mkdir release
+	mkdir -p release
 	GOOS=darwin GOARCH=amd64 go build -ldflags="-X main.VERSION=${VERSION}" -o release/$(BINARY)-darwin-amd64 github.com/pusher/faros/cmd/manager
 	GOOS=linux GOARCH=amd64 go build -ldflags="-X main.VERSION=${VERSION}" -o release/$(BINARY)-linux-amd64 github.com/pusher/faros/cmd/manager
 	GOOS=linux GOARCH=arm64 go build -ldflags="-X main.VERSION=${VERSION}" -o release/$(BINARY)-linux-arm64 github.com/pusher/faros/cmd/manager
