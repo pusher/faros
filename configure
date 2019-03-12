@@ -173,7 +173,7 @@ check_for go
 check_go_version
 check_go_env
 
-if ! [[ ci -eq true ]]; then
+if [[ $ci != "true" ]]; then
   check_for dep
   check_for kubectl
   check_for kustomize
