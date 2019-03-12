@@ -83,7 +83,7 @@ vercomp () {
 
 check_go_version() {
   echo -n "Checking go version... "
-  GO_VERSION=$(${tools[go]} version | ${tools[awk]} '{where = match($0, /[0-9]\.[0-9]+\.[0-9]*/); if (where != 0) print substr($0, RSTART, RLENGTH)}')
+  GO_VERSION=$(${tools[go]} version | ${tools[awk]} '{where = match($0, /[0-9]\.[0-9]+[\.0-9]*/); if (where != 0) print substr($0, RSTART, RLENGTH)}')
   vercomp $GO_VERSION 1.10
   case $? in
     0) ;&
@@ -188,7 +188,7 @@ cat <<- EOF > .env
   SHASUM := "${tools[shasum]}"
   TAR := "${tools[tar]}"
   GO := "${tools[go]}"
-  GOVERSION := $GO_VERSION
+  GOVERSION := "$GO_VERSION"
   DEP := "${tools[dep]}"
   LINTER := "${tools[golangci-lint]}"
   KUBECTL := "${tools[kubectl]}"
