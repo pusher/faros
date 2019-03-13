@@ -170,15 +170,16 @@ check_for sed
 check_for shasum
 check_for tar
 check_for go
+check_for dep
+check_for ginkgo
+check_for golangci-lint
+check_kubebuilder
 check_go_version
 check_go_env
 
 if [[ $ci != "true" ]]; then
-  check_for dep
   check_for kubectl
   check_for kustomize
-  check_for golangci-lint
-  check_kubebuilder
   check_kubebuilder_version
 fi
 
@@ -189,6 +190,7 @@ SHASUM := ${tools[shasum]}
 TAR := ${tools[tar]}
 GO := ${tools[go]}
 GOVERSION := $GO_VERSION
+GINKGO := ${tools[ginkgo]}
 DEP := ${tools[dep]}
 LINTER := ${tools[golangci-lint]}
 KUBECTL := ${tools[kubectl]}
