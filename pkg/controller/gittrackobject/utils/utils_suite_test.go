@@ -19,12 +19,12 @@ package utils_test
 import (
 	"testing"
 
-	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pusher/faros/test/reporters"
 )
 
 func TestUtils(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t, "Utils Suite", []Reporter{test.NewlineReporter{}})
+	RunSpecsWithDefaultAndCustomReporters(t, "Utils Suite", reporters.Reporters())
 }

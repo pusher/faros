@@ -21,11 +21,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/pkg/apis"
 	farosflags "github.com/pusher/faros/pkg/flags"
+	"github.com/pusher/faros/test/reporters"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,7 +40,7 @@ var cfg *rest.Config
 
 func TestGitTrackObjectController(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t, "GitTrackObject Suite", []Reporter{test.NewlineReporter{}})
+	RunSpecsWithDefaultAndCustomReporters(t, "GitTrackObject Suite", reporters.Reporters())
 }
 
 var t *envtest.Environment

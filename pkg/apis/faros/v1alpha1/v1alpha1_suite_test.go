@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/pusher/faros/test/reporters" // Not using ginkgo here but need the flags set from this package
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
