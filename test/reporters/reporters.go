@@ -3,6 +3,7 @@ package reporters
 import (
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
 	"github.com/onsi/ginkgo"
@@ -21,9 +22,10 @@ func init() {
 
 // Reporters creates the ginkgo reporters for the test suites
 func Reporters() []ginkgo.Reporter {
+	now, _ := time.Now().MarshalText()
 	reps := []ginkgo.Reporter{test.NewlineReporter{}}
 	if reportDir != "" {
-		reps = append(reps, reporters.NewJUnitReporter(fmt.Sprintf("%s/junit_%d.xml", reportDir, config.GinkgoConfig.ParallelNode)))
+		reps = append(reps, reporters.NewJUnitReporter(fmt.Sprintf("%s/junit_%s_%d.xml", reportDir, string(now), config.GinkgoConfig.ParallelNode)))
 	}
 	return reps
 }
