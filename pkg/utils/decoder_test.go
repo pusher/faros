@@ -3,17 +3,17 @@ package utils_test
 import (
 	"testing"
 
-	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/pusher/faros/pkg/utils"
+	"github.com/pusher/faros/test/reporters"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestDecoder(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t, "Decoder Suite", []Reporter{test.NewlineReporter{}})
+	RunSpecsWithDefaultAndCustomReporters(t, "Decoder Suite", reporters.Reporters())
 }
 
 var roleBinding = `---

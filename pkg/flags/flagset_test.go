@@ -19,15 +19,15 @@ package flags
 import (
 	"testing"
 
-	"github.com/kubernetes-sigs/kubebuilder/pkg/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pusher/faros/test/reporters"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestFlagSet(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t, "FlagSet Suite", []Reporter{test.NewlineReporter{}})
+	RunSpecsWithDefaultAndCustomReporters(t, "FlagSet Suite", reporters.Reporters())
 }
 
 var _ = Describe("FlagSet Suite", func() {
