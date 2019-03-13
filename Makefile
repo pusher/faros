@@ -1,3 +1,4 @@
+include Makefile.tools
 include .env
 
 BINARY := faros-gittrack-controller
@@ -26,7 +27,16 @@ distclean: clean
 # Generate code
 .PHONY: generate
 generate: vendor
+	@ echo "\033[36mGenerating code\033[0m"
 	$(GO) generate ./pkg/... ./cmd/...
+	@ echo
+
+# Verify generated code has been checked in
+verify-%:
+	@ make $*
+	@ echo "\033[36mVerifying Git Status\033[0m"
+	@ if [ "$$(git status -s)" != "" ]; then git --no-pager diff --color; echo "\033[31;1mERROR: Git Diff found. Please run \`make $*\` and commit the result.\033[0m"; exit 1; else echo "\033[32mVerified $*\033[0m";fi
+	@ echo
 
 # Run go fmt against code
 .PHONY: fmt
@@ -40,6 +50,7 @@ vet:
 
 .PHONY: lint
 lint:
+	@ echo "\033[36mLinting code\033[0m"
 	$(LINTER) run --disable-all \
           --enable=vet \
           --enable=vetshadow \
@@ -53,6 +64,7 @@ lint:
           --deadline=120s \
           --verbose \
           --tests ./...
+		@ echo
 
 # Run tests
 export TEST_ASSET_KUBECTL := $(KUBEBUILDER)/bin/kubectl
@@ -60,11 +72,19 @@ export TEST_ASSET_KUBE_APISERVER := $(KUBEBUILDER)/bin/kube-apiserver
 export TEST_ASSET_ETCD := $(KUBEBUILDER)/bin/etcd
 
 vendor:
+	@ echo "\033[36mPuling dependencies\033[0m"
 	$(DEP) ensure --vendor-only
+	@ echo
 
 .PHONY: test
 test: vendor generate fmt vet lint manifests
 	$(GO) test ./pkg/... ./cmd/... -coverprofile cover.out
+
+.PHONY: test-ginkgo
+test-ginkgo: vendor generate manifests
+	@ echo "\033[36mRunning test suite in Ginkgo\033[0m"
+	$(GINKGO) -v -race -randomizeAllSpecs ./pkg/... ./cmd/...
+	@ echo
 
 # Build manager binary
 $(BINARY): generate fmt vet
@@ -103,8 +123,10 @@ deploy: manifests
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests:
+manifests: vendor
+	@ echo "\033[36mGenerating manifests\033[0m"
 	$(GO) run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+	@ echo
 
 # Build the docker image
 docker-build: test
