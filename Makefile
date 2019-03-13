@@ -83,7 +83,7 @@ test: vendor generate fmt vet lint manifests
 .PHONY: test-ginkgo
 test-ginkgo: vendor generate manifests
 	@ echo "\033[36mRunning test suite in Ginkgo\033[0m"
-	$(GINKGO) -v -race -randomizeAllSpecs ./pkg/... ./cmd/...
+	$(GINKGO) -v -race -randomizeAllSpecs ./pkg/... ./cmd/... -- -report-dir=$$ARTIFACTS
 	@ echo
 
 # Build manager binary
