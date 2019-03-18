@@ -6,6 +6,13 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: gittrackobjects.faros.pusher.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[0].status
+    name: In-Sync
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: faros.pusher.com
   names:
     kind: GitTrackObject

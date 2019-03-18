@@ -6,6 +6,28 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: gittracks.faros.pusher.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.repository
+    name: Repository
+    type: string
+  - JSONPath: .spec.reference
+    name: Reference
+    type: string
+  - JSONPath: .status.objectsApplied
+    name: objectsApplied
+    type: integer
+  - JSONPath: .status.objectsDiscovered
+    name: objectsDiscovered
+    type: integer
+  - JSONPath: .status.objectsIgnored
+    name: objectsIgnored
+    type: integer
+  - JSONPath: .status.objectsInSync
+    name: objectsInSync
+    type: integer
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: faros.pusher.com
   names:
     kind: GitTrack

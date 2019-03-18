@@ -110,6 +110,13 @@ type GitTrackCondition struct {
 
 // GitTrack is the Schema for the gittracks API
 // +k8s:openapi-gen=true
+// +kubebuilder:printcolumn:name="Repository",type="string",JSONPath=".spec.repository"
+// +kubebuilder:printcolumn:name="Reference",type="string",JSONPath=".spec.reference"
+// +kubebuilder:printcolumn:name="objectsApplied",type="integer",JSONPath=".status.objectsApplied"
+// +kubebuilder:printcolumn:name="objectsDiscovered",type="integer",JSONPath=".status.objectsDiscovered"
+// +kubebuilder:printcolumn:name="objectsIgnored",type="integer",JSONPath=".status.objectsIgnored"
+// +kubebuilder:printcolumn:name="objectsInSync",type="integer",JSONPath=".status.objectsInSync"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type GitTrack struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
