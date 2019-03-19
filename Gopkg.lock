@@ -1640,6 +1640,8 @@
     "github.com/kubernetes-sigs/kubebuilder",
     "github.com/kubernetes-sigs/kubebuilder/pkg/test",
     "github.com/onsi/ginkgo",
+    "github.com/onsi/ginkgo/config",
+    "github.com/onsi/ginkgo/reporters",
     "github.com/onsi/gomega",
     "github.com/onsi/gomega/types",
     "github.com/prometheus/client_golang/prometheus",
