@@ -227,6 +227,10 @@ func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstruc
 
 // applyChildWithDryRun first applies the child with DryRun and then updates the resource if there is change to persist
 func (r *ReconcileGitTrackObject) applyChildWithDryRun(found, child *unstructured.Unstructured, force bool) (bool, error) {
+	// Take a copy of the original child so that if the dry run shows a diff,
+	// we Apply the original state of the child object
+	originalChild := child.DeepCopy()
+
 	dryRunTrue := true
 	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force, ServerDryRun: &dryRunTrue}, child)
 	if err != nil {
@@ -239,7 +243,7 @@ func (r *ReconcileGitTrackObject) applyChildWithDryRun(found, child *unstructure
 	}
 
 	// The DryRun showed a change is required so now update without DryRun
-	err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
+	err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, originalChild)
 	if err != nil {
 		return false, fmt.Errorf("unable to update child resource: %v", err)
 	}
