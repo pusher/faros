@@ -6,6 +6,13 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: clustergittrackobjects.faros.pusher.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=="ObjectInSync")].status
+    name: InSync
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: faros.pusher.com
   names:
     kind: ClusterGitTrackObject

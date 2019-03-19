@@ -26,6 +26,8 @@ import (
 
 // ClusterGitTrackObject is the Schema for the clustergittrackobjects API
 // +k8s:openapi-gen=true
+// +kubebuilder:printcolumn:name="InSync",type="string",JSONPath=".status.conditions[?(@.type=="ObjectInSync")].status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type ClusterGitTrackObject struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
