@@ -15,9 +15,6 @@ declare -A desired=()
 
 for arg in "$@"; do
   case ${arg%%=*} in
-    "--ci")
-      ci=true
-      ;;
     "--with-go")
       desired[go]="${arg##*=}"
       ;;
