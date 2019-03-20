@@ -67,9 +67,9 @@ lint:
 		@ echo
 
 # Run tests
-export TEST_ASSET_KUBECTL := $(KUBEBUILDER)/bin/kubectl
-export TEST_ASSET_KUBE_APISERVER := $(KUBEBUILDER)/bin/kube-apiserver
-export TEST_ASSET_ETCD := $(KUBEBUILDER)/bin/etcd
+export TEST_ASSET_KUBECTL := $(KUBEBUILDER)/kubectl
+export TEST_ASSET_KUBE_APISERVER := $(KUBEBUILDER)/kube-apiserver
+export TEST_ASSET_ETCD := $(KUBEBUILDER)/etcd
 
 vendor:
 	@ echo "\033[36mPuling dependencies\033[0m"
@@ -77,11 +77,7 @@ vendor:
 	@ echo
 
 .PHONY: test
-test: vendor generate fmt vet lint manifests
-	$(GO) test ./pkg/... ./cmd/... -coverprofile cover.out
-
-.PHONY: test-ginkgo
-test-ginkgo: vendor generate manifests
+test: vendor generate manifests
 	@ echo "\033[36mRunning test suite in Ginkgo\033[0m"
 	$(GINKGO) -v -race -randomizeAllSpecs ./pkg/... ./cmd/... -- -report-dir=$$ARTIFACTS
 	@ echo
