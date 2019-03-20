@@ -3,7 +3,6 @@ include .env
 
 BINARY := faros-gittrack-controller
 VERSION := $(shell git describe --always --dirty --tags 2>/dev/null || echo "undefined")
-DOCKER_TAG_VERSION := $(shell echo ${VERSION} | sed 's/-/_/g')
 
 # Image URL to use all building/pushing image targets
 IMG := quay.io/pusher/faros
@@ -130,14 +129,14 @@ manifests: vendor
 
 # Build the docker image
 docker-build:
-	docker build . -t ${IMG}:${DOCKER_TAG_VERSION}
-	@echo "\033[36mBuilt $(IMG):$(DOCKER_TAG_VERSION)\033[0m"
+	docker build . -t ${IMG}:${VERSION}
+	@echo "\033[36mBuilt $(IMG):$(VERSION)\033[0m"
 
 TAGS ?= latest
 docker-tag:
-	@for tag in {${TAGS}}; do docker tag ${IMG}:${DOCKER_TAG_VERSION} ${IMG}:$${tag}; echo "\033[36mTagged $(IMG):$(DOCKER_TAG_VERSION) as $${tag}\033[0m"; done
+	@for tag in {${TAGS},}; do docker tag ${IMG}:${VERSION} ${IMG}:$${tag}; echo "\033[36mTagged $(IMG):$(VERSION) as $${tag}\033[0m"; done
 
 # Push the docker image
-PUSH_TAGS ?= ${DOCKER_TAG_VERSION},latest
+PUSH_TAGS ?= ${VERSION},latest
 docker-push:
-	@for tag in {${PUSH_TAGS}}; do docker push ${IMG}:$${tag}; echo "\033[36mPushed $(IMG):$${tag}\033[0m"; done
+	@for tag in {${PUSH_TAGS},}; do docker push ${IMG}:$${tag}; echo "\033[36mPushed $(IMG):$${tag}\033[0m"; done
