@@ -131,9 +131,9 @@ check_kubebuilder() {
   if ! [ -z "${desired[kubebuilder]}" ]; then
     TOOL_PATH="${desired[kubebuilder]}"
   else
-    TOOL_PATH=$(command -v kubebuilder | sed s/\\/bin\\/kubebuilder$//)
+    TOOL_PATH=$(command -v kubebuilder | sed s/\\/kubebuilder$//)
   fi
-  if ! [ -d "$TOOL_PATH" -a -f "$TOOL_PATH/bin/kubebuilder" -a -x "$TOOL_PATH/bin/kubebuilder" ]; then
+  if ! [ -d "$TOOL_PATH" -a -f "$TOOL_PATH/kubebuilder" -a -x "$TOOL_PATH/kubebuilder" ]; then
     printf "${RED}not found${NC}\n"
     cd - > /dev/null
     exit 1
@@ -141,25 +141,6 @@ check_kubebuilder() {
     printf "${GREEN}found${NC} - using $TOOL_PATH\n"
     tools[kubebuilder]=$TOOL_PATH
   fi
-}
-
-check_kubebuilder_version() {
-  echo -n "Checking kubebuilder version... "
-  ver=$( ${tools[kubebuilder]}/bin/kubebuilder version | awk '{where = match($0, /KubeBuilderVersion:"[0-9]\.[0-9]+\.[0-9]+"/); if (where != 0) print substr($0, RSTART+20, RLENGTH)}' | sed s/\",.\*// )
-  vercomp $ver 1.0.8
-  case $? in
-    0) ;&
-    1)
-      printf "${GREEN}"
-      echo $ver
-      printf "${NC}"
-      ;;
-    2)
-      printf "${RED}"
-      echo "$ver < 1.0.8"
-      exit 1
-      ;;
-  esac
 }
 
 cd ${0%/*}
@@ -176,12 +157,9 @@ check_for golangci-lint
 check_kubebuilder
 check_go_version
 check_go_env
+check_for kubectl
+check_for kustomize
 
-if [[ $ci != "true" ]]; then
-  check_for kubectl
-  check_for kustomize
-  check_kubebuilder_version
-fi
 
 cat <<- EOF > .env
 MAKE := ${tools[make]}

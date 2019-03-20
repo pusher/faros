@@ -1,7 +1,7 @@
 .PHONY: prepare-env-%
 prepare-env-%: gopath dep ginkgo-cli golangci-lint kustomize
 	make kubebuilder-tools-$*
-	PATH=$$GOPATH/bin:$$PATH ./configure
+	PATH=$$GOPATH/bin:$$PATH ./configure --with-kubebuilder=/usr/local/kubebuilder-$*/bin
 
 .PHONY: gopath
 gopath:
@@ -40,25 +40,26 @@ kustomize:
 kubebuilder-tools-1.13:
 	@ ver=$$(kubebuilder version | awk '{where = match($$0, /KubeBuilderVersion:"[0-9]\.[0-9]+\.[0-9]+"/); if (where != 0) print substr($$0, RSTART+20, RLENGTH)}' | sed s/\",.\*// ); \
 	if [ "$$ver" != "1.0.8" ]; then \
-	  kubebuilder_version=1.0.8 make install-kubebuilder-tools; \
+	  kubebuilder_version=1.0.8 kubernetes_version=1.13 make install-kubebuilder-tools; \
 	fi
 
 .PHONY: kubebuilder-tools-1.12
 kubebuilder-tools-1.12:
 	@ ver=$$(kubebuilder version | awk '{where = match($$0, /KubeBuilderVersion:"[0-9]\.[0-9]+\.[0-9]+"/); if (where != 0) print substr($$0, RSTART+20, RLENGTH)}' | sed s/\",.\*// ); \
 	if [ "$$ver" != "1.0.7" ]; then \
-	  kubebuilder_version=1.0.7 make install-kubebuilder-tools; \
+	  kubebuilder_version=1.0.7 kubernetes_version=1.12 make install-kubebuilder-tools; \
 	fi
 
 .PHONY: kubebuilder-tools-1.11
 kubebuilder-tools-1.11:
 	@ ver=$$(kubebuilder version | awk '{where = match($$0, /KubeBuilderVersion:"[0-9]\.[0-9]+\.[0-9]+"/); if (where != 0) print substr($$0, RSTART+20, RLENGTH)}' | sed s/\",.\*// ); \
 	if [ "$$ver" != "1.0.5" ]; then \
-	  kubebuilder_version=1.0.5 make install-kubebuilder-tools; \
+	  kubebuilder_version=1.0.5 kubernetes_version=1.11 make install-kubebuilder-tools; \
 	fi
 
 # latest stable version
 kubebuilder_version ?= 1.0.8
+kubernetes_version ?= 1.13
 os := $(shell uname | awk '{print tolower($$0)}')
 # Version string should be approx v1.x.x_linux_amd64
 kubebuilder_version_string=$(kubebuilder_version)_$(os)_amd64
@@ -70,12 +71,13 @@ install-kubebuilder-tools:
 	tar -zxvf kubebuilder_$(kubebuilder_version_string).tar.gz
 	rm kubebuilder_$(kubebuilder_version_string).tar.gz
 
-	export TEST_ASSET_DIR=/usr/local/bin; \
+	export TEST_ASSET_DIR=/usr/local/kubebuilder-${kubernetes_version}/bin; \
 	export TEST_ASSET_KUBECTL=$$TEST_ASSET_DIR/kubectl \
 	TEST_ASSET_KUBE_APISERVER=$$TEST_ASSET_DIR/kube-apiserver \
 	TEST_ASSET_ETCD=$$TEST_ASSET_DIR/etcd \
 	TEST_ASSET_KUBEBUILDER=$$TEST_ASSET_DIR/kubebuilder; \
 	\
+	mkdir -p $$TEST_ASSET_DIR; \
 	mv kubebuilder_$(kubebuilder_version_string)/bin/etcd $$TEST_ASSET_ETCD; \
 	mv kubebuilder_$(kubebuilder_version_string)/bin/kube-apiserver $$TEST_ASSET_KUBE_APISERVER; \
 	mv kubebuilder_$(kubebuilder_version_string)/bin/kubectl $$TEST_ASSET_KUBECTL; \
