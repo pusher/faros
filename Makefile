@@ -3,9 +3,10 @@ include .env
 
 BINARY := faros-gittrack-controller
 VERSION := $(shell git describe --always --dirty --tags 2>/dev/null || echo "undefined")
+DOCKER_TAG_VERSION := $(shell echo ${VERSION} | sed 's/-/_/g')
 
 # Image URL to use all building/pushing image targets
-IMG := faros-gittrack-controller:latest
+IMG := quay.io/pusher/faros
 
 .NOTPARALLEL:
 
@@ -76,6 +77,9 @@ vendor:
 	$(DEP) ensure --vendor-only
 	@ echo
 
+.PHONY: check
+check: fmt lint vet test
+
 .PHONY: test
 test: vendor generate manifests
 	@ echo "\033[36mRunning test suite in Ginkgo\033[0m"
@@ -87,7 +91,7 @@ $(BINARY): generate fmt vet
 	CGO_ENABLED=0 $(GO) build -o $(BINARY) -ldflags="-X main.VERSION=${VERSION}" github.com/pusher/faros/cmd/manager
 
 # Build all arch binaries
-release: test
+release: test docker-build docker-tag docker-push
 	mkdir -p release
 	GOOS=darwin GOARCH=amd64 go build -ldflags="-X main.VERSION=${VERSION}" -o release/$(BINARY)-darwin-amd64 github.com/pusher/faros/cmd/manager
 	GOOS=linux GOARCH=amd64 go build -ldflags="-X main.VERSION=${VERSION}" -o release/$(BINARY)-linux-amd64 github.com/pusher/faros/cmd/manager
@@ -125,11 +129,15 @@ manifests: vendor
 	@ echo
 
 # Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
-	@echo "updating kustomize image patch file for manager resource"
-	$(SED) -i 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+docker-build:
+	docker build . -t ${IMG}:${DOCKER_TAG_VERSION}
+	@echo "\033[36mBuilt $(IMG):$(DOCKER_TAG_VERSION)\033[0m"
+
+TAGS ?= latest
+docker-tag:
+	@for tag in {${TAGS}}; do docker tag ${IMG}:${DOCKER_TAG_VERSION} ${IMG}:$${tag}; echo "\033[36mTagged $(IMG):$(DOCKER_TAG_VERSION) as $${tag}\033[0m"; done
 
 # Push the docker image
+PUSH_TAGS ?= ${DOCKER_TAG_VERSION},latest
 docker-push:
-	docker push ${IMG}
+	@for tag in {${PUSH_TAGS}}; do docker push ${IMG}:$${tag}; echo "\033[36mPushed $(IMG):$${tag}\033[0m"; done
