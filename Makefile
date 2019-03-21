@@ -134,9 +134,9 @@ docker-build:
 
 TAGS ?= latest
 docker-tag:
-	@for tag in {${TAGS},}; do docker tag ${IMG}:${VERSION} ${IMG}:$${tag}; echo "\033[36mTagged $(IMG):$(VERSION) as $${tag}\033[0m"; done
+	@IFS=","; tags=${TAGS}; for tag in $${tags}; do docker tag ${IMG}:${VERSION} ${IMG}:$${tag}; echo "\033[36mTagged $(IMG):$(VERSION) as $${tag}\033[0m"; done
 
 # Push the docker image
 PUSH_TAGS ?= ${VERSION},latest
 docker-push:
-	@for tag in {${PUSH_TAGS},}; do docker push ${IMG}:$${tag}; echo "\033[36mPushed $(IMG):$${tag}\033[0m"; done
+	@IFS=","; tags=${PUSH_TAGS}; for tag in $${tags}; do docker push ${IMG}:$${tag}; echo "\033[36mPushed $(IMG):$${tag}\033[0m"; done
