@@ -154,8 +154,9 @@ check_for golangci-lint
 check_kubebuilder
 check_go_version
 check_go_env
-check_for kubectl
 check_for kustomize
+export PATH=${tools[kubebuilder]};$PATH
+check_for kubectl
 
 
 cat <<- EOF > .env
