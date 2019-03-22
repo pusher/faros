@@ -15,16 +15,16 @@ spec:
     name: Reference
     type: string
   - JSONPath: .status.objectsApplied
-    name: ChildrenCreated
+    name: Children Created
     type: integer
   - JSONPath: .status.objectsDiscovered
-    name: ResourcesDiscovered
+    name: Resources Discovered
     type: integer
   - JSONPath: .status.objectsIgnored
-    name: ResourcesIgnored
+    name: Resources Ignored
     type: integer
   - JSONPath: .status.objectsInSync
-    name: ChildrenInSync
+    name: Children In Sync
     type: integer
   - JSONPath: .metadata.creationTimestamp
     name: Age
