@@ -9,6 +9,7 @@ spec:
   additionalPrinterColumns:
   - JSONPath: .spec.repository
     name: Repository
+    priority: 1
     type: string
   - JSONPath: .spec.reference
     name: Reference
@@ -27,6 +28,7 @@ spec:
     type: integer
   - JSONPath: .metadata.creationTimestamp
     name: Age
+    priority: 1
     type: date
   group: faros.pusher.com
   names:
