@@ -112,10 +112,10 @@ type GitTrackCondition struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:printcolumn:name="Repository",type="string",JSONPath=".spec.repository",priority=1
 // +kubebuilder:printcolumn:name="Reference",type="string",JSONPath=".spec.reference"
-// +kubebuilder:printcolumn:name="ChildrenCreated",type="integer",JSONPath=".status.objectsApplied"
-// +kubebuilder:printcolumn:name="ResourcesDiscovered",type="integer",JSONPath=".status.objectsDiscovered"
-// +kubebuilder:printcolumn:name="ResourcesIgnored",type="integer",JSONPath=".status.objectsIgnored"
-// +kubebuilder:printcolumn:name="ChildrenInSync",type="integer",JSONPath=".status.objectsInSync"
+// +kubebuilder:printcolumn:name="Children Created",type="integer",JSONPath=".status.objectsApplied"
+// +kubebuilder:printcolumn:name="Resources Discovered",type="integer",JSONPath=".status.objectsDiscovered"
+// +kubebuilder:printcolumn:name="Resources Ignored",type="integer",JSONPath=".status.objectsIgnored"
+// +kubebuilder:printcolumn:name="Children In Sync",type="integer",JSONPath=".status.objectsInSync"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",priority=1
 type GitTrack struct {
 	metav1.TypeMeta   `json:",inline"`
