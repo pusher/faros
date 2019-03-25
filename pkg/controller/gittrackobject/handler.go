@@ -54,7 +54,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 	if err != nil {
 		return handlerResult{
 			inSyncReason: reason,
-			inSyncError:  fmt.Errorf("error reading child: %v", err),
+			inSyncError:  fmt.Errorf("error reading child %s %s: %v", gto.GetSpec().Kind, gto.GetSpec().Name, err),
 		}
 	}
 
@@ -64,7 +64,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 	if err != nil {
 		return handlerResult{
 			inSyncReason: gittrackobjectutils.ErrorWatchingChild,
-			inSyncError:  fmt.Errorf("unable to create watch: %v", err),
+			inSyncError:  fmt.Errorf("unable to create watch for kind %s: %v", gto.GetSpec().Kind, err),
 		}
 	}
 
@@ -73,7 +73,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 	if err != nil {
 		return handlerResult{
 			inSyncReason: gittrackobjectutils.ErrorAddingOwnerReference,
-			inSyncError:  fmt.Errorf("unable to add owner reference: %v", err),
+			inSyncError:  fmt.Errorf("unable to add owner reference to child %s %s: %v", gto.GetSpec().Kind, gto.GetSpec().Name, err),
 		}
 	}
 
@@ -88,7 +88,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 		if err != nil {
 			return handlerResult{
 				inSyncReason: reason,
-				inSyncError:  fmt.Errorf("error creating child: %v", err),
+				inSyncError:  fmt.Errorf("error creating child %s %s: %v", gto.GetSpec().Kind, gto.GetSpec().Name, err),
 			}
 		}
 
@@ -97,7 +97,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 	} else if err != nil {
 		return handlerResult{
 			inSyncReason: gittrackobjectutils.ErrorGettingChild,
-			inSyncError:  fmt.Errorf("unable to get child: %v", err),
+			inSyncError:  fmt.Errorf("unable to get child %s %s: %v", gto.GetSpec().Kind, gto.GetSpec().Name, err),
 		}
 	}
 
@@ -105,7 +105,7 @@ func (r *ReconcileGitTrackObject) handleGitTrackObject(gto farosv1alpha1.GitTrac
 	if err != nil {
 		return handlerResult{
 			inSyncReason: reason,
-			inSyncError:  fmt.Errorf("error updating child: %v", err),
+			inSyncError:  fmt.Errorf("error updating child %s %s: %v", gto.GetSpec().Kind, gto.GetSpec().Name, err),
 		}
 	}
 
@@ -176,6 +176,7 @@ func (r *ReconcileGitTrackObject) handleDefaultUpdateStrategy(gto farosv1alpha1.
 
 	// Update was successful
 	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+	log.Printf("Updated child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 	return "", nil
 }
 
@@ -205,6 +206,7 @@ func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1
 
 	// Update was successful
 	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
+	log.Printf("Updated child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 	return "", nil
 }
 
