@@ -298,6 +298,7 @@ var _ = Describe("Handler Suite", func() {
 					child.Subjects = []rbacv1.Subject{}
 					child.SetOwnerReferences([]metav1.OwnerReference{testutils.GetClusterGitTrackObjectOwnerRef(gto)})
 					m.Apply(child, &farosclient.ApplyOptions{}).Should(Succeed())
+					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).Should(testutils.WithSubjects(BeEmpty()))
 
 					originalVersion = child.GetResourceVersion()
