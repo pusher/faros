@@ -18,11 +18,14 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	g "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -40,11 +43,57 @@ func DeleteAll(cfg *rest.Config, timeout time.Duration, objLists ...runtime.Obje
 		errs := make(chan error, len(objs))
 		for _, obj := range objs {
 			go func(o runtime.Object) {
-				errs <- c.Delete(context.TODO(), o)
+				errs <- deleteObj(c, o)
 			}(obj)
 		}
 		for range objs {
 			g.Expect(<-errs).ToNot(g.HaveOccurred())
 		}
 	}
+}
+
+func deleteObj(c client.Client, obj runtime.Object) error {
+	metaAccessor, err := apimeta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+
+	// Remove finalizers
+	if len(metaAccessor.GetFinalizers()) > 0 {
+		metaAccessor.SetFinalizers([]string{})
+		err = c.Update(context.TODO(), obj)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = c.Delete(context.TODO(), obj)
+	if err != nil {
+		return err
+	}
+
+	checkDeleted := func() error {
+		key := types.NamespacedName{Namespace: metaAccessor.GetNamespace(), Name: metaAccessor.GetName()}
+
+		err := c.Get(context.TODO(), key, obj)
+		if err != nil && errors.IsNotFound(err) {
+			// Object has been deleted
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		if metaAccessor.GetDeletionTimestamp() == nil {
+			return fmt.Errorf("Object has not been deleted")
+		}
+		if len(metaAccessor.GetFinalizers()) > 0 {
+			return fmt.Errorf("Object has remaining Finalizers: %v", metaAccessor.GetFinalizers())
+		}
+		// If the object has deletion timestamp and no finalizers,
+		// it shouldn't exist and we shouldn't get here
+		panic(fmt.Sprintf("Unexpected Object state: %+v", obj))
+	}
+
+	g.Eventually(checkDeleted, 5*time.Second).Should(g.Succeed())
+	return nil
 }
