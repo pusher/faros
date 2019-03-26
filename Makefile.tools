@@ -1,7 +1,7 @@
 .PHONY: prepare-env-%
 prepare-env-%: gopath dep ginkgo-cli golangci-lint kustomize
-	make kubebuilder-tools-$*
-	PATH=$$GOPATH/bin:$$PATH ./configure --with-kubebuilder=/usr/local/kubebuilder-$*/bin
+	PATH=$$GOPATH/bin:/usr/local/kubebuilder-$*/bin:$$PATH make kubebuilder-tools-$*
+	PATH=$$GOPATH/bin:/usr/local/kubebuilder-$*/bin:$$PATH ./configure
 
 .PHONY: gopath
 gopath:
