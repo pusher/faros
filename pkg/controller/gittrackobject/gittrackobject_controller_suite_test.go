@@ -69,9 +69,14 @@ type testReconciler struct {
 }
 
 func (t *testReconciler) Reconcile(req reconcile.Request) (reconcile.Result, error) {
-	result, err := t.ReconcileGitTrackObject.Reconcile(req)
-	t.requests <- req
-	return result, err
+	select {
+	case <-t.StopChan():
+		return reconcile.Result{}, nil
+	default:
+		result, err := t.ReconcileGitTrackObject.Reconcile(req)
+		t.requests <- req
+		return result, err
+	}
 }
 
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and
