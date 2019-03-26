@@ -135,6 +135,10 @@ var _ = Describe("GitTrackObject Suite", func() {
 				})
 				child = testutils.ExampleDeployment.DeepCopy()
 				Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
+
+				// Make sure the resources don't already exist
+				m.Get(gto.DeepCopy(), timeout).ShouldNot(Succeed())
+				m.Get(child.DeepCopy(), timeout).ShouldNot(Succeed())
 			})
 
 			Context("with valid data", func() {
@@ -509,6 +513,10 @@ var _ = Describe("GitTrackObject Suite", func() {
 				})
 				child = testutils.ExampleClusterRoleBinding.DeepCopy()
 				Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
+
+				// Make sure the resources don't already exist
+				m.Get(gto.DeepCopy(), timeout).ShouldNot(Succeed())
+				m.Get(child.DeepCopy(), timeout).ShouldNot(Succeed())
 			})
 
 			Context("with valid data", func() {
