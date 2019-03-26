@@ -72,7 +72,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
 		Expect(err).NotTo(HaveOccurred())
 
-		c = mgr.GetClient()
+		c, err = client.New(mgr.GetConfig(), client.Options{})
+		Expect(err).NotTo(HaveOccurred())
 		m = testutils.Matcher{Client: mgr.GetClient(), FarosClient: applier}
 
 		recFn := newReconciler(mgr)

@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -60,7 +61,10 @@ var _ = Describe("Handler Suite", func() {
 		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
 		Expect(err).NotTo(HaveOccurred())
 
-		m = testutils.Matcher{Client: mgr.GetClient(), FarosClient: applier}
+		c, err := client.New(mgr.GetConfig(), client.Options{})
+		Expect(err).NotTo(HaveOccurred())
+
+		m = testutils.Matcher{Client: c, FarosClient: applier}
 
 		recFn := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
