@@ -155,7 +155,7 @@ check_kubebuilder
 check_go_version
 check_go_env
 check_for kustomize
-export PATH=${tools[kubebuilder]};$PATH
+export PATH="${tools[kubebuilder]};$PATH"
 check_for kubectl
 
 
