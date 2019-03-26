@@ -93,6 +93,10 @@ var _ = Describe("Handler Suite", func() {
 				child = testutils.ExampleDeployment.DeepCopy()
 				Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
 
+				// Make sure the resources don't already exist
+				m.Get(gto.DeepCopy(), timeout).ShouldNot(Succeed())
+				m.Get(child.DeepCopy(), timeout).ShouldNot(Succeed())
+
 				// Create and fetch the instance to make sure caches are synced
 				m.Create(gto).Should(Succeed())
 				m.Get(gto, timeout).Should(Succeed())
@@ -232,6 +236,10 @@ var _ = Describe("Handler Suite", func() {
 				gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
 				child = testutils.ExampleClusterRoleBinding.DeepCopy()
 				Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
+
+				// Make sure the resources don't already exist
+				m.Get(gto.DeepCopy(), timeout).ShouldNot(Succeed())
+				m.Get(child.DeepCopy(), timeout).ShouldNot(Succeed())
 
 				// Create and fetch the instance to make sure caches are synced
 				m.Create(gto).Should(Succeed())
