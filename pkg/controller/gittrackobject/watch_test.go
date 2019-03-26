@@ -84,6 +84,7 @@ var _ = Describe("Watch Suite", func() {
 			u.SetUnstructuredContent(content)
 
 			m.Create(&u).Should(Succeed())
+			m.Get(&u, timeout).Should(Succeed())
 
 			// Call watch with the unstructued deployment
 			Expect(r.watch(u)).NotTo(HaveOccurred())
