@@ -21,6 +21,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// GitCredentialType defines the type of git credential
+type GitCredentialType string
+
+const (
+	// GitCredentialTypeSSH defines a private SSH key credential type
+	GitCredentialTypeSSH = "SSH"
+	// GitCredentialTypeHTTPBasicAuth defines an http basic auth type
+	GitCredentialTypeHTTPBasicAuth = "HTTPBasicAuth"
+)
+
 // GitTrackSpec defines the desired state of GitTrack
 type GitTrackSpec struct {
 	// Reference contains the git reference this GitTrack tracks
@@ -37,13 +47,17 @@ type GitTrackSpec struct {
 	DeployKey GitTrackDeployKey `json:"deployKey,omitempty"`
 }
 
-// GitTrackDeployKey holds a reference to an SSH key needed to access the repository
+// GitTrackDeployKey holds a reference to a secret such as an SSH key or HTTP Basic Auth credentials needed to access the repository
 type GitTrackDeployKey struct {
 	// SecretName is the name of the Secret object containins the key
 	SecretName string `json:"secretName"`
 
-	// Key is the key within the Secret object that contains the deploy key
+	// Key is the key within the Secret object that contains the deploy secret
 	Key string `json:"key"`
+
+	// Type is the type of credential. Accepted values are "SSH", "HTTPBasicAuth". Defaults to "SSH".
+	// +kubebuilder:validation:Enum=SSH,HTTPBasicAuth
+	Type GitCredentialType `json:"type,omitempty"`
 }
 
 // GitTrackStatus defines the observed state of GitTrack

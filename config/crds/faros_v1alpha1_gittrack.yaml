@@ -56,11 +56,18 @@ spec:
               properties:
                 key:
                   description: Key is the key within the Secret object that contains
-                    the deploy key
+                    the deploy secret
                   type: string
                 secretName:
                   description: SecretName is the name of the Secret object containins
                     the key
+                  type: string
+                type:
+                  description: Type is the type of credential. Accepted values are
+                    "SSH", "HTTPBasicAuth". Defaults to "SSH".
+                  enum:
+                  - SSH
+                  - HTTPBasicAuth
                   type: string
               required:
               - secretName
