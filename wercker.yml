@@ -27,7 +27,7 @@ generate:
         package-dir: github.com/pusher/faros
     - script:
         name: configure make
-        code: ./configure
+        code: touch .env && make prepare-env-1.13
     - script:
         name: Generate code
         code: make generate
@@ -43,12 +43,8 @@ lint:
     - wercker/setup-go-workspace:
         package-dir: github.com/pusher/faros
     - script:
-        name: Install linter
-        code: |
-          export BIN_DIR=/usr/local/bin
-          export CI_LINT_VERSION=1.15.0
-          export CI_LINT_URI=https://github.com/golangci/golangci-lint/releases/download/v$CI_LINT_VERSION/golangci-lint-$CI_LINT_VERSION-linux-amd64.tar.gz
-          curl -L $CI_LINT_URI | tar -C $BIN_DIR -xzf - --strip-components 1 --wildcards \*/golangci-lint
+        name: configure make
+        code: touch .env && make prepare-env-1.13
     - script:
         name: Run linter(s)
         code: |
@@ -71,31 +67,8 @@ test:
     - wercker/setup-go-workspace:
         package-dir: github.com/pusher/faros
     - script:
-      name: Install Ginkgo CLI
-      code: |
-        go get -u github.com/onsi/ginkgo/ginkgo
-    - script:
-        name: Setup Test environment
-        code: |
-          version=1.0.8 # latest stable version
-          arch=amd64
-
-          # download the release
-          curl -L -O "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_${arch}.tar.gz"
-          tar -zxvf kubebuilder_${version}_linux_${arch}.tar.gz
-
-          export TEST_ASSET_DIR=/usr/local/bin
-          export TEST_ASSET_KUBECTL=$TEST_ASSET_DIR/kubectl
-          export TEST_ASSET_KUBE_APISERVER=$TEST_ASSET_DIR/kube-apiserver
-          export TEST_ASSET_ETCD=$TEST_ASSET_DIR/etcd
-
-          mv kubebuilder_${version}_linux_${arch}/bin/etcd $TEST_ASSET_ETCD
-          mv kubebuilder_${version}_linux_${arch}/bin/kube-apiserver $TEST_ASSET_KUBE_APISERVER
-          mv kubebuilder_${version}_linux_${arch}/bin/kubectl $TEST_ASSET_KUBECTL
-
-          chmod +x $TEST_ASSET_ETCD
-          chmod +x $TEST_ASSET_KUBE_APISERVER
-          chmod +x $TEST_ASSET_KUBECTL
+        name: configure make
+        code: touch .env && make prepare-env-1.13
     - script:
         name: ginkgo
         code: ginkgo -v -race -randomizeAllSpecs ./pkg/... ./cmd/...
