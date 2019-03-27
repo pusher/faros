@@ -17,7 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"log"
+	"runtime"
 	"time"
 
 	goflag "flag"
@@ -38,6 +40,7 @@ var (
 	leaederElectionNamespace = flag.String("leader-election-namespace", "", "Namespace for the configmap used by the leader election system")
 	metricsBindAddress       = flag.String("metrics-bind-address", ":8080", "Specify which address to bind to for serving prometheus metrics")
 	syncPeriod               = flag.Duration("sync-period", 5*time.Minute, "Reconcile sync period")
+	showVersion              = flag.Bool("version", false, "Show version and exit")
 )
 
 func main() {
@@ -46,6 +49,12 @@ func main() {
 	flag.CommandLine.AddFlagSet(farosflags.FlagSet)
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
+
+	// Handle version flag
+	if *showVersion {
+		fmt.Printf("faros-gittrack-controller %s (built with %s)\n", VERSION, runtime.Version())
+		return
+	}
 
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()

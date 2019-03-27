@@ -22,9 +22,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	testutils "github.com/pusher/faros/test/utils"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,7 +74,12 @@ var _ = Describe("Watch Suite", func() {
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
 		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackList{},
+			&farosv1alpha1.GitTrackObjectList{},
+			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&appsv1.DeploymentList{},
+			&rbacv1.ClusterRoleBindingList{},
+			&corev1.EventList{},
 		)
 	})
 
@@ -84,6 +92,7 @@ var _ = Describe("Watch Suite", func() {
 			u.SetUnstructuredContent(content)
 
 			m.Create(&u).Should(Succeed())
+			m.Get(&u, timeout).Should(Succeed())
 
 			// Call watch with the unstructued deployment
 			Expect(r.watch(u)).NotTo(HaveOccurred())

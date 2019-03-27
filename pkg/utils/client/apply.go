@@ -36,8 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
@@ -305,12 +305,7 @@ func (a *Applier) configFor(gv schema.GroupVersion) (*rest.Config, error) {
 		config.APIPath = "apis/"
 	}
 
-	ns := scheme.Codecs
-	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	encoder := ns.EncoderForVersion(info.Serializer, gv)
-	// Use universal decoder so we don't attempt conversion
-	codec := runtime.NewCodec(encoder, scheme.Codecs.UniversalDecoder(gv))
-	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
+	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: unstructured.UnstructuredJSONScheme})
 	return config, nil
 }
 
@@ -325,12 +320,12 @@ func newUnstructuredFor(obj runtime.Object) *unstructured.Unstructured {
 	return u
 }
 
-func (a *Applier) restClientFor(gv schema.GroupVersion) (*rest.RESTClient, error) {
+func (a *Applier) restClientFor(gv schema.GroupVersion) (rest.Interface, error) {
 	restConfig, err := a.configFor(gv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct config for Group Version %+v: %v", gv, err)
 	}
-	restClient, err := rest.RESTClientFor(restConfig)
+	restClient, err := rest.UnversionedRESTClientFor(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialise rest client: %v", err)
 	}

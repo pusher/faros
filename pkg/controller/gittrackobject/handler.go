@@ -210,19 +210,27 @@ func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1
 
 // recreateChild first deletes and then creates a child resource for a (Cluster)GitTrackObject
 func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstructured) (bool, error) {
-	if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err != nil {
-		return r.applyChildWithDryRun(found, child, true)
-	}
+	// Recreating the child does not make sense with dry run (dry run delete does
+	// not mean we can dry run create) and so do not attempt dry run here.
 	return r.applyChild(found, child, true)
 }
 
 // updateChild updates the given child resource of a (Cluster)GitTrackObject
 func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) (bool, error) {
-	return r.applyChildWithDryRun(found, child, false)
+	// HasSupport returns an error if dry run not supported
+	if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err == nil {
+		return r.applyChildWithDryRun(found, child, false)
+	}
+	// Dry run not supported so apply without DryRun
+	return r.applyChild(found, child, false)
 }
 
 // applyChildWithDryRun first applies the child with DryRun and then updates the resource if there is change to persist
 func (r *ReconcileGitTrackObject) applyChildWithDryRun(found, child *unstructured.Unstructured, force bool) (bool, error) {
+	// Take a copy of the original child so that if the dry run shows a diff,
+	// we Apply the original state of the child object
+	originalChild := child.DeepCopy()
+
 	dryRunTrue := true
 	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force, ServerDryRun: &dryRunTrue}, child)
 	if err != nil {
@@ -235,7 +243,7 @@ func (r *ReconcileGitTrackObject) applyChildWithDryRun(found, child *unstructure
 	}
 
 	// The DryRun showed a change is required so now update without DryRun
-	err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, child)
+	err = r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{ForceDeletion: &force}, originalChild)
 	if err != nil {
 		return false, fmt.Errorf("unable to update child resource: %v", err)
 	}

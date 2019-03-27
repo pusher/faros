@@ -19,6 +19,7 @@ package gittrackobject
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -53,6 +54,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 	var expectedClusterRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "example"}}
 	var gitTrack *farosv1alpha1.GitTrack
 	var requests chan reconcile.Request
+	var reconcileStopped *sync.WaitGroup
 	var testEvents chan TestEvent
 
 	const timeout = time.Second * 5
@@ -72,13 +74,14 @@ var _ = Describe("GitTrackObject Suite", func() {
 		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
 		Expect(err).NotTo(HaveOccurred())
 
-		c = mgr.GetClient()
+		c, err = client.New(mgr.GetConfig(), client.Options{})
+		Expect(err).NotTo(HaveOccurred())
 		m = testutils.Matcher{Client: mgr.GetClient(), FarosClient: applier}
 
 		recFn := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
 		recFn, testEvents = SetupTestEventRecorder(recFn)
-		recFn, requests = SetupTestReconcile(recFn)
+		recFn, requests, reconcileStopped = SetupTestReconcile(recFn)
 		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
 
 		stopInformers = r.StopChan()
@@ -107,6 +110,18 @@ var _ = Describe("GitTrackObject Suite", func() {
 		// Stop Controller and informers before cleaning up
 		close(stop)
 		close(stopInformers)
+
+		select {
+		case <-requests:
+			// shortcut to timeout
+			break
+		case <-time.After(time.Second):
+			break
+		}
+
+		// Wait for last reconcile to stop
+		reconcileStopped.Wait()
+
 		// Clean up all resources as GC is disabled in the control plane
 		testutils.DeleteAll(cfg, timeout,
 			&farosv1alpha1.GitTrackList{},
