@@ -8,7 +8,7 @@ metadata:
 spec:
   additionalPrinterColumns:
   - JSONPath: .status.conditions[?(@.type=="ObjectInSync")].status
-    name: InSync
+    name: In Sync
     type: string
   - JSONPath: .metadata.creationTimestamp
     name: Age
