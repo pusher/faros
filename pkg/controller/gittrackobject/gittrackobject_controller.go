@@ -206,6 +206,10 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	inSync := result.inSyncError == nil
 	r.updateMetrics(instance, &metricsOpts{inSync: inSync})
 
+	if result.inSyncError != nil {
+		log.Printf("error syncing child %s: %v", instance.GetNamespacedName(), result.inSyncError)
+	}
+
 	return reconcile.Result{}, result.inSyncError
 }
 
