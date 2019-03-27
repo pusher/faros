@@ -43,9 +43,8 @@ func createRepoRefFromCreds(url string, creds *gitCredentials) (*gitstore.RepoRe
 		credStringSplit := strings.SplitN(string(creds.secret), ":", 2)
 		if len(credStringSplit) == 2 {
 			return &gitstore.RepoRef{URL: url, User: credStringSplit[0], Pass: credStringSplit[1]}, nil
-		} else {
-			return nil, fmt.Errorf("You must specify the secret as <username>:<password> for credential type %s", creds.credentialType)
 		}
+		return nil, fmt.Errorf("You must specify the secret as <username>:<password> for credential type %s", creds.credentialType)
 	default:
 		return nil, fmt.Errorf("Unable to create repo ref: invalid type \"%s\"", creds.credentialType)
 	}
