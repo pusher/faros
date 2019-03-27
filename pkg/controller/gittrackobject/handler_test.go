@@ -28,10 +28,12 @@ import (
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -60,7 +62,10 @@ var _ = Describe("Handler Suite", func() {
 		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
 		Expect(err).NotTo(HaveOccurred())
 
-		m = testutils.Matcher{Client: mgr.GetClient(), FarosClient: applier}
+		c, err := client.New(mgr.GetConfig(), client.Options{})
+		Expect(err).NotTo(HaveOccurred())
+
+		m = testutils.Matcher{Client: c, FarosClient: applier}
 
 		recFn := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
@@ -75,10 +80,12 @@ var _ = Describe("Handler Suite", func() {
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
 		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackList{},
 			&farosv1alpha1.GitTrackObjectList{},
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&appsv1.DeploymentList{},
 			&rbacv1.ClusterRoleBindingList{},
+			&corev1.EventList{},
 		)
 	})
 
@@ -290,6 +297,7 @@ var _ = Describe("Handler Suite", func() {
 					child.Subjects = []rbacv1.Subject{}
 					child.SetOwnerReferences([]metav1.OwnerReference{testutils.GetClusterGitTrackObjectOwnerRef(gto)})
 					m.Apply(child, &farosclient.ApplyOptions{}).Should(Succeed())
+					m.Get(child, timeout).Should(Succeed())
 					m.Eventually(child, timeout).Should(testutils.WithSubjects(BeEmpty()))
 
 					originalVersion = child.GetResourceVersion()

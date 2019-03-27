@@ -19,6 +19,7 @@ package gittrackobject
 import (
 	"log"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -66,23 +67,33 @@ var _ = AfterSuite(func() {
 type testReconciler struct {
 	*ReconcileGitTrackObject
 	requests chan reconcile.Request
+	wait     *sync.WaitGroup
 }
 
 func (t *testReconciler) Reconcile(req reconcile.Request) (reconcile.Result, error) {
-	result, err := t.ReconcileGitTrackObject.Reconcile(req)
-	t.requests <- req
-	return result, err
+	select {
+	case <-t.StopChan():
+		return reconcile.Result{}, nil
+	default:
+		t.wait.Add(1)
+		result, err := t.ReconcileGitTrackObject.Reconcile(req)
+		t.wait.Done()
+		t.requests <- req
+		return result, err
+	}
 }
 
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and
 // writes the request to requests after Reconcile is finished.
-func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request) {
+func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request, *sync.WaitGroup) {
 	requests := make(chan reconcile.Request)
 	reconciler := inner.(*ReconcileGitTrackObject)
+	wait := &sync.WaitGroup{}
 	return &testReconciler{
 		ReconcileGitTrackObject: reconciler,
 		requests:                requests,
-	}, requests
+		wait:                    wait,
+	}, requests, wait
 }
 
 // StartTestManager adds recFn
