@@ -43,7 +43,7 @@ func DeleteAll(cfg *rest.Config, timeout time.Duration, objLists ...runtime.Obje
 		errs := make(chan error, len(objs))
 		for _, obj := range objs {
 			go func(o runtime.Object) {
-				errs <- deleteObj(c, o)
+				errs <- deleteObj(c, timeout, o)
 			}(obj)
 		}
 		for range objs {
@@ -52,19 +52,10 @@ func DeleteAll(cfg *rest.Config, timeout time.Duration, objLists ...runtime.Obje
 	}
 }
 
-func deleteObj(c client.Client, obj runtime.Object) error {
+func deleteObj(c client.Client, timeout time.Duration, obj runtime.Object) error {
 	metaAccessor, err := apimeta.Accessor(obj)
 	if err != nil {
 		return err
-	}
-
-	// Remove finalizers
-	if len(metaAccessor.GetFinalizers()) > 0 {
-		metaAccessor.SetFinalizers([]string{})
-		err = c.Update(context.TODO(), obj)
-		if err != nil {
-			return err
-		}
 	}
 
 	err = c.Delete(context.TODO(), obj)
@@ -94,6 +85,6 @@ func deleteObj(c client.Client, obj runtime.Object) error {
 		panic(fmt.Sprintf("Unexpected Object state: %+v", obj))
 	}
 
-	g.Eventually(checkDeleted, 5*time.Second).Should(g.Succeed())
+	g.Eventually(checkDeleted, timeout).Should(g.Succeed())
 	return nil
 }
