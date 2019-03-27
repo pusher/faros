@@ -32,6 +32,7 @@ generate: vendor
 	@ echo
 
 # Verify generated code has been checked in
+.PHONY: verify-%
 verify-%:
 	@ make $*
 	@ echo "\033[36mVerifying Git Status\033[0m"
@@ -109,34 +110,41 @@ release: test docker-build docker-tag docker-push
 	$(TAR) -czvf release/$(BINARY)-$(VERSION).windows-amd64.$(GOVERSION).tar.gz release/$(BINARY)-windows-amd64
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
+.PHONY: run
 run: generate fmt vet
 	$(GO) run ./cmd/manager/main.go
 
 # Install CRDs into a cluster
+.PHONY: install
 install: manifests
 	$(KUBECTL) apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+.PHONY: deploy
 deploy: manifests
 	$(KUBECTL) apply -f config/crds
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
+.PHONY: manifests
 manifests: vendor
 	@ echo "\033[36mGenerating manifests\033[0m"
 	$(GO) run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
 	@ echo
 
 # Build the docker image
+.PHONY: docker-build
 docker-build:
 	docker build . -t ${IMG}:${VERSION}
 	@echo "\033[36mBuilt $(IMG):$(VERSION)\033[0m"
 
 TAGS ?= latest
+.PHONY: docker-tag
 docker-tag:
 	@IFS=","; tags=${TAGS}; for tag in $${tags}; do docker tag ${IMG}:${VERSION} ${IMG}:$${tag}; echo "\033[36mTagged $(IMG):$(VERSION) as $${tag}\033[0m"; done
 
 # Push the docker image
 PUSH_TAGS ?= ${VERSION},latest
+.PHONY: docker-push
 docker-push:
 	@IFS=","; tags=${PUSH_TAGS}; for tag in $${tags}; do docker push ${IMG}:$${tag}; echo "\033[36mPushed $(IMG):$${tag}\033[0m"; done
