@@ -5,7 +5,7 @@ BINARY := faros-gittrack-controller
 VERSION := $(shell git describe --always --dirty --tags 2>/dev/null || echo "undefined")
 
 # Image URL to use all building/pushing image targets
-IMG := quay.io/pusher/faros
+IMG ?= quay.io/pusher/faros
 
 .NOTPARALLEL:
 
