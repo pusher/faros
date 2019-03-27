@@ -64,7 +64,7 @@ lint:
           --deadline=120s \
           --verbose \
           --tests ./...
-		@ echo
+	@ echo
 
 # Run tests
 export TEST_ASSET_KUBECTL := $(KUBEBUILDER)/kubectl
