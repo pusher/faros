@@ -28,6 +28,7 @@ import (
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,10 +80,12 @@ var _ = Describe("Handler Suite", func() {
 		close(stopInformers)
 		// Clean up all resources as GC is disabled in the control plane
 		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackList{},
 			&farosv1alpha1.GitTrackObjectList{},
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&appsv1.DeploymentList{},
 			&rbacv1.ClusterRoleBindingList{},
+			&corev1.EventList{},
 		)
 	})
 
