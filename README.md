@@ -56,6 +56,20 @@ well as providing a canonical history of what was deployed and when.
 
 ## Installation
 
+### Building
+
+To build faros locally, run
+```
+./configure
+make build
+```
+
+In order to build all binaries for all supported architectures, you may
+```
+./configure
+make release
+```
+
 ### Deploying to Kubernetes
 
 Faros is a [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) based
@@ -151,7 +165,7 @@ standby will be promoted to master.
 To enable leader election, set the following flags:
 
 ```
---leader-elect=true
+--leader-election=true
 --leader-election-id=<name-of-leader-election-configmap>
 --leader-election-namespace=<namespace-controller-runs-in>
 ```

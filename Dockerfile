@@ -8,8 +8,10 @@ RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 WORKDIR /go/src/github.com/pusher/faros
 COPY Gopkg.lock Gopkg.lock
 COPY Gopkg.toml Gopkg.toml
-# Fetch dependencies - doing this here allows docker to cache unless Gopkg changes
+
+# Fetch dependencies before copying code (should cache unless Gopkg's change)
 RUN dep ensure --vendor-only
+
 COPY pkg/    pkg/
 COPY cmd/    cmd/
 
