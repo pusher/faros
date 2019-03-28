@@ -497,7 +497,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	sOpts := newStatusOpts()
 	mOpts := newMetricOpts(sOpts)
 
-	// Update the GitTrackObject status when we leave this function
+	// Update the GitTrack status when we leave this function
 	defer func() {
 		err := r.updateStatus(instance, sOpts)
 		mErr := r.updateMetrics(instance, mOpts)
