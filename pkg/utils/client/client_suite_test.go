@@ -23,11 +23,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-logr/glogr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/test/reporters"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -47,7 +47,7 @@ var t *envtest.Environment
 var _ = BeforeSuite(func() {
 	t = &envtest.Environment{}
 
-	logf.SetLogger(glogr.New())
+	logf.SetLogger(klogr.New())
 
 	var err error
 	if cfg, err = t.Start(); err != nil {
