@@ -1000,6 +1000,16 @@ var _ = Describe("GitTrack Suite", func() {
 		getsFilesFromRepo("foobar/", 2)
 	})
 
+	Context(fmt.Sprintf("With invalid files"), func() {
+		BeforeEach(func() {
+			_, ok := r.(*ReconcileGitTrack) // reconciler
+			Expect(ok).To(BeTrue())
+			createInstance(instance, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced")
+			waitForInstanceCreated(key)
+		})
+
+	})
+
 	Context("When a list of ignored GVRs is supplied", func() {
 		BeforeEach(func() {
 			reconciler, ok := r.(*ReconcileGitTrack)

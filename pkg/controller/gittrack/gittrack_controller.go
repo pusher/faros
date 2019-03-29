@@ -452,18 +452,18 @@ func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.G
 }
 
 // objectsFrom iterates through all the files given and attempts to create Unstructured objects
-func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured, []string) {
+func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured, map[string]string) {
 	objects := []*unstructured.Unstructured{}
-	errors := []string{}
+	fileErrors := make(map[string]string)
 	for path, file := range files {
 		us, err := utils.YAMLToUnstructuredSlice([]byte(file.Contents()))
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("unable to parse '%s': %v\n", path, err))
+			fileErrors[path] = fmt.Sprintf("unable to parse '%s': %v\n", path, err)
 			continue
 		}
 		objects = append(objects, us...)
 	}
-	return objects, errors
+	return objects, fileErrors
 }
 
 // checkOwner checks the owner reference of an object from the API to see if it
@@ -559,16 +559,19 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	reconciler.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.Spec.Repository, instance.Spec.Reference)
 
 	// Attempt to parse k8s objects from files
-	objects, errors := objectsFrom(files)
-	if len(errors) > 0 {
-		sOpts.parseError = fmt.Errorf(strings.Join(errors, ",\n"))
+	objects, fileErrors := objectsFrom(files)
+	sOpts.ignoredFiles = fileErrors
+	sOpts.ignored += int64(len(fileErrors))
+	if len(fileErrors) > 0 {
+		// sOpts.parseError = fmt.Errorf(strings.Join(errors, ",\n")) // TODO Print errors
 		sOpts.parseReason = gittrackutils.ErrorParsingFiles
 	} else {
 		sOpts.parseReason = gittrackutils.FileParseSuccess
 	}
 
 	// Update status with the number of objects discovered
-	sOpts.discovered = int64(len(objects))
+	sOpts.discovered = int64(len(objects)) + int64(len(fileErrors))
+
 	// Get a list of the GitTrackObjects that currently exist, by name
 	objectsByName, err := reconciler.listObjectsByName(instance)
 	if err != nil {

@@ -39,6 +39,7 @@ type statusOpts struct {
 	gcReason       gittrackutils.ConditionReason
 	upToDateError  error
 	upToDateReason gittrackutils.ConditionReason
+	ignoredFiles   map[string]string
 }
 
 func newStatusOpts() *statusOpts {
@@ -61,6 +62,7 @@ func updateGitTrackStatus(gt *farosv1alpha1.GitTrack, opts *statusOpts) (updated
 	status.ObjectsDiscovered = opts.discovered
 	status.ObjectsIgnored = opts.ignored
 	status.ObjectsInSync = opts.inSync
+	status.IgnoredFiles = opts.ignoredFiles
 	setCondition(&status, farosv1alpha1.FilesParsedType, opts.parseError, opts.parseReason)
 	setCondition(&status, farosv1alpha1.FilesFetchedType, opts.gitError, opts.gitReason)
 	setCondition(&status, farosv1alpha1.ChildrenGarbageCollectedType, opts.gcError, opts.gcReason)

@@ -74,6 +74,9 @@ type GitTrackStatus struct {
 	// ObjectsInSync is the number of GitTrackObjects that were successfully applied to the cluster
 	ObjectsInSync int64 `json:"objectsInSync"`
 
+	// IgnoredFiles is the list of YAML files containing invalid k8s manifests.
+	IgnoredFiles map[string]string `json:"ignoredFiles,omitempty"`
+
 	// Conditions are the conditions on this GitTrack
 	Conditions []GitTrackCondition `json:"conditions,omitempty"`
 }
