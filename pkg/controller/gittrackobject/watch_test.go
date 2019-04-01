@@ -31,8 +31,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/flowcontrol"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -115,7 +115,7 @@ var _ = Describe("Watch Suite", func() {
 		})
 
 		Context("when called a second time with the same object", func() {
-			var originalInformers map[string]cache.SharedIndexInformer
+			var originalInformers map[string]cache.Informer
 			BeforeEach(func() {
 				originalInformers = r.informers
 

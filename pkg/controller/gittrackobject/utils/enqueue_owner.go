@@ -37,12 +37,12 @@ var _ handler.EventHandler = &EnqueueRequestForOwner{}
 type EnqueueRequestForOwner struct {
 	NamespacedEnqueueRequestForOwner    *handler.EnqueueRequestForOwner
 	NonNamespacedEnqueueRequestForOwner *handler.EnqueueRequestForOwner
-	RestMapper                          meta.RESTMapper
+	restMapper                          meta.RESTMapper
 }
 
 // Create implements EventHandler
 func (e *EnqueueRequestForOwner) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	_, namespaced, err := utils.GetAPIResource(e.RestMapper, evt.Object.GetObjectKind().GroupVersionKind())
+	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
 	if err != nil {
 		log.Printf("unable to get API resource: %v", err)
 	}
@@ -55,7 +55,7 @@ func (e *EnqueueRequestForOwner) Create(evt event.CreateEvent, q workqueue.RateL
 
 // Update implements EventHandler
 func (e *EnqueueRequestForOwner) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	_, namespaced, err := utils.GetAPIResource(e.RestMapper, evt.ObjectNew.GetObjectKind().GroupVersionKind())
+	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.ObjectNew.GetObjectKind().GroupVersionKind())
 	if err != nil {
 		log.Printf("unable to get API resource: %v", err)
 	}
@@ -68,7 +68,7 @@ func (e *EnqueueRequestForOwner) Update(evt event.UpdateEvent, q workqueue.RateL
 
 // Delete implements EventHandler
 func (e *EnqueueRequestForOwner) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	_, namespaced, err := utils.GetAPIResource(e.RestMapper, evt.Object.GetObjectKind().GroupVersionKind())
+	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
 	if err != nil {
 		log.Printf("unable to get API resource: %v", err)
 	}
@@ -81,7 +81,7 @@ func (e *EnqueueRequestForOwner) Delete(evt event.DeleteEvent, q workqueue.RateL
 
 // Generic implements EventHandler
 func (e *EnqueueRequestForOwner) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
-	_, namespaced, err := utils.GetAPIResource(e.RestMapper, evt.Object.GetObjectKind().GroupVersionKind())
+	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
 	if err != nil {
 		log.Printf("unable to get API resource: %v", err)
 	}
@@ -101,4 +101,17 @@ func (e *EnqueueRequestForOwner) InjectScheme(s *runtime.Scheme) error {
 		return err
 	}
 	return e.NonNamespacedEnqueueRequestForOwner.InjectScheme(s)
+}
+
+var _ inject.Mapper = &EnqueueRequestForOwner{}
+
+// InjectMapper is called by the Controller to provide the rest mapper used by the manager.
+func (e *EnqueueRequestForOwner) InjectMapper(m meta.RESTMapper) error {
+	e.restMapper = m
+
+	err := e.NamespacedEnqueueRequestForOwner.InjectMapper(m)
+	if err != nil {
+		return err
+	}
+	return e.NonNamespacedEnqueueRequestForOwner.InjectMapper(m)
 }
