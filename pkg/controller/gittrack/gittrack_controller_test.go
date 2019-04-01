@@ -246,7 +246,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends events about checking out configured Git repository", func() {
 				events := &v1.EventList{}
-				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.List(context.TODO(), events) }, timeout).Should(Succeed())
 				startEvents := testevents.Select(events.Items, reasonFilter("CheckoutStarted"))
 				successEvents := testevents.Select(events.Items, reasonFilter("CheckoutSuccessful"))
 				Expect(startEvents).ToNot(BeEmpty())
@@ -260,7 +260,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends events about creating GitTrackObjects", func() {
 				events := &v1.EventList{}
-				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.List(context.TODO(), events) }, timeout).Should(Succeed())
 				startEvents := testevents.Select(events.Items, reasonFilter("CreateStarted"))
 				successEvents := testevents.Select(events.Items, reasonFilter("CreateSuccessful"))
 				Expect(startEvents).ToNot(BeEmpty())
@@ -328,7 +328,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends a CheckoutFailed event", func() {
 				events := &v1.EventList{}
-				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.List(context.TODO(), events) }, timeout).Should(Succeed())
 				failedEvents := testevents.Select(events.Items, reasonFilter("CheckoutFailed"))
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {
@@ -362,7 +362,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends a CheckoutFailed event", func() {
 				events := &v1.EventList{}
-				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.List(context.TODO(), events) }, timeout).Should(Succeed())
 				failedEvents := testevents.Select(events.Items, reasonFilter("CheckoutFailed"))
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {
@@ -567,7 +567,7 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).ShouldNot(Succeed())
 
 				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err := c.List(context.TODO(), client.InNamespace(instance.Namespace), gtos)
+				err := c.List(context.TODO(), gtos, client.InNamespace(instance.Namespace))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(gtos.Items)).To(Equal(2))
 			})
@@ -644,7 +644,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				Eventually(func() error {
 					events := &v1.EventList{}
-					err := c.List(context.TODO(), &client.ListOptions{}, events)
+					err := c.List(context.TODO(), events)
 					if err != nil {
 						return err
 					}
@@ -654,7 +654,7 @@ var _ = Describe("GitTrack Suite", func() {
 					return nil
 				}, timeout*2).Should(Succeed())
 				events := &v1.EventList{}
-				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.List(context.TODO(), events) }, timeout).Should(Succeed())
 				successEvents := testevents.Select(events.Items, reasonFilter("UpdateSuccessful"))
 				failedEvents := testevents.Select(events.Items, reasonFilter("UpdateFailed"))
 				Expect(successEvents).ToNot(BeEmpty())
@@ -783,7 +783,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				Eventually(func() error {
 					events := &v1.EventList{}
-					err := c.List(context.TODO(), &client.ListOptions{}, events)
+					err := c.List(context.TODO(), events)
 					if err != nil {
 						return err
 					}
@@ -793,7 +793,7 @@ var _ = Describe("GitTrack Suite", func() {
 					return nil
 				}, timeout).Should(Succeed())
 				events := &v1.EventList{}
-				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.List(context.TODO(), events) }, timeout).Should(Succeed())
 				failedEvents := testevents.Select(events.Items, reasonFilter("CheckoutFailed"))
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {
@@ -886,7 +886,7 @@ var _ = Describe("GitTrack Suite", func() {
 				}
 				Eventually(func() error {
 					events := &v1.EventList{}
-					err := c.List(context.TODO(), &client.ListOptions{}, events)
+					err := c.List(context.TODO(), events)
 					if err != nil {
 						return err
 					}
@@ -896,7 +896,7 @@ var _ = Describe("GitTrack Suite", func() {
 					return nil
 				}, timeout).Should(Succeed())
 				events := &v1.EventList{}
-				Eventually(func() error { return c.List(context.TODO(), &client.ListOptions{}, events) }, timeout).Should(Succeed())
+				Eventually(func() error { return c.List(context.TODO(), events) }, timeout).Should(Succeed())
 				failedEvents := testevents.Select(events.Items, filter)
 				Expect(failedEvents).ToNot(BeEmpty())
 				for _, e := range failedEvents {

@@ -64,7 +64,7 @@ func (p OwnerInNamespacePredicate) Generic(e event.GenericEvent) bool {
 // in the namespace the controller is managing.
 func (p OwnerInNamespacePredicate) ownerInNamespace(ownerRefs []metav1.OwnerReference) bool {
 	gtList := &farosv1alpha1.GitTrackList{}
-	err := p.client.List(context.TODO(), &client.ListOptions{}, gtList)
+	err := p.client.List(context.TODO(), gtList)
 	if err != nil {
 		// We can't list CGTOs so fail closed and ignore the requests
 		return false
@@ -124,13 +124,13 @@ func (p OwnersOwnerInNamespacePredicate) Generic(e event.GenericEvent) bool {
 // in the namespace the controller is managing.
 func (p OwnersOwnerInNamespacePredicate) ownersOwnerInNamespace(ownerRefs []metav1.OwnerReference) bool {
 	cgtoList := &farosv1alpha1.ClusterGitTrackObjectList{}
-	err := p.client.List(context.TODO(), &client.ListOptions{}, cgtoList)
+	err := p.client.List(context.TODO(), cgtoList)
 	if err != nil {
 		// We can't list CGTOs so fail closed and ignore the requests
 		return false
 	}
 	gtoList := &farosv1alpha1.GitTrackObjectList{}
-	err = p.client.List(context.TODO(), &client.ListOptions{}, gtoList)
+	err = p.client.List(context.TODO(), gtoList)
 	if err != nil {
 		// We can't list GTOs so fail closed and ignore the requests
 		return false
