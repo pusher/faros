@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
@@ -93,7 +92,7 @@ type Patcher struct {
 
 func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
-	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	current, err := runtime.Encode(UnstructuredStatusAwareJSONScheme, obj)
 	if err != nil {
 		return nil, nil, addSourceToErr(fmt.Sprintf("serializing current configuration from:\n%v\nfor:", obj), source, err)
 	}
@@ -218,7 +217,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	}); err != nil {
 		return modified, nil, err
 	}
-	versionedObject, _, err := unstructured.UnstructuredJSONScheme.Decode(modified, nil, nil)
+	versionedObject, _, err := UnstructuredStatusAwareJSONScheme.Decode(modified, nil, nil)
 	if err != nil {
 		return modified, nil, err
 	}

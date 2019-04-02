@@ -190,7 +190,7 @@ func (a *Applier) Apply(ctx context.Context, opts *ApplyOptions, modified runtim
 }
 
 func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Object) error {
-	err := createApplyAnnotation(obj, unstructured.UnstructuredJSONScheme)
+	err := createApplyAnnotation(obj, UnstructuredStatusAwareJSONScheme)
 	if err != nil {
 		return fmt.Errorf("unable to apply LastAppliedAnnotation to object: %v", err)
 	}
@@ -231,7 +231,7 @@ func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Ob
 }
 
 func (a *Applier) update(ctx context.Context, opts *ApplyOptions, current, modified runtime.Object) error {
-	modifiedJSON, err := getModifiedConfiguration(modified, true, unstructured.UnstructuredJSONScheme)
+	modifiedJSON, err := getModifiedConfiguration(modified, true, UnstructuredStatusAwareJSONScheme)
 	if err != nil {
 		return fmt.Errorf("unable to get modified configuration: %v", err)
 	}
@@ -305,7 +305,7 @@ func (a *Applier) configFor(gv schema.GroupVersion) (*rest.Config, error) {
 		config.APIPath = "apis/"
 	}
 
-	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: unstructured.UnstructuredJSONScheme})
+	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: UnstructuredStatusAwareJSONScheme})
 	return config, nil
 }
 
