@@ -18,6 +18,8 @@ package client
 
 import (
 	"log"
+	"os"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -33,6 +35,7 @@ import (
 )
 
 var cfg *rest.Config
+var skipDryRun bool
 
 func TestMain(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -49,6 +52,10 @@ var _ = BeforeSuite(func() {
 	var err error
 	if cfg, err = t.Start(); err != nil {
 		log.Fatal(err)
+	}
+	if skipDryRunEnv := os.Getenv("SKIP_DRY_RUN_TESTS"); skipDryRunEnv != "" {
+		skipDryRun, err = strconv.ParseBool(skipDryRunEnv)
+		Expect(err).NotTo(HaveOccurred())
 	}
 })
 

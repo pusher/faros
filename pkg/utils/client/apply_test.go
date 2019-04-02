@@ -109,6 +109,9 @@ var _ = Describe("Applier Suite", func() {
 
 		Context("with ServerDryRun true", func() {
 			BeforeEach(func() {
+				if skipDryRun {
+					Skip("dry run tests are skipped")
+				}
 				serverDryRun := true
 				o.ServerDryRun = &serverDryRun
 				Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
@@ -167,6 +170,9 @@ var _ = Describe("Applier Suite", func() {
 
 			Context("with ServerDryRun true", func() {
 				BeforeEach(func() {
+					if skipDryRun {
+						Skip("dry run tests are skipped")
+					}
 					serverDryRun := true
 					o.ServerDryRun = &serverDryRun
 					Expect(a.Apply(context.TODO(), o, deployment)).NotTo(HaveOccurred())
