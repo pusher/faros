@@ -33,12 +33,16 @@ var (
 
 	// ignoredResources is a list of Kubernets kinds to ignore when reconciling
 	ignoredResources []string
+
+	// ServerDryRun whether to enable Server side dry run or not
+	ServerDryRun bool
 )
 
 func init() {
 	FlagSet = flag.NewFlagSet("faros", flag.PanicOnError)
 	FlagSet.StringVar(&Namespace, "namespace", "", "Only manage GitTrack resources in given namespace")
 	FlagSet.StringSliceVar(&ignoredResources, "ignore-resource", []string{}, "Ignore resources of these kinds found in repositories, specified in <resource>.<group>/<version> format eg jobs.batch/v1")
+	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
 }
 
 // ParseIgnoredResources attempts to parse the ignore-resource flag value and
