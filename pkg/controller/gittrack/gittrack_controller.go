@@ -79,7 +79,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		scheme:          mgr.GetScheme(),
 		store:           gitstore.NewRepoStore(),
 		restMapper:      restMapper,
-		recorder:        mgr.GetRecorder("gittrack-controller"),
+		recorder:        mgr.GetEventRecorderFor("gittrack-controller"),
 		ignoredGVRs:     gvrs,
 		lastUpdateTimes: make(map[string]time.Time),
 		mutex:           sync.RWMutex{},
@@ -253,7 +253,7 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 	result := make(map[string]farosv1alpha1.GitTrackObjectInterface)
 
 	gtos := &farosv1alpha1.GitTrackObjectList{}
-	err := r.List(context.TODO(), &client.ListOptions{}, gtos)
+	err := r.List(context.TODO(), gtos)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +264,7 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 	}
 
 	cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
-	err = r.List(context.TODO(), &client.ListOptions{}, cgtos)
+	err = r.List(context.TODO(), cgtos)
 	if err != nil {
 		return nil, err
 	}

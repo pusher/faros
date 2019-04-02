@@ -212,9 +212,10 @@ var _ = Describe("EnqueueRequestForOwner Suite", func() {
 				IsController: true,
 				OwnerType:    &farosv1alpha1.ClusterGitTrackObject{},
 			},
-			RestMapper: testrestmapper.TestOnlyStaticRESTMapper(s),
 		}
 		err := enqueue.InjectScheme(s)
+		Expect(err).ToNot(HaveOccurred())
+		err = enqueue.InjectMapper(testrestmapper.TestOnlyStaticRESTMapper(s))
 		Expect(err).ToNot(HaveOccurred())
 	})
 

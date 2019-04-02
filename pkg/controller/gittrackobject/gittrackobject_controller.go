@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,10 +76,10 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		scheme:         mgr.GetScheme(),
 		eventStream:    make(chan event.GenericEvent),
 		cache:          mgr.GetCache(),
-		informers:      make(map[string]toolscache.SharedIndexInformer),
+		informers:      make(map[string]cache.Informer),
 		config:         mgr.GetConfig(),
 		stop:           stop,
-		recorder:       mgr.GetRecorder("gittrackobject-controller"),
+		recorder:       mgr.GetEventRecorderFor("gittrackobject-controller"),
 		applier:        applier,
 		dryRunVerifier: dryRunVerifier,
 	}
@@ -116,13 +115,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			Source: gtoReconciler.EventStream(),
 		}
 
-		restMapper, err := utils.NewRestMapper(mgr.GetConfig())
-		if err != nil {
-			msg := fmt.Sprintf("unable to create new RESTMapper: %v", err)
-			log.Printf(msg)
-			return fmt.Errorf(msg)
-		}
-
 		// When an event is received, queue the event's owner for reconciliation
 		err = c.Watch(src,
 			&gittrackobjectutils.EnqueueRequestForOwner{
@@ -134,7 +126,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 					IsController: true,
 					OwnerType:    &farosv1alpha1.ClusterGitTrackObject{},
 				},
-				RestMapper: restMapper,
 			},
 			utils.NewOwnersOwnerInNamespacePredicate(mgr.GetClient()),
 		)
@@ -163,7 +154,7 @@ type ReconcileGitTrackObject struct {
 	scheme      *runtime.Scheme
 	eventStream chan event.GenericEvent
 	cache       cache.Cache
-	informers   map[string]toolscache.SharedIndexInformer
+	informers   map[string]cache.Informer
 	config      *rest.Config
 	stop        chan struct{}
 	recorder    record.EventRecorder
