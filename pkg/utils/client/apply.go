@@ -305,7 +305,8 @@ func (a *Applier) configFor(gv schema.GroupVersion) (*rest.Config, error) {
 		config.APIPath = "apis/"
 	}
 
-	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: unstructured.UnstructuredJSONScheme})
+	contentConfig := resource.UnstructuredPlusDefaultContentConfig()
+	config.NegotiatedSerializer = contentConfig.NegotiatedSerializer
 	return config, nil
 }
 
