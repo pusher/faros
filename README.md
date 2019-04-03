@@ -59,12 +59,14 @@ well as providing a canonical history of what was deployed and when.
 ### Building
 
 To build faros locally, run
+
 ```
 ./configure
 make build
 ```
 
 In order to build all binaries for all supported architectures, you may
+
 ```
 ./configure
 make release
@@ -185,6 +187,32 @@ Therefore, by setting the following flag;
 
 You can ensure that every resource will be reconciled at least every 5 minutes.
 
+#### Server Dry Run
+
+By default, the GitTrackObject controller will attempt to dry run updates to
+resources before actually applying updates. This helps to prevent unnecessary
+updates and allows mutating admission controller results to be observed.
+
+Server side dry run currently sits behind a feature gate within Kubernetes,
+please see the table below for compatibility.
+
+| Kubernetes Version | Feature Status                           | Compatible |
+| ------------------ | ---------------------------------------- | :--------: |
+| **1.14**           | **Beta feature gate enabled (default)**  |  **True**  |
+| 1.14               | Beta feature gate disabled               |   False    |
+| **1.13**           | **Beta feature gate enabled (default)**  |  **True**  |
+| 1.13               | Beta feature gate disabled               |   False    |
+| 1.12               | Alpha feature gate enabled               |    True    |
+| **1.12**           | **Beta feature gate disabled (default)** | **False**  |
+| **1.11**           | **Not Implemented**                      | **False**  |
+
+If your version of Kubernets is incompatible, please disable server dry run as
+below:
+
+```
+--server-dry-run=false // Defaults to true
+```
+
 #### Metrics
 
 The controller exposes a number of metrics in a prometheus format at a
@@ -273,26 +301,26 @@ and `objectsInSync` fields should be equal.
 ```yaml
 status:
   conditions:
-  - lastTransitionTime: 2018-10-16T17:36:21Z
-    lastUpdateTime: 2018-10-16T17:36:21Z
-    reason: FileParseSuccess
-    status: "True"
-    type: FilesParsed
-  - lastTransitionTime: 2018-10-16T17:36:21Z
-    lastUpdateTime: 2018-10-16T17:36:21Z
-    reason: GitFetchSuccess
-    status: "True"
-    type: FilesFetched
-  - lastTransitionTime: 2018-10-16T17:36:21Z
-    lastUpdateTime: 2018-10-16T17:36:21Z
-    reason: GCSuccess
-    status: "True"
-    type: ChildrenGarbageCollected
-  - lastTransitionTime: 2018-10-16T17:36:21Z
-    lastUpdateTime: 2018-10-16T17:36:21Z
-    reason: ChildUpdateSuccess
-    status: "True"
-    type: ChildrenUpToDate
+    - lastTransitionTime: 2018-10-16T17:36:21Z
+      lastUpdateTime: 2018-10-16T17:36:21Z
+      reason: FileParseSuccess
+      status: "True"
+      type: FilesParsed
+    - lastTransitionTime: 2018-10-16T17:36:21Z
+      lastUpdateTime: 2018-10-16T17:36:21Z
+      reason: GitFetchSuccess
+      status: "True"
+      type: FilesFetched
+    - lastTransitionTime: 2018-10-16T17:36:21Z
+      lastUpdateTime: 2018-10-16T17:36:21Z
+      reason: GCSuccess
+      status: "True"
+      type: ChildrenGarbageCollected
+    - lastTransitionTime: 2018-10-16T17:36:21Z
+      lastUpdateTime: 2018-10-16T17:36:21Z
+      reason: ChildUpdateSuccess
+      status: "True"
+      type: ChildrenUpToDate
   objectsApplied: 82
   objectsDiscovered: 83
   objectsIgnored: 1

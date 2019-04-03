@@ -220,8 +220,10 @@ func (r *ReconcileGitTrackObject) recreateChild(found, child *unstructured.Unstr
 // updateChild updates the given child resource of a (Cluster)GitTrackObject
 func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstructured) (bool, error) {
 	// HasSupport returns an error if dry run not supported
-	if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err == nil {
-		return r.applyChildWithDryRun(found, child, false)
+	if farosflags.ServerDryRun {
+		if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err == nil {
+			return r.applyChildWithDryRun(found, child, false)
+		}
 	}
 	// Dry run not supported so apply without DryRun
 	return r.applyChild(found, child, false)
