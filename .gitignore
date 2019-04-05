@@ -1,5 +1,5 @@
-bin
-vendor
-cover.out
+vendor/
+release/
 .env
-release
+cover.out
+faros-gittrack-controller
