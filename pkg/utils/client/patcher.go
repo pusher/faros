@@ -128,7 +128,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		}
 	case err != nil:
 		return nil, nil, addSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.Mapping.GroupVersionKind), source, err)
-	case err == nil:
+	default:
 		// Compute a three way strategic merge patch to send to server.
 		patchType = types.StrategicMergePatchType
 
