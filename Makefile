@@ -55,12 +55,22 @@ lint:
 	$(LINTER) run --disable-all \
                 --exclude-use-default=false \
                 --enable=govet \
+                --enable=staticcheck \
+                --enable=unused \
+                --enable=gosimple \
+                --enable=structcheck \
+                --enable=varcheck \
                 --enable=ineffassign \
                 --enable=deadcode \
+                --enable=typecheck \
                 --enable=golint \
+                --enable=stylecheck \
+                --enable=unconvert \
                 --enable=goconst \
                 --enable=gofmt \
                 --enable=goimports \
+                --enable=misspell \
+                --enable=scopelint \
                 --skip-dirs=pkg/client/ \
                 --deadline=120s \
                 --tests ./...
