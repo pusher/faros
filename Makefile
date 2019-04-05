@@ -112,7 +112,7 @@ release: test docker-build docker-tag docker-push
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
 run: generate fmt vet
-	$(GO) run ./cmd/manager/main.go
+	$(GO) run ./cmd/manager
 
 # Install CRDs into a cluster
 .PHONY: install
