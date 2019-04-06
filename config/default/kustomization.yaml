@@ -11,16 +11,17 @@ namePrefix: faros-
 # Labels to add to all resources and selectors.
 #commonLabels:
 #  someName: someValue
-
+bases:
+- ../rbac
 # Each entry in this list must resolve to an existing
 # resource definition in YAML.  These are the resource
 # files that kustomize reads, modifies and emits as a
 # YAML string, with resources separated by document
 # markers ("---").
 resources:
-- ../rbac/rbac_role.yaml
-- ../rbac/rbac_role_binding.yaml
-- ../manager/manager.yaml
+- manager.yaml
 
-patches:
-- manager_image_patch.yaml
+images:
+  - name: controller:latest
+    newName: quay.io/pusher/faros
+    newTag: latest
