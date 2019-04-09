@@ -29,7 +29,7 @@ import (
 	farosflags "github.com/pusher/faros/pkg/flags"
 	utils "github.com/pusher/faros/pkg/utils"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
-	gitstore "github.com/pusher/git-store"
+	gitstore "github.com/slentzen-auth0/git-store"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -219,7 +219,7 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 	}
 
 	globbedSubPath := strings.TrimPrefix(subPath, "/") + "{**/*,*}.{yaml,yml,json}"
-	files, err := repo.GetAllFiles(globbedSubPath, true)
+	files, err := repo.GetAllFiles(globbedSubPath, true, true)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to get files for SubPath '%s'", gt.Spec.SubPath)
 		return nil, fmt.Errorf("failed to get all files for subpath '%s': %v", gt.Spec.SubPath, err)

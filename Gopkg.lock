@@ -676,6 +676,39 @@
   revision = "418d78d0b9a7b7de3a6bbc8a23def624cc977bb2"
 
 [[projects]]
+  digest = "1:b863963d4df8db4592c619af11f81e445514939bf04e76ff631e397e28e4ae74"
+  name = "github.com/pusher/faros"
+  packages = [
+    "pkg/apis",
+    "pkg/apis/faros/v1alpha1",
+    "pkg/client/clientset",
+    "pkg/client/clientset/scheme",
+    "pkg/client/clientset/typed/faros/v1alpha1",
+    "pkg/client/clientset/typed/faros/v1alpha1/fake",
+    "pkg/client/informers/externalversions/faros",
+    "pkg/client/informers/externalversions/faros/v1alpha1",
+    "pkg/client/informers/externalversions/internalinterfaces",
+    "pkg/client/listers/faros/v1alpha1",
+    "pkg/controller",
+    "pkg/controller/gittrack",
+    "pkg/controller/gittrack/metrics",
+    "pkg/controller/gittrack/utils",
+    "pkg/controller/gittrackobject",
+    "pkg/controller/gittrackobject/metrics",
+    "pkg/controller/gittrackobject/utils",
+    "pkg/flags",
+    "pkg/utils",
+    "pkg/utils/client",
+    "pkg/utils/client/test",
+    "test/events",
+    "test/reporters",
+    "test/utils",
+  ]
+  pruneopts = "T"
+  revision = "fb32b4e8f0fc3ae5314b2307846572a758584056"
+  version = "v0.4.0-rc4"
+
+[[projects]]
   digest = "1:dc16a6f5bdd6af17ace824614da4838c43765bfa7fe1602be9c57655cd2fe0db"
   name = "github.com/pusher/git-store"
   packages = ["."]
@@ -698,6 +731,14 @@
   pruneopts = "T"
   revision = "1744e2970ca51c86172c8190fadad617561ed6e7"
   version = "v1.0.0"
+
+[[projects]]
+  digest = "1:3b22d8a0904ec766a1a1270bcae556f748e7f692202c59db05d4eca68132e664"
+  name = "github.com/slentzen-auth0/git-store"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "09947afd7cb6cd1f27c41c74e9da0391f86a640e"
+  version = "0.5.1"
 
 [[projects]]
   digest = "1:2b9e473441ec584565880b55467ba1797417f42a60d92af4a761f8485a57e4d0"
@@ -1642,7 +1683,32 @@
     "github.com/onsi/gomega/types",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_model/go",
+    "github.com/pusher/faros/pkg/apis",
+    "github.com/pusher/faros/pkg/apis/faros/v1alpha1",
+    "github.com/pusher/faros/pkg/client/clientset",
+    "github.com/pusher/faros/pkg/client/clientset/scheme",
+    "github.com/pusher/faros/pkg/client/clientset/typed/faros/v1alpha1",
+    "github.com/pusher/faros/pkg/client/clientset/typed/faros/v1alpha1/fake",
+    "github.com/pusher/faros/pkg/client/informers/externalversions/faros",
+    "github.com/pusher/faros/pkg/client/informers/externalversions/faros/v1alpha1",
+    "github.com/pusher/faros/pkg/client/informers/externalversions/internalinterfaces",
+    "github.com/pusher/faros/pkg/client/listers/faros/v1alpha1",
+    "github.com/pusher/faros/pkg/controller",
+    "github.com/pusher/faros/pkg/controller/gittrack",
+    "github.com/pusher/faros/pkg/controller/gittrack/metrics",
+    "github.com/pusher/faros/pkg/controller/gittrack/utils",
+    "github.com/pusher/faros/pkg/controller/gittrackobject",
+    "github.com/pusher/faros/pkg/controller/gittrackobject/metrics",
+    "github.com/pusher/faros/pkg/controller/gittrackobject/utils",
+    "github.com/pusher/faros/pkg/flags",
+    "github.com/pusher/faros/pkg/utils",
+    "github.com/pusher/faros/pkg/utils/client",
+    "github.com/pusher/faros/pkg/utils/client/test",
+    "github.com/pusher/faros/test/events",
+    "github.com/pusher/faros/test/reporters",
+    "github.com/pusher/faros/test/utils",
     "github.com/pusher/git-store",
+    "github.com/slentzen-auth0/git-store",
     "github.com/spf13/pflag",
     "golang.org/x/net/context",
     "gopkg.in/yaml.v2",

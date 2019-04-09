@@ -3,7 +3,7 @@ required = [
     "github.com/onsi/ginkgo", # for test framework
     "github.com/onsi/gomega", # for test matchers
     "github.com/kubernetes-sigs/kubebuilder", # For tests
-    "github.com/pusher/git-store",
+    "github.com/slentzen-auth0/git-store",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
     "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
@@ -21,8 +21,8 @@ required = [
   go-tests = true
 
 [[constraint]]
-name="github.com/pusher/git-store"
-version="v0.5.0"
+name="github.com/slentzen-auth0/git-store"
+version="v0.5.1"
 
 [[override]]
 name="gopkg.in/src-d/go-git.v4"

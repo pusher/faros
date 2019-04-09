@@ -19,7 +19,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
-	gitstore "github.com/pusher/git-store"
+	gitstore "github.com/slentzen-auth0/git-store"
 )
 
 var _ = Describe("GitTrack Suite", func() {
