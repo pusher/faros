@@ -1707,7 +1707,6 @@
     "github.com/pusher/faros/test/events",
     "github.com/pusher/faros/test/reporters",
     "github.com/pusher/faros/test/utils",
-    "github.com/pusher/git-store",
     "github.com/slentzen-auth0/git-store",
     "github.com/spf13/pflag",
     "golang.org/x/net/context",

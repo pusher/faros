@@ -34,7 +34,7 @@ import (
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testevents "github.com/pusher/faros/test/events"
 	testutils "github.com/pusher/faros/test/utils"
-	gitstore "github.com/pusher/git-store"
+	gitstore "github.com/slentzen-auth0/git-store"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
