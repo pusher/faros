@@ -27,8 +27,12 @@ import (
 	"github.com/pusher/faros/pkg/apis"
 	"github.com/pusher/faros/pkg/controller"
 	farosflags "github.com/pusher/faros/pkg/flags"
+	"github.com/pusher/faros/pkg/utils"
 	flag "github.com/spf13/pflag"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
@@ -62,6 +66,24 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Create a restMapper (used by informer to look up resource kinds)
+	restMapper, err := utils.NewRestMapper(cfg)
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest mapper: %v", err))
+	}
+
+	// Create a client using the restMapper
+	restClient, err := client.New(cfg, client.Options{Mapper: restMapper})
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest client: %v", err))
+	}
+
+	// Create a cache using the restMapper
+	restCache, _ := cache.New(cfg, cache.Options{Mapper: restMapper})
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest cache: %v", err))
+	}
+
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
 		LeaderElection:          *leaderElection,
@@ -70,6 +92,12 @@ func main() {
 		MetricsBindAddress:      *metricsBindAddress,
 		SyncPeriod:              syncPeriod,
 		Namespace:               farosflags.Namespace,
+		NewClient: func(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
+			return restClient
+		},
+		NewCache: func(config *rest.Config, opts Options) (Cache, error) {
+			return restCache
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
