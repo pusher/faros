@@ -93,10 +93,10 @@ func main() {
 		SyncPeriod:              syncPeriod,
 		Namespace:               farosflags.Namespace,
 		NewClient: func(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
-			return restClient
+			return restClient, nil
 		},
-		NewCache: func(config *rest.Config, opts Options) (Cache, error) {
-			return restCache
+		NewCache: func(config *rest.Config, options cache.Options) (cache.Cache, error) {
+			return restCache, nil
 		},
 	})
 	if err != nil {
