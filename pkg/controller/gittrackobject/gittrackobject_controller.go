@@ -61,6 +61,24 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		close(stop)
 	}()
 
+	// Create a restMapper (used by informer to look up resource kinds)
+	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest mapper: %v", err))
+	}
+
+	// Create a client using the restMapper
+	restClient, err := client.New(mgr.GetConfig(), client.Options{Mapper: restMapper})
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest client: %v", err))
+	}
+
+	// Create a cache using the restMapper
+	restCache, _ := cache.New(mgr.GetConfig(), cache.Options{Mapper: restMapper})
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest cache: %v", err))
+	}
+
 	applier, err := farosclient.NewApplier(mgr.GetConfig(), farosclient.Options{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create applier: %v", err))
@@ -72,10 +90,10 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 
 	return &ReconcileGitTrackObject{
-		Client:         mgr.GetClient(),
+		Client:         restClient,
 		scheme:         mgr.GetScheme(),
 		eventStream:    make(chan event.GenericEvent),
-		cache:          mgr.GetCache(),
+		cache:          restCache,
 		informers:      make(map[string]cache.Informer),
 		config:         mgr.GetConfig(),
 		stop:           stop,

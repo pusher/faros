@@ -64,6 +64,12 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create rest mapper: %v", err))
 	}
 
+	// Create a client using the restMapper
+	restClient, err := client.New(mgr.GetConfig(), client.Options{Mapper: restMapper})
+	if err != nil {
+		panic(fmt.Errorf("unable to create rest client: %v", err))
+	}
+
 	gvrs, err := farosflags.ParseIgnoredResources()
 	if err != nil {
 		panic(fmt.Errorf("unable to parse ignored resources: %v", err))
@@ -75,7 +81,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 
 	return &ReconcileGitTrack{
-		Client:          mgr.GetClient(),
+		Client:          restClient,
 		scheme:          mgr.GetScheme(),
 		store:           gitstore.NewRepoStore(),
 		restMapper:      restMapper,
