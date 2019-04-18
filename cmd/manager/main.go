@@ -27,6 +27,7 @@ import (
 	"github.com/pusher/faros/pkg/apis"
 	"github.com/pusher/faros/pkg/controller"
 	farosflags "github.com/pusher/faros/pkg/flags"
+	"github.com/pusher/faros/pkg/utils"
 	flag "github.com/spf13/pflag"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -70,6 +71,7 @@ func main() {
 		MetricsBindAddress:      *metricsBindAddress,
 		SyncPeriod:              syncPeriod,
 		Namespace:               farosflags.Namespace,
+		MapperProvider:          utils.NewRestMapper,
 	})
 	if err != nil {
 		log.Fatal(err)

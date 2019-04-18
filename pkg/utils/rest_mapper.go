@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 // NewRestMapper creates a restMapper from the discovery client
@@ -38,7 +39,13 @@ func NewRestMapper(config *rest.Config) (meta.RESTMapper, error) {
 		return nil, fmt.Errorf("unable to fetch API Group Resources: %v", err)
 	}
 
-	return restmapper.NewDiscoveryRESTMapper(apiGroupResources), nil
+	drm := restmapper.NewDiscoveryRESTMapper(apiGroupResources)
+
+	lrm := meta.NewLazyRESTMapperLoader(func() (meta.RESTMapper, error) {
+		return apiutil.NewDiscoveryRESTMapper(config)
+	})
+
+	return meta.FirstHitRESTMapper{MultiRESTMapper: meta.MultiRESTMapper{drm, lrm}}, nil
 }
 
 // GetAPIResource uses a rest mapper to get the GroupVersionResource and
