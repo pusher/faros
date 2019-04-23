@@ -19,7 +19,6 @@ package gittrack
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
@@ -106,11 +105,11 @@ func (r *ReconcileGitTrack) updateStatus(original *farosv1alpha1.GitTrack, opts 
 
 	// If the status was modified, update the GitTrack on the API
 	if gtUpdated {
-		log.Printf("Updating GitTrack %s status", gt.Name)
 		err := r.Update(context.TODO(), gt)
 		if err != nil {
 			return fmt.Errorf("unable to update GitTrack: %v", err)
 		}
+		r.log.V(2).Info("Status updated")
 	}
 	return nil
 }

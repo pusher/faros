@@ -19,11 +19,11 @@ package gittrack
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	rlogr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -82,8 +83,9 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		recorder:        mgr.GetEventRecorderFor("gittrack-controller"),
 		ignoredGVRs:     gvrs,
 		lastUpdateTimes: make(map[string]time.Time),
-		mutex:           sync.RWMutex{},
+		mutex:           &sync.RWMutex{},
 		applier:         applier,
+		log:             rlogr.Log.WithName("gittrack-controller"),
 	}
 }
 
@@ -131,13 +133,20 @@ type ReconcileGitTrack struct {
 	recorder        record.EventRecorder
 	ignoredGVRs     map[schema.GroupVersionResource]interface{}
 	lastUpdateTimes map[string]time.Time
-	mutex           sync.RWMutex
+	mutex           *sync.RWMutex
 	applier         farosclient.Client
+	log             logr.Logger
+}
+
+func (r *ReconcileGitTrack) withValues(keysAndValues ...interface{}) *ReconcileGitTrack {
+	reconciler := *r
+	reconciler.log = r.log.WithValues(keysAndValues...)
+	return &reconciler
 }
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
 func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCredentials) (*gitstore.Repo, error) {
-	log.Printf("Getting repository '%s'\n", url)
+	r.log.V(4).Info("Getting repository", "url", url)
 	repoRef, err := createRepoRefFromCreds(url, gitCreds)
 	if err != nil {
 		return &gitstore.Repo{}, err
@@ -147,7 +156,7 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
 	}
 
-	log.Printf("Checking out '%s'\n", ref)
+	r.log.V(2).Info("Checking out reference", "ref", ref)
 	err = repo.Checkout(ref)
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to checkout '%s': %v", ref, err)
@@ -383,7 +392,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	}
 	if childUpdated {
 		inSync = false
-		log.Printf("Updated child for '%s'\n", name)
+		r.log.V(2).Info("Child updated", "ChildName", name)
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
 	return successResult(gto.GetNamespacedName(), timeToDeploy, inSync)
@@ -399,13 +408,13 @@ func childInSync(child farosv1alpha1.GitTrackObjectInterface) bool {
 }
 
 func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration, owner *farosv1alpha1.GitTrack, foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) result {
-	log.Printf("Creating child for '%s'\n", name)
 	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
 	if err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, childGTO); err != nil {
 		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
 		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to create child for '%s': %v", name, err))
 	}
 	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
+	r.log.V(2).Info("Child created", "ChildName", name)
 	return successResult(childGTO.GetNamespacedName(), timeToDeploy, false)
 }
 
@@ -429,10 +438,10 @@ func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO farosv1alpha1.GitTrac
 // deleteResources deletes any resources that are present in the given map
 func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.GitTrackObjectInterface) error {
 	for name, obj := range leftovers {
-		log.Printf("Deleting child '%s'\n", name)
 		if err := r.Delete(context.TODO(), obj); err != nil {
 			return fmt.Errorf("failed to delete child for '%s': '%s'", name, err)
 		}
+		r.log.V(2).Info("Deleted child", "ChildName", name)
 	}
 	return nil
 }
@@ -493,14 +502,26 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, er
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=gittrackobjects,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=faros.pusher.com,resources=clustergittrackobjects,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	instance := &farosv1alpha1.GitTrack{}
+	instance, err := r.fetchInstance(request)
+	if err != nil || instance == nil {
+		return reconcile.Result{}, err
+	}
+
+	reconciler := r.withValues(
+		"Namespace", instance.GetNamespace(),
+		"Name", instance.GetName(),
+	)
+	reconciler.log.V(2).Info("Reconcile started")
+
 	sOpts := newStatusOpts()
 	mOpts := newMetricOpts(sOpts)
 
 	// Update the GitTrack status when we leave this function
 	defer func() {
-		err := r.updateStatus(instance, sOpts)
-		mErr := r.updateMetrics(instance, mOpts)
+		err := reconciler.updateStatus(instance, sOpts)
+		mErr := reconciler.updateMetrics(instance, mOpts)
+
+		reconciler.log.V(2).Info("Reconcile finished")
 		// Print out any errors that may have occurred
 		for _, e := range []error{
 			err,
@@ -511,22 +532,16 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 			sOpts.upToDateError,
 		} {
 			if e != nil {
-				log.Printf("%v", e)
+				r.log.Error(e, "error in reconcile")
 			}
 		}
 	}()
-
-	var err error
-	instance, err = r.fetchInstance(request)
-	if err != nil || instance == nil {
-		return reconcile.Result{}, err
-	}
 
 	// Set the repository for metrics
 	mOpts.repository = instance.Spec.Repository
 
 	// Get a map of the files that are in the Spec
-	files, err := r.getFiles(instance)
+	files, err := reconciler.getFiles(instance)
 	if err != nil {
 		sOpts.gitError = err
 		sOpts.gitReason = gittrackutils.ErrorFetchingFiles
@@ -534,7 +549,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 	// Git successful, set condition
 	sOpts.gitReason = gittrackutils.GitFetchSuccess
-	r.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.Spec.Repository, instance.Spec.Reference)
+	reconciler.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.Spec.Repository, instance.Spec.Reference)
 
 	// Attempt to parse k8s objects from files
 	objects, errors := objectsFrom(files)
@@ -548,7 +563,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	// Update status with the number of objects discovered
 	sOpts.discovered = int64(len(objects))
 	// Get a list of the GitTrackObjects that currently exist, by name
-	objectsByName, err := r.listObjectsByName(instance)
+	objectsByName, err := reconciler.listObjectsByName(instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -556,7 +571,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	resultsChan := make(chan result, len(objects))
 	for _, obj := range objects {
 		go func(obj *unstructured.Unstructured) {
-			resultsChan <- r.handleObject(obj, instance)
+			resultsChan <- reconciler.handleObject(obj, instance)
 		}(obj)
 	}
 
@@ -589,10 +604,10 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 
 	// Cleanup potentially leftover resources
-	if err = r.deleteResources(objectsByName); err != nil {
+	if err = reconciler.deleteResources(objectsByName); err != nil {
 		sOpts.gcError = err
 		sOpts.gcReason = gittrackutils.ErrorDeletingChildren
-		r.recorder.Eventf(instance, apiv1.EventTypeWarning, "CleanupFailed", "Failed to clean-up leftover resources")
+		reconciler.recorder.Eventf(instance, apiv1.EventTypeWarning, "CleanupFailed", "Failed to clean-up leftover resources")
 		return reconcile.Result{}, fmt.Errorf("failed to clean-up tracked objects: %v", err)
 	}
 	sOpts.gcReason = gittrackutils.GCSuccess
