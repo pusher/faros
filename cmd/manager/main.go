@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"time"
 
@@ -51,9 +52,12 @@ func main() {
 	log := logr.Log.WithName("manager")
 	logFlags := &goflag.FlagSet{}
 	klog.InitFlags(logFlags)
+	err := logFlags.Lookup("logtostderr").Value.Set("false")
+	if err != nil {
+		log.Error(err, "unable to set flag logtostderr")
+	}
 
 	// Setup flags
-	goflag.Lookup("logtostderr").Value.Set("true")
 	flag.CommandLine.AddFlagSet(farosflags.FlagSet)
 	flag.CommandLine.AddGoFlagSet(logFlags)
 	flag.Parse()
@@ -62,6 +66,12 @@ func main() {
 	if *showVersion {
 		fmt.Printf("faros-gittrack-controller %s (built with %s)\n", VERSION, runtime.Version())
 		return
+	}
+
+	if logFlags.Lookup("logtostderr").Value.String() != "true" {
+		klog.CopyStandardLogTo("INFO")
+		klog.SetOutput(os.Stderr)
+		klog.SetOutputBySeverity("INFO", os.Stdout)
 	}
 
 	// Get a config to talk to the apiserver
@@ -82,7 +92,7 @@ func main() {
 		MapperProvider:          utils.NewRestMapper,
 	})
 	if err != nil {
-		log.Error(err, "failed to initalise manager")
+		log.Error(err, "failed to initialise manager")
 		panic(err)
 	}
 
