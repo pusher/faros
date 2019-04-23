@@ -40,6 +40,7 @@ func (r *ReconcileGitTrackObject) watch(obj unstructured.Unstructured) error {
 
 	// Add event handlers
 	informer.AddEventHandler(&gittrackobjectutils.EventToChannelHandler{
+		Kind:       obj.GetKind(),
 		EventsChan: r.eventStream,
 	})
 

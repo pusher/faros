@@ -129,6 +129,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 					IsController: true,
 					OwnerType:    &farosv1alpha1.ClusterGitTrackObject{},
 				},
+				Log: rlogr.Log.WithName("gittrackobject-controller/enqueue-request-for-owner"),
 			},
 			utils.NewOwnersOwnerInNamespacePredicate(mgr.GetClient()),
 		)

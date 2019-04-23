@@ -17,17 +17,19 @@ limitations under the License.
 package utils
 
 import (
-	"log"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	rlogr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 // EventToChannelHandler send all events onto the EventsChan for consumption
 // and filtering by the controller's Watch function
 type EventToChannelHandler struct {
 	EventsChan chan event.GenericEvent
+	Kind       string
 }
 
 // OnAdd implements the cache.ResoureEventHandler interface
@@ -54,7 +56,8 @@ func (e *EventToChannelHandler) queueEventForObject(obj interface{}) {
 	var u *unstructured.Unstructured
 	var ok bool
 	if u, ok = obj.(*unstructured.Unstructured); !ok {
-		log.Printf("unable to create unstructured object from interface: %+v", obj)
+		log := rlogr.Log.WithName("gittrackobject-controller/event-to-channel-handler")
+		log.Error(fmt.Errorf("unable to create unstructured object from interface"), "Unable to queue event for object", "kind", e.Kind)
 		return
 	}
 
