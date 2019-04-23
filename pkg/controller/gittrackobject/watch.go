@@ -18,7 +18,6 @@ package gittrackobject
 
 import (
 	"fmt"
-	"log"
 
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,12 +32,10 @@ func (r *ReconcileGitTrackObject) watch(obj unstructured.Unstructured) error {
 	}
 
 	// Create new informer
-	log.Printf("Creating new informer for kind %s", obj.GetObjectKind().GroupVersionKind().Kind)
+	r.log.V(3).Info("Creating informer for child kind")
 	informer, err := r.cache.GetInformer(&obj)
 	if err != nil {
-		msg := fmt.Sprintf("error creating informer: %v", err)
-		log.Printf(msg)
-		return fmt.Errorf(msg)
+		return fmt.Errorf("error creating informer: %v", err)
 	}
 
 	// Add event handlers

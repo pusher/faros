@@ -27,6 +27,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 
+	"github.com/go-logr/logr"
 	"github.com/pusher/faros/pkg/utils"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	rlogr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -82,6 +84,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		recorder:       mgr.GetEventRecorderFor("gittrackobject-controller"),
 		applier:        applier,
 		dryRunVerifier: dryRunVerifier,
+		log:            rlogr.Log.WithName("gittrackobject-controller"),
 	}
 }
 
@@ -158,6 +161,7 @@ type ReconcileGitTrackObject struct {
 	config      *rest.Config
 	stop        chan struct{}
 	recorder    record.EventRecorder
+	log         logr.Logger
 
 	applier        farosclient.Client
 	dryRunVerifier *utils.DryRunVerifier
@@ -171,6 +175,12 @@ func (r *ReconcileGitTrackObject) EventStream() chan event.GenericEvent {
 // StopChan returns the object stop channel
 func (r *ReconcileGitTrackObject) StopChan() chan struct{} {
 	return r.stop
+}
+
+func (r *ReconcileGitTrackObject) withValues(keysAndValues ...interface{}) *ReconcileGitTrackObject {
+	reconciler := *r
+	reconciler.log = r.log.WithValues(keysAndValues...)
+	return &reconciler
 }
 
 // Reconcile reads that state of the cluster for a GitTrackObject object and makes changes based on the state read
@@ -191,12 +201,22 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
-	// Create new opts structs for updating status and metrics
-	result := r.handleGitTrackObject(instance)
-	r.updateStatus(instance, &statusOpts{inSyncError: result.inSyncError, inSyncReason: result.inSyncReason})
-	inSync := result.inSyncError == nil
-	r.updateMetrics(instance, &metricsOpts{inSync: inSync})
+	// Get a reconciler with appropriate logging values
+	reconciler := r.withValues(
+		"Namespace", instance.GetNamespace(),
+		"ChildName", instance.GetSpec().Name,
+		"ChildKind", instance.GetSpec().Kind,
+	)
 
+	reconciler.log.V(3).Info("Reconcile started")
+
+	// Create new opts structs for updating status and metrics
+	result := reconciler.handleGitTrackObject(instance)
+	reconciler.updateStatus(instance, &statusOpts{inSyncError: result.inSyncError, inSyncReason: result.inSyncReason})
+	inSync := result.inSyncError == nil
+	reconciler.updateMetrics(instance, &metricsOpts{inSync: inSync})
+
+	reconciler.log.V(3).Info("Reconcile finished")
 	return reconcile.Result{}, result.inSyncError
 }
 

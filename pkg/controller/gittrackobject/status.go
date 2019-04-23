@@ -19,7 +19,6 @@ package gittrackobject
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
@@ -83,11 +82,11 @@ func (r *ReconcileGitTrackObject) updateStatus(original farosv1alpha1.GitTrackOb
 	gto := original.DeepCopyInterface()
 	gtoUpdated := updateGitTrackObjectStatus(gto, opts)
 	if gtoUpdated {
-		log.Printf("Updating %s/%s status", gto.GetNamespace(), gto.GetName())
 		err := r.Update(context.TODO(), gto)
 		if err != nil {
 			return fmt.Errorf("unable to update status: %v", err)
 		}
+		r.log.V(2).Info("Parent status Updated")
 	}
 
 	return nil
