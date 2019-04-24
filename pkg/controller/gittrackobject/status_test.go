@@ -90,6 +90,13 @@ var _ = Describe("Status Suite", func() {
 
 			BeforeEach(func() {
 				gto = testutils.ExampleGitTrackObject.DeepCopy()
+
+				r = r.withValues(
+					"Namespace", gto.GetNamespace(),
+					"ChildName", gto.GetSpec().Name,
+					"ChildKind", gto.GetSpec().Kind,
+				)
+
 				m.Create(gto).Should(Succeed())
 				m.Get(gto, timeout).Should(Succeed())
 			})
@@ -144,6 +151,13 @@ var _ = Describe("Status Suite", func() {
 
 			BeforeEach(func() {
 				gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+
+				r = r.withValues(
+					"Namespace", gto.GetNamespace(),
+					"ChildName", gto.GetSpec().Name,
+					"ChildKind", gto.GetSpec().Kind,
+				)
+
 				m.Create(gto).Should(Succeed())
 				m.Get(gto, timeout).Should(Succeed())
 			})

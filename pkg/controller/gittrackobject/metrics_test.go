@@ -63,6 +63,12 @@ var _ = Describe("Metrics Suite", func() {
 
 			BeforeEach(func() {
 				gto = testutils.ExampleGitTrackObject.DeepCopy()
+
+				r = r.withValues(
+					"Namespace", gto.GetNamespace(),
+					"ChildName", gto.GetSpec().Name,
+					"ChildKind", gto.GetSpec().Kind,
+				)
 			})
 
 			Context("with inSync true", func() {
@@ -97,6 +103,12 @@ var _ = Describe("Metrics Suite", func() {
 
 			BeforeEach(func() {
 				gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+
+				r = r.withValues(
+					"Namespace", gto.GetNamespace(),
+					"ChildName", gto.GetSpec().Name,
+					"ChildKind", gto.GetSpec().Kind,
+				)
 			})
 
 			Context("with inSync true", func() {
