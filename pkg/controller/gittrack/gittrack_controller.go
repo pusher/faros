@@ -156,7 +156,7 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
 	}
 
-	r.log.V(1).Info("Checking out reference", "ref", ref)
+	r.log.V(1).Info("Checking out reference", "reference", ref)
 	err = repo.Checkout(ref)
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to checkout '%s': %v", ref, err)
@@ -227,6 +227,7 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 		subPath += "/"
 	}
 
+	r.log.V(1).Info("Loading files from subpath", "subpath", subPath)
 	globbedSubPath := strings.TrimPrefix(subPath, "/") + "{**/*,*}.{yaml,yml,json}"
 	files, err := repo.GetAllFiles(globbedSubPath, true)
 	if err != nil {
@@ -237,6 +238,7 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 		return nil, fmt.Errorf("no files for subpath '%s'", gt.Spec.SubPath)
 	}
 
+	r.log.V(1).Info("Loaded files from repository", "file count", string(len(files)))
 	return files, nil
 }
 
@@ -437,6 +439,9 @@ func (r *ReconcileGitTrack) updateChild(foundGTO, childGTO farosv1alpha1.GitTrac
 
 // deleteResources deletes any resources that are present in the given map
 func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.GitTrackObjectInterface) error {
+	if len(leftovers) > 0 {
+		r.log.V(0).Info("Found leftover resources to clean up", "leftover resources", string(len(leftovers)))
+	}
 	for name, obj := range leftovers {
 		if err := r.Delete(context.TODO(), obj); err != nil {
 			return fmt.Errorf("failed to delete child for '%s': '%s'", name, err)
@@ -486,10 +491,12 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, er
 
 	// Ignore namespaced objects not in the namespace managed by the controller
 	if namespaced && farosflags.Namespace != "" && farosflags.Namespace != u.GetNamespace() {
+		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", farosflags.Namespace)
 		return true, nil
 	}
 	// Ignore GVKs in the ignoredGVKs set
 	if _, ok := r.ignoredGVRs[gvr]; ok {
+		r.log.V(1).Info("Object group version ignored globally", "group version resource", gvr.String())
 		return true, nil
 	}
 	return false, nil
