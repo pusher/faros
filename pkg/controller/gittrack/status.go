@@ -109,7 +109,7 @@ func (r *ReconcileGitTrack) updateStatus(original *farosv1alpha1.GitTrack, opts 
 		if err != nil {
 			return fmt.Errorf("unable to update GitTrack: %v", err)
 		}
-		r.log.V(2).Info("Status updated")
+		r.log.V(1).Info("Status updated")
 	}
 	return nil
 }

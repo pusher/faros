@@ -203,7 +203,7 @@ func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Ob
 		"Name", metadata.GetName(),
 		"Namespace", metadata.GetNamespace(),
 	)
-	log.V(4).Info("creating resource", "dry-run", *opts.ServerDryRun)
+	log.V(2).Info("creating resource", "dry-run", *opts.ServerDryRun)
 
 	err = createApplyAnnotation(obj, unstructured.UnstructuredJSONScheme)
 	if err != nil {
@@ -223,7 +223,6 @@ func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Ob
 
 	createOptions := &metav1.CreateOptions{}
 	if *opts.ServerDryRun {
-		log.V(4).Info("creating with dryRun=all")
 		createOptions.DryRun = []string{metav1.DryRunAll}
 	}
 
@@ -252,7 +251,7 @@ func (a *Applier) update(ctx context.Context, opts *ApplyOptions, current, modif
 		"Name", metadata.GetName(),
 		"Namespace", metadata.GetNamespace(),
 	)
-	log.V(4).Info("updating resource", "dry-run", *opts.ServerDryRun)
+	log.V(2).Info("updating resource", "dry-run", *opts.ServerDryRun)
 
 	modifiedJSON, err := getModifiedConfiguration(modified, true, unstructured.UnstructuredJSONScheme)
 	if err != nil {

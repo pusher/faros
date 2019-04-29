@@ -86,7 +86,7 @@ func (r *ReconcileGitTrackObject) updateStatus(original farosv1alpha1.GitTrackOb
 		if err != nil {
 			return fmt.Errorf("unable to update status: %v", err)
 		}
-		r.log.V(2).Info("Parent status Updated")
+		r.log.V(1).Info("Parent status Updated")
 	}
 
 	return nil

@@ -209,7 +209,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 		"ChildKind", instance.GetSpec().Kind,
 	)
 
-	reconciler.log.V(3).Info("Reconcile started")
+	reconciler.log.V(1).Info("Reconcile started")
 
 	// Create new opts structs for updating status and metrics
 	result := reconciler.handleGitTrackObject(instance)
@@ -217,7 +217,7 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 	inSync := result.inSyncError == nil
 	reconciler.updateMetrics(instance, &metricsOpts{inSync: inSync})
 
-	reconciler.log.V(3).Info("Reconcile finished")
+	reconciler.log.V(1).Info("Reconcile finished")
 	return reconcile.Result{}, result.inSyncError
 }
 

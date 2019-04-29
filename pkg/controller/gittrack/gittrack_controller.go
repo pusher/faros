@@ -146,7 +146,7 @@ func (r *ReconcileGitTrack) withValues(keysAndValues ...interface{}) *ReconcileG
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
 func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCredentials) (*gitstore.Repo, error) {
-	r.log.V(4).Info("Getting repository", "url", url)
+	r.log.V(1).Info("Getting repository", "url", url)
 	repoRef, err := createRepoRefFromCreds(url, gitCreds)
 	if err != nil {
 		return &gitstore.Repo{}, err
@@ -156,7 +156,7 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
 	}
 
-	r.log.V(2).Info("Checking out reference", "ref", ref)
+	r.log.V(1).Info("Checking out reference", "ref", ref)
 	err = repo.Checkout(ref)
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to checkout '%s': %v", ref, err)
@@ -392,7 +392,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	}
 	if childUpdated {
 		inSync = false
-		r.log.V(2).Info("Child updated", "ChildName", name)
+		r.log.V(0).Info("Child updated", "ChildName", name)
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
 	return successResult(gto.GetNamespacedName(), timeToDeploy, inSync)
@@ -414,7 +414,7 @@ func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration,
 		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to create child for '%s': %v", name, err))
 	}
 	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
-	r.log.V(2).Info("Child created", "ChildName", name)
+	r.log.V(0).Info("Child created", "ChildName", name)
 	return successResult(childGTO.GetNamespacedName(), timeToDeploy, false)
 }
 
@@ -441,7 +441,7 @@ func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.G
 		if err := r.Delete(context.TODO(), obj); err != nil {
 			return fmt.Errorf("failed to delete child for '%s': '%s'", name, err)
 		}
-		r.log.V(2).Info("Deleted child", "ChildName", name)
+		r.log.V(0).Info("Deleted child", "ChildName", name)
 	}
 	return nil
 }
@@ -511,7 +511,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		"Namespace", instance.GetNamespace(),
 		"Name", instance.GetName(),
 	)
-	reconciler.log.V(2).Info("Reconcile started")
+	reconciler.log.V(1).Info("Reconcile started")
 
 	sOpts := newStatusOpts()
 	mOpts := newMetricOpts(sOpts)
@@ -521,7 +521,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		err := reconciler.updateStatus(instance, sOpts)
 		mErr := reconciler.updateMetrics(instance, mOpts)
 
-		reconciler.log.V(2).Info("Reconcile finished")
+		reconciler.log.V(1).Info("Reconcile finished")
 		// Print out any errors that may have occurred
 		for _, e := range []error{
 			err,

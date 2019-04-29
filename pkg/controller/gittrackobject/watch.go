@@ -32,7 +32,7 @@ func (r *ReconcileGitTrackObject) watch(obj unstructured.Unstructured) error {
 	}
 
 	// Create new informer
-	r.log.V(3).Info("Creating informer for child kind")
+	r.log.V(1).Info("Creating informer for child kind")
 	informer, err := r.cache.GetInformer(&obj)
 	if err != nil {
 		return fmt.Errorf("error creating informer: %v", err)
