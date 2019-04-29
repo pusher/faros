@@ -65,9 +65,9 @@ var _ = Describe("Metrics Suite", func() {
 				gto = testutils.ExampleGitTrackObject.DeepCopy()
 
 				r = r.withValues(
-					"Namespace", gto.GetNamespace(),
-					"ChildName", gto.GetSpec().Name,
-					"ChildKind", gto.GetSpec().Kind,
+					"namespace", gto.GetNamespace(),
+					"child name", gto.GetSpec().Name,
+					"child kind", gto.GetSpec().Kind,
 				)
 			})
 
@@ -105,9 +105,9 @@ var _ = Describe("Metrics Suite", func() {
 				gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
 
 				r = r.withValues(
-					"Namespace", gto.GetNamespace(),
-					"ChildName", gto.GetSpec().Name,
-					"ChildKind", gto.GetSpec().Kind,
+					"namespace", gto.GetNamespace(),
+					"child name", gto.GetSpec().Name,
+					"child kind", gto.GetSpec().Kind,
 				)
 			})
 

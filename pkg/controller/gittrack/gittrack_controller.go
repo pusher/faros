@@ -392,7 +392,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	}
 	if childUpdated {
 		inSync = false
-		r.log.V(0).Info("Child updated", "ChildName", name)
+		r.log.V(0).Info("Child updated", "child name", name)
 		r.recorder.Eventf(owner, apiv1.EventTypeNormal, "UpdateSuccessful", "Updated child '%s'", name)
 	}
 	return successResult(gto.GetNamespacedName(), timeToDeploy, inSync)
@@ -414,7 +414,7 @@ func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration,
 		return errorResult(childGTO.GetNamespacedName(), fmt.Errorf("failed to create child for '%s': %v", name, err))
 	}
 	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateSuccessful", "Created child '%s'", name)
-	r.log.V(0).Info("Child created", "ChildName", name)
+	r.log.V(0).Info("Child created", "child name", name)
 	return successResult(childGTO.GetNamespacedName(), timeToDeploy, false)
 }
 
@@ -441,7 +441,7 @@ func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.G
 		if err := r.Delete(context.TODO(), obj); err != nil {
 			return fmt.Errorf("failed to delete child for '%s': '%s'", name, err)
 		}
-		r.log.V(0).Info("Deleted child", "ChildName", name)
+		r.log.V(0).Info("Child deleted", "child name", name)
 	}
 	return nil
 }
@@ -508,8 +508,8 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 
 	reconciler := r.withValues(
-		"Namespace", instance.GetNamespace(),
-		"Name", instance.GetName(),
+		"namespace", instance.GetNamespace(),
+		"name", instance.GetName(),
 	)
 	reconciler.log.V(1).Info("Reconcile started")
 

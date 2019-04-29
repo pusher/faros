@@ -204,9 +204,9 @@ func (r *ReconcileGitTrackObject) Reconcile(request reconcile.Request) (reconcil
 
 	// Get a reconciler with appropriate logging values
 	reconciler := r.withValues(
-		"Namespace", instance.GetNamespace(),
-		"ChildName", instance.GetSpec().Name,
-		"ChildKind", instance.GetSpec().Kind,
+		"namespace", instance.GetNamespace(),
+		"child name", instance.GetSpec().Name,
+		"child kind", instance.GetSpec().Kind,
 	)
 
 	reconciler.log.V(1).Info("Reconcile started")

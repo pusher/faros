@@ -101,9 +101,9 @@ var _ = Describe("Handler Suite", func() {
 				Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
 
 				r = r.withValues(
-					"Namespace", gto.GetNamespace(),
-					"ChildName", gto.GetSpec().Name,
-					"ChildKind", gto.GetSpec().Kind,
+					"namespace", gto.GetNamespace(),
+					"child name", gto.GetSpec().Name,
+					"child kind", gto.GetSpec().Kind,
 				)
 
 				// Create and fetch the instance to make sure caches are synced
