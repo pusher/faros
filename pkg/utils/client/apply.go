@@ -199,9 +199,9 @@ func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Ob
 		return fmt.Errorf("unable to read metadata from object: %v", err)
 	}
 	log := a.log.WithValues(
-		"Kind", obj.GetObjectKind().GroupVersionKind().String(),
-		"Name", metadata.GetName(),
-		"Namespace", metadata.GetNamespace(),
+		"kind", obj.GetObjectKind().GroupVersionKind().String(),
+		"name", metadata.GetName(),
+		"namespace", metadata.GetNamespace(),
 	)
 	log.V(2).Info("creating resource", "dry-run", *opts.ServerDryRun)
 
@@ -247,9 +247,9 @@ func (a *Applier) update(ctx context.Context, opts *ApplyOptions, current, modif
 	}
 
 	log := a.log.WithValues(
-		"Kind", modified.GetObjectKind().GroupVersionKind().String(),
-		"Name", metadata.GetName(),
-		"Namespace", metadata.GetNamespace(),
+		"kind", modified.GetObjectKind().GroupVersionKind().String(),
+		"name", metadata.GetName(),
+		"namespace", metadata.GetNamespace(),
 	)
 	log.V(2).Info("updating resource", "dry-run", *opts.ServerDryRun)
 

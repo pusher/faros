@@ -45,7 +45,7 @@ func (e *EnqueueRequestForOwner) Create(evt event.CreateEvent, q workqueue.RateL
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
 	if err != nil && e.Log != nil {
 		gvk := evt.Object.GetObjectKind().GroupVersionKind()
-		e.Log.Error(err, "unable to get API resource", "Group", gvk.Group, "Version", gvk.Version, "Kind", gvk.Kind)
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Create(evt, q)
@@ -59,7 +59,7 @@ func (e *EnqueueRequestForOwner) Update(evt event.UpdateEvent, q workqueue.RateL
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.ObjectNew.GetObjectKind().GroupVersionKind())
 	if err != nil && e.Log != nil {
 		gvk := evt.ObjectNew.GetObjectKind().GroupVersionKind()
-		e.Log.Error(err, "unable to get API resource", "Group", gvk.Group, "Version", gvk.Version, "Kind", gvk.Kind)
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Update(evt, q)
@@ -73,7 +73,7 @@ func (e *EnqueueRequestForOwner) Delete(evt event.DeleteEvent, q workqueue.RateL
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
 	if err != nil && e.Log != nil {
 		gvk := evt.Object.GetObjectKind().GroupVersionKind()
-		e.Log.Error(err, "unable to get API resource", "Group", gvk.Group, "Version", gvk.Version, "Kind", gvk.Kind)
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Delete(evt, q)
@@ -87,7 +87,7 @@ func (e *EnqueueRequestForOwner) Generic(evt event.GenericEvent, q workqueue.Rat
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
 	if err != nil && e.Log != nil {
 		gvk := evt.Object.GetObjectKind().GroupVersionKind()
-		e.Log.Error(err, "unable to get API resource", "Group", gvk.Group, "Version", gvk.Version, "Kind", gvk.Kind)
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Generic(evt, q)
