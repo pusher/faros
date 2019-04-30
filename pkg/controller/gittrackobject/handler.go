@@ -176,7 +176,7 @@ func (r *ReconcileGitTrackObject) handleDefaultUpdateStrategy(gto farosv1alpha1.
 
 	// Update was successful
 	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-	r.log.V(0).Info("Child Updated")
+	r.log.V(0).Info("Child updated")
 	return "", nil
 }
 
@@ -208,7 +208,7 @@ func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1
 
 	// Update was successful
 	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-	r.log.V(0).Info("Child Updated")
+	r.log.V(0).Info("Child updated")
 	return "", nil
 }
 
