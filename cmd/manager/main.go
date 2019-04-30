@@ -72,6 +72,11 @@ func main() {
 		klog.CopyStandardLogTo("INFO")
 		klog.SetOutput(os.Stderr)
 		klog.SetOutputBySeverity("INFO", os.Stdout)
+		err := logFlags.Lookup("stderrthreshold").Value.Set("WARNING")
+		if err != nil {
+			log.Error(err, "unable to set `stderrthreshold`")
+			panic(err)
+		}
 	}
 
 	// Get a config to talk to the apiserver
