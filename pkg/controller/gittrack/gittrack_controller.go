@@ -457,6 +457,8 @@ func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured,
 	objects := []*unstructured.Unstructured{}
 	fileErrors := make(map[string]string)
 	for path, file := range files {
+		// TODO (@JoelSpeed): What happens if there are multiple resources in one file,
+		// but one of them is invalid? Can we still get the rest?
 		us, err := utils.YAMLToUnstructuredSlice([]byte(file.Contents()))
 		if err != nil {
 			fileErrors[path] = fmt.Sprintf("unable to parse '%s': %v\n", path, err)
