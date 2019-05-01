@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/jonboulle/clockwork"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	rlogr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 // Options are creation options for a Applier
@@ -69,6 +71,7 @@ type Applier struct {
 	dynamicClient dynamic.Interface
 	config        *rest.Config
 	codecs        serializer.CodecFactory
+	log           logr.Logger
 }
 
 // NewApplier constucts a new Applier client
@@ -114,6 +117,7 @@ func NewApplier(config *rest.Config, options Options) (*Applier, error) {
 		client:        cachingClient,
 		dynamicClient: dynamicClient,
 		config:        config,
+		log:           rlogr.Log.WithName("applier"),
 	}
 
 	return a, nil
@@ -190,7 +194,18 @@ func (a *Applier) Apply(ctx context.Context, opts *ApplyOptions, modified runtim
 }
 
 func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Object) error {
-	err := createApplyAnnotation(obj, unstructured.UnstructuredJSONScheme)
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("unable to read metadata from object: %v", err)
+	}
+	log := a.log.WithValues(
+		"kind", obj.GetObjectKind().GroupVersionKind().String(),
+		"name", metadata.GetName(),
+		"namespace", metadata.GetNamespace(),
+	)
+	log.V(2).Info("creating resource", "dry-run", *opts.ServerDryRun)
+
+	err = createApplyAnnotation(obj, unstructured.UnstructuredJSONScheme)
 	if err != nil {
 		return fmt.Errorf("unable to apply LastAppliedAnnotation to object: %v", err)
 	}
@@ -204,11 +219,6 @@ func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Ob
 	mapping, err := a.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return fmt.Errorf("unable to get REST mapping for GroupVersionKind %s: %v", gvk.String(), err)
-	}
-
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return fmt.Errorf("unable to get metadata: %v", err)
 	}
 
 	createOptions := &metav1.CreateOptions{}
@@ -231,14 +241,21 @@ func (a *Applier) create(ctx context.Context, opts *ApplyOptions, obj runtime.Ob
 }
 
 func (a *Applier) update(ctx context.Context, opts *ApplyOptions, current, modified runtime.Object) error {
-	modifiedJSON, err := getModifiedConfiguration(modified, true, unstructured.UnstructuredJSONScheme)
-	if err != nil {
-		return fmt.Errorf("unable to get modified configuration: %v", err)
-	}
-
 	metadata, err := meta.Accessor(modified)
 	if err != nil {
 		return fmt.Errorf("unable to get object metadata: %v", err)
+	}
+
+	log := a.log.WithValues(
+		"kind", modified.GetObjectKind().GroupVersionKind().String(),
+		"name", metadata.GetName(),
+		"namespace", metadata.GetNamespace(),
+	)
+	log.V(2).Info("updating resource", "dry-run", *opts.ServerDryRun)
+
+	modifiedJSON, err := getModifiedConfiguration(modified, true, unstructured.UnstructuredJSONScheme)
+	if err != nil {
+		return fmt.Errorf("unable to get modified configuration: %v", err)
 	}
 
 	patcher, err := a.newPatcher(opts, modified)

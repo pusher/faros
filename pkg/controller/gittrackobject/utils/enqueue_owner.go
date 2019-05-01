@@ -17,8 +17,7 @@ limitations under the License.
 package utils
 
 import (
-	"log"
-
+	"github.com/go-logr/logr"
 	"github.com/pusher/faros/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,14 +36,16 @@ var _ handler.EventHandler = &EnqueueRequestForOwner{}
 type EnqueueRequestForOwner struct {
 	NamespacedEnqueueRequestForOwner    *handler.EnqueueRequestForOwner
 	NonNamespacedEnqueueRequestForOwner *handler.EnqueueRequestForOwner
+	Log                                 logr.Logger
 	restMapper                          meta.RESTMapper
 }
 
 // Create implements EventHandler
 func (e *EnqueueRequestForOwner) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
-	if err != nil {
-		log.Printf("unable to get API resource: %v", err)
+	if err != nil && e.Log != nil {
+		gvk := evt.Object.GetObjectKind().GroupVersionKind()
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Create(evt, q)
@@ -56,8 +57,9 @@ func (e *EnqueueRequestForOwner) Create(evt event.CreateEvent, q workqueue.RateL
 // Update implements EventHandler
 func (e *EnqueueRequestForOwner) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.ObjectNew.GetObjectKind().GroupVersionKind())
-	if err != nil {
-		log.Printf("unable to get API resource: %v", err)
+	if err != nil && e.Log != nil {
+		gvk := evt.ObjectNew.GetObjectKind().GroupVersionKind()
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Update(evt, q)
@@ -69,8 +71,9 @@ func (e *EnqueueRequestForOwner) Update(evt event.UpdateEvent, q workqueue.RateL
 // Delete implements EventHandler
 func (e *EnqueueRequestForOwner) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
-	if err != nil {
-		log.Printf("unable to get API resource: %v", err)
+	if err != nil && e.Log != nil {
+		gvk := evt.Object.GetObjectKind().GroupVersionKind()
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Delete(evt, q)
@@ -82,8 +85,9 @@ func (e *EnqueueRequestForOwner) Delete(evt event.DeleteEvent, q workqueue.RateL
 // Generic implements EventHandler
 func (e *EnqueueRequestForOwner) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 	_, namespaced, err := utils.GetAPIResource(e.restMapper, evt.Object.GetObjectKind().GroupVersionKind())
-	if err != nil {
-		log.Printf("unable to get API resource: %v", err)
+	if err != nil && e.Log != nil {
+		gvk := evt.Object.GetObjectKind().GroupVersionKind()
+		e.Log.Error(err, "unable to get API resource", "group", gvk.Group, "version", gvk.Version, "kind", gvk.Kind)
 	}
 	if namespaced {
 		e.NamespacedEnqueueRequestForOwner.Generic(evt, q)

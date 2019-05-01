@@ -19,7 +19,6 @@ package gittrackobject
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
@@ -132,7 +131,6 @@ func (r *ReconcileGitTrackObject) getChildFromGitTrackObject(gto farosv1alpha1.G
 // handleCreate takes an unstructured object sends it to the API to create it
 func (r *ReconcileGitTrackObject) handleCreate(gto farosv1alpha1.GitTrackObjectInterface, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
 	// Log and send event that we are attempting to create the child resource
-	log.Printf("Creating child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
 	r.sendEvent(gto, corev1.EventTypeNormal, "CreateStarted", "Creating child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 
 	err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, child)
@@ -140,6 +138,8 @@ func (r *ReconcileGitTrackObject) handleCreate(gto farosv1alpha1.GitTrackObjectI
 		r.sendEvent(gto, corev1.EventTypeWarning, "CreateFailed", "Failed to create child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
 		return gittrackobjectutils.ErrorCreatingChild, fmt.Errorf("unable to create child: %v", err)
 	}
+
+	r.log.V(0).Info("Child created")
 
 	// Successfully created the child object
 	r.sendEvent(gto, corev1.EventTypeNormal, "CreateSuccessful", "Successfully created child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
@@ -176,13 +176,14 @@ func (r *ReconcileGitTrackObject) handleDefaultUpdateStrategy(gto farosv1alpha1.
 
 	// Update was successful
 	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-	log.Printf("Updated child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
+	r.log.V(0).Info("Child updated")
 	return "", nil
 }
 
 // handleNeverUpdateStrategy compares the existing object to the existing object
 // with the correct owner references applied and updates if necessary
 func (r *ReconcileGitTrackObject) handleNeverUpdateStrategy(gto farosv1alpha1.GitTrackObjectInterface, found *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
+	r.log.V(1).Info("Child has `never` update strategy")
 	child := found.DeepCopy()
 	err := controllerutil.SetControllerReference(gto, child, r.scheme)
 	if err != nil {
@@ -195,6 +196,7 @@ func (r *ReconcileGitTrackObject) handleNeverUpdateStrategy(gto farosv1alpha1.Gi
 // resources and then deletes and recreates the child object if an update is
 // required
 func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1.GitTrackObjectInterface, found, child *unstructured.Unstructured) (gittrackobjectutils.ConditionReason, error) {
+	r.log.V(1).Info("Child has `recreate` update strategy")
 	childUpdated, err := r.recreateChild(found, child)
 	if err != nil {
 		r.sendEvent(gto, corev1.EventTypeWarning, "UpdateFailed", "Unable to update child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
@@ -206,7 +208,7 @@ func (r *ReconcileGitTrackObject) handleRecreateUpdateStrategy(gto farosv1alpha1
 
 	// Update was successful
 	r.sendEvent(gto, corev1.EventTypeNormal, "UpdateSuccessful", "Successfully updated child %s %s/%s", child.GetKind(), child.GetNamespace(), child.GetName())
-	log.Printf("Updated child %s %s/%s\n", child.GetKind(), child.GetNamespace(), child.GetName())
+	r.log.V(0).Info("Child updated")
 	return "", nil
 }
 
@@ -222,10 +224,12 @@ func (r *ReconcileGitTrackObject) updateChild(found, child *unstructured.Unstruc
 	// HasSupport returns an error if dry run not supported
 	if farosflags.ServerDryRun {
 		if err := r.dryRunVerifier.HasSupport(child.GroupVersionKind()); err == nil {
+			r.log.V(2).Info("Updating child with dry-run support")
 			return r.applyChildWithDryRun(found, child, false)
 		}
 	}
 	// Dry run not supported so apply without DryRun
+	r.log.V(2).Info("Updating child without dry-run support")
 	return r.applyChild(found, child, false)
 }
 

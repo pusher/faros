@@ -193,14 +193,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:6c280b44782900265b0827ceb9a7f9982dd15f183f05107b73cc06c65c8dc5b6"
-  name = "github.com/go-logr/glogr"
-  packages = ["."]
-  pruneopts = "T"
-  revision = "03aa3c3200582c33f271f63ba3ae7d23abb9e699"
-  version = "v0.1.0"
-
-[[projects]]
   branch = "master"
   digest = "1:65587005c6fa4293c0b8a2e457e689df7fda48cc5e1f5449ea2c1e7784551558"
   name = "github.com/go-logr/logr"
@@ -1461,7 +1453,10 @@
 [[projects]]
   digest = "1:ed9fcc00d9b154265b72e4117e7e41c4af049bf2c4a7ee9171960f938ff1ca65"
   name = "k8s.io/klog"
-  packages = ["."]
+  packages = [
+    ".",
+    "klogr",
+  ]
   pruneopts = "T"
   revision = "71442cd4037d612096940ceb0f3fec3f7fff66e0"
   version = "v0.2.0"
@@ -1518,7 +1513,7 @@
   revision = "c2654d5206da6b7b6ace12841e8f359bb89b443c"
 
 [[projects]]
-  digest = "1:97d80be126d2265e0e127658a91b4c40b8eedcf217104e015cd424e694b485a4"
+  digest = "1:95ffb16725c38eee5c646a7cbb60bd433c5e05443022fa21ccfc6bcf55c3a9d1"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -1557,7 +1552,8 @@
     "pkg/webhook/internal/metrics",
   ]
   pruneopts = "T"
-  revision = "e4c40bc20113bec130047ba0a42cec39ca0d6476"
+  revision = "4276f3895df0acc9249f817eb86a47a3db6b7a9e"
+  version = "v0.2.0-alpha.0"
 
 [[projects]]
   digest = "1:2aec1bbf1553a2d433b3a85f9359930655de83e2dceed4aca44577a720396da8"
@@ -1631,7 +1627,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/emicklei/go-restful",
-    "github.com/go-logr/glogr",
+    "github.com/go-logr/logr",
     "github.com/jonboulle/clockwork",
     "github.com/kubernetes-sigs/kubebuilder",
     "github.com/kubernetes-sigs/kubebuilder/pkg/test",
@@ -1683,6 +1679,8 @@
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/workqueue",
     "k8s.io/code-generator/cmd/deepcopy-gen",
+    "k8s.io/klog",
+    "k8s.io/klog/klogr",
     "k8s.io/kube-openapi/pkg/util/proto",
     "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi",
