@@ -571,7 +571,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 
 	// Update status with the number of objects discovered
-	sOpts.discovered = int64(len(objects)) + int64(len(fileErrors))
+	sOpts.discovered = int64(len(objects))
 
 	// Get a list of the GitTrackObjects that currently exist, by name
 	objectsByName, err := reconciler.listObjectsByName(instance)
