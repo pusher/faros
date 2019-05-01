@@ -566,7 +566,11 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	sOpts.ignoredFiles = fileErrors
 	sOpts.ignored += int64(len(fileErrors))
 	if len(fileErrors) > 0 {
-		// sOpts.parseError = fmt.Errorf(strings.Join(errors, ",\n")) // TODO Print errors
+		var errs []string
+		for file, reason := range fileErrors {
+			errs = append(errs, fmt.Sprintf("%s: %s", file, reason))
+		}
+		sOpts.parseError = fmt.Errorf(strings.Join(errs, ",\n"))
 		sOpts.parseReason = gittrackutils.ErrorParsingFiles
 	} else {
 		sOpts.parseReason = gittrackutils.FileParseSuccess
