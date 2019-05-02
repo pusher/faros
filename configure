@@ -155,6 +155,7 @@ check_kubebuilder
 check_go_version
 check_go_env
 check_for kustomize
+check_for snyk
 export PATH="${tools[kubebuilder]};$PATH"
 check_for kubectl
 
@@ -172,6 +173,7 @@ LINTER := ${tools[golangci-lint]}
 KUBECTL := ${tools[kubectl]}
 KUSTOMIZE := ${tools[kustomize]}
 KUBEBUILDER := ${tools[kubebuilder]}
+SNYK := ${tools[snyk]}
 EOF
 
 echo "Environment configuration written to .env"
