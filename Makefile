@@ -76,6 +76,11 @@ vendor:
 	$(DEP) ensure --vendor-only
 	@ echo
 
+scan: vendor
+	@ echo "\033[36mScanning dependencies\033[0m"
+	$(SNYK) monitor
+	@ echo
+
 .PHONY: check
 check: fmt lint vet test
 
@@ -147,3 +152,7 @@ PUSH_TAGS ?= ${VERSION},latest
 .PHONY: docker-push
 docker-push:
 	@IFS=","; tags=${PUSH_TAGS}; for tag in $${tags}; do docker push ${IMG}:$${tag}; echo "\033[36mPushed $(IMG):$${tag}\033[0m"; done
+
+.PHONY: docker-scan
+docker-scan:
+	$(SNYK) monitor --docker ${IMG}:${VERSION}

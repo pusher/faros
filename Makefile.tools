@@ -1,5 +1,5 @@
 .PHONY: prepare-env-%
-prepare-env-%: gopath dep ginkgo-cli golangci-lint kustomize
+prepare-env-%: gopath dep ginkgo-cli golangci-lint kustomize snyk
 	PATH=$$GOPATH/bin:/usr/local/kubebuilder-$*/bin:$$PATH make kubebuilder-tools-$*
 	PATH=$$GOPATH/bin:/usr/local/kubebuilder-$*/bin:$$PATH ./configure
 
@@ -34,6 +34,11 @@ golangci-lint:
 kustomize:
 	@ if [ ! $$(which kustomize) ]; then \
 	 	go get -u sigs.k8s.io/kustomize; \
+	fi
+
+.PHONY: snyk
+	@ if [ ! $$(which snyk) ]; then \
+		npm install -g snyk
 	fi
 
 .PHONY: kubebuilder-tools-1.13
