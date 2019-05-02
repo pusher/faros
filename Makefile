@@ -76,7 +76,7 @@ vendor:
 	$(DEP) ensure --vendor-only
 	@ echo
 
-scan:
+scan: vendor
 	@ echo "\033[36mScanning dependencies\033[0m"
 	$(SNYK) monitor
 	@ echo
