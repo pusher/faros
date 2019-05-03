@@ -306,7 +306,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 						})
 					})
 
-					Context("and the object metdata is updated", func() {
+					Context("and the object metadata is updated", func() {
 						var originalVersion string
 
 						BeforeEach(func() {

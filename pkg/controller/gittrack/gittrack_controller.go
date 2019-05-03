@@ -238,7 +238,7 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 		return nil, fmt.Errorf("no files for subpath '%s'", gt.Spec.SubPath)
 	}
 
-	r.log.V(1).Info("Loaded files from repository", "file count", string(len(files)))
+	r.log.V(1).Info("Loaded files from repository", "file count", len(files))
 	return files, nil
 }
 
@@ -293,6 +293,7 @@ type result struct {
 	NamespacedName string
 	Error          error
 	Ignored        bool
+	Reason         string
 	InSync         bool
 	TimeToDeploy   time.Duration
 }
@@ -303,8 +304,8 @@ func errorResult(namespacedName string, err error) result {
 }
 
 // ignoreResult is a convenience function for creating an ignore result
-func ignoreResult(namespacedName string) result {
-	return result{NamespacedName: namespacedName, Ignored: true}
+func ignoreResult(namespacedName string, reason string) result {
+	return result{NamespacedName: namespacedName, Ignored: true, Reason: reason}
 }
 
 // successResult is a convenience function for creating a success result
@@ -357,12 +358,12 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 		return errorResult(namespacedName, err)
 	}
 
-	ignored, err := r.ignoreObject(u)
+	ignored, reason, err := r.ignoreObject(u)
 	if err != nil {
 		return errorResult(gto.GetNamespacedName(), err)
 	}
 	if ignored {
-		return ignoreResult(gto.GetNamespacedName())
+		return ignoreResult(gto.GetNamespacedName(), reason)
 	}
 
 	r.mutex.RLock()
@@ -383,7 +384,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	err = checkOwner(owner, found, r.scheme)
 	if err != nil {
 		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "ControllerMismatch", "Child '%s' is owned by another controller: %v", name, err)
-		return ignoreResult(gto.GetNamespacedName())
+		return ignoreResult(gto.GetNamespacedName(), "child is owned by another controller")
 	}
 
 	inSync := childInSync(found)
@@ -452,18 +453,20 @@ func (r *ReconcileGitTrack) deleteResources(leftovers map[string]farosv1alpha1.G
 }
 
 // objectsFrom iterates through all the files given and attempts to create Unstructured objects
-func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured, []string) {
+func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured, map[string]string) {
 	objects := []*unstructured.Unstructured{}
-	errors := []string{}
+	fileErrors := make(map[string]string)
 	for path, file := range files {
+		// TODO (@JoelSpeed): What happens if there are multiple resources in one file,
+		// but one of them is invalid? Can we still get the rest?
 		us, err := utils.YAMLToUnstructuredSlice([]byte(file.Contents()))
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("unable to parse '%s': %v\n", path, err))
+			fileErrors[path] = fmt.Sprintf("unable to parse '%s': %v\n", path, err)
 			continue
 		}
 		objects = append(objects, us...)
 	}
-	return objects, errors
+	return objects, fileErrors
 }
 
 // checkOwner checks the owner reference of an object from the API to see if it
@@ -483,23 +486,23 @@ func checkOwner(owner *farosv1alpha1.GitTrack, child farosv1alpha1.GitTrackObjec
 }
 
 // ignoreObject checks whether the unstructured object should be ignored
-func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, error) {
+func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, string, error) {
 	gvr, namespaced, err := utils.GetAPIResource(r.restMapper, u.GetObjectKind().GroupVersionKind())
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	// Ignore namespaced objects not in the namespace managed by the controller
 	if namespaced && farosflags.Namespace != "" && farosflags.Namespace != u.GetNamespace() {
 		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", farosflags.Namespace)
-		return true, nil
+		return true, fmt.Sprintf("namespace `%s` is not managed by this Faros", u.GetNamespace()), nil
 	}
 	// Ignore GVKs in the ignoredGVKs set
 	if _, ok := r.ignoredGVRs[gvr]; ok {
 		r.log.V(1).Info("Object group version ignored globally", "group version resource", gvr.String())
-		return true, nil
+		return true, fmt.Sprintf("resource `%s.%s/%s` ignored globally by flag", gvr.Resource, gvr.Group, gvr.Version), nil
 	}
-	return false, nil
+	return false, "", nil
 }
 
 // Reconcile reads the state of the cluster for a GitTrack object and makes changes based on the state read
@@ -559,9 +562,15 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	reconciler.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.Spec.Repository, instance.Spec.Reference)
 
 	// Attempt to parse k8s objects from files
-	objects, errors := objectsFrom(files)
-	if len(errors) > 0 {
-		sOpts.parseError = fmt.Errorf(strings.Join(errors, ",\n"))
+	objects, fileErrors := objectsFrom(files)
+	sOpts.ignoredFiles = fileErrors
+	sOpts.ignored += int64(len(fileErrors))
+	if len(fileErrors) > 0 {
+		var errs []string
+		for file, reason := range fileErrors {
+			errs = append(errs, fmt.Sprintf("%s: %s", file, reason))
+		}
+		sOpts.parseError = fmt.Errorf(strings.Join(errs, ",\n"))
 		sOpts.parseReason = gittrackutils.ErrorParsingFiles
 	} else {
 		sOpts.parseReason = gittrackutils.FileParseSuccess
@@ -569,6 +578,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 
 	// Update status with the number of objects discovered
 	sOpts.discovered = int64(len(objects))
+
 	// Get a list of the GitTrackObjects that currently exist, by name
 	objectsByName, err := reconciler.listObjectsByName(instance)
 	if err != nil {
@@ -587,6 +597,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	for range objects {
 		res := <-resultsChan
 		if res.Ignored {
+			sOpts.ignoredFiles[res.NamespacedName] = res.Reason
 			sOpts.ignored++
 		} else {
 			sOpts.applied++

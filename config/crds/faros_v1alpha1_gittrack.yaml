@@ -120,6 +120,10 @@ spec:
                 - status
                 type: object
               type: array
+            ignoredFiles:
+              description: IgnoredFiles is the list of YAML files containing invalid
+                k8s manifests.
+              type: object
             objectsApplied:
               description: ObjectsApplied is the number of k8s objects for which a
                 GitTrackObjects was created

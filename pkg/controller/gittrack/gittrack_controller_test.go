@@ -395,6 +395,17 @@ var _ = Describe("GitTrack Suite", func() {
 
 				Expect(instance.Status.ObjectsIgnored).To(Equal(int64(2)))
 			})
+
+			It("adds a message to the ignoredFiles status", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("foo/deployment-nginx", "namespace `foo` is not managed by this Faros"))
+				Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("foo/service-nginx", "namespace `foo` is not managed by this Faros"))
+			})
+
+			It("includes the ignored files in ignoredObjects count", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.Status.IgnoredFiles).To(HaveLen(int(instance.Status.ObjectsIgnored)))
+			})
 		})
 
 		Context("with a child owned by another controller", func() {
@@ -1000,6 +1011,23 @@ var _ = Describe("GitTrack Suite", func() {
 		getsFilesFromRepo("foobar/", 2)
 	})
 
+	Context(fmt.Sprintf("with invalid files"), func() {
+		BeforeEach(func() {
+			createInstance(instance, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced")
+			waitForInstanceCreated(key)
+		})
+
+		It("adds a message to the ignoredFiles status", func() {
+			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+			Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("invalid_file.yaml", "unable to parse 'invalid_file.yaml': unable to unmarshal JSON: Object 'Kind' is missing in '{\"I\":\"a;m an \\\"invalid Kubernetes manifest.)\"}'\n"))
+		})
+
+		It("includes the invalid file in ignoredObjects count", func() {
+			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+			Expect(instance.Status.IgnoredFiles).To(HaveLen(int(instance.Status.ObjectsIgnored)))
+		})
+	})
+
 	Context("When a list of ignored GVRs is supplied", func() {
 		BeforeEach(func() {
 			reconciler, ok := r.(*ReconcileGitTrack)
@@ -1030,6 +1058,16 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
 
 			Expect(instance.Status.ObjectsIgnored).To(Equal(int64(1)))
+		})
+
+		It("adds a message to the ignoredFiles status", func() {
+			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+			Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("default/deployment-nginx", "resource `deployments.apps/v1` ignored globally by flag"))
+		})
+
+		It("includes the ignored files in ignoredObjects count", func() {
+			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+			Expect(instance.Status.IgnoredFiles).To(HaveLen(int(instance.Status.ObjectsIgnored)))
 		})
 	})
 
