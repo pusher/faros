@@ -1,0 +1,20 @@
+# Labels to add to all resources and selectors.
+#commonLabels:
+#  someName: someValue
+
+# Each entry in this list must resolve to an existing
+# resource definition in YAML.  These are the resource
+# files that kustomize reads, modifies and emits as a
+# YAML string, with resources separated by document
+# markers ("---").
+resources:
+- manager_role.yaml
+- manager_role_binding.yaml
+
+patchesJson6902:
+- target:
+    version: v1
+    group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+    name: manager-rolebinding
+  path: set_serviceaccount_json6902.yaml
