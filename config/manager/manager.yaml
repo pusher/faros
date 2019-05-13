@@ -5,39 +5,24 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: system
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: controller-manager-service
-  namespace: system
-  labels:
-    control-plane: controller-manager
-    controller-tools.k8s.io: "1.0"
-spec:
-  selector:
-    control-plane: controller-manager
-    controller-tools.k8s.io: "1.0"
-  ports:
-  - port: 443
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: controller-manager
+  name: faros
   namespace: system
   labels:
-    control-plane: controller-manager
+    control-plane: faros
     controller-tools.k8s.io: "1.0"
 spec:
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: faros
       controller-tools.k8s.io: "1.0"
-  serviceName: controller-manager-service
+  serviceName: faros
   template:
     metadata:
       labels:
-        control-plane: controller-manager
+        control-plane: faros
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
