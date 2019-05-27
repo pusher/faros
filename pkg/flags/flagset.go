@@ -31,6 +31,9 @@ var (
 	// Namespace is the namespace for the controller to be restricted to
 	Namespace string
 
+	// NamespacedOnly disables management of cluster-level resources
+	NamespacedOnly bool
+
 	// ignoredResources is a list of Kubernets kinds to ignore when reconciling
 	ignoredResources []string
 
@@ -41,6 +44,7 @@ var (
 func init() {
 	FlagSet = flag.NewFlagSet("faros", flag.PanicOnError)
 	FlagSet.StringVar(&Namespace, "namespace", "", "Only manage GitTrack resources in given namespace")
+	FlagSet.BoolVar(&NamespacedOnly, "namespaced-only", false, "Only manage namespace-scoped resources")
 	FlagSet.StringSliceVar(&ignoredResources, "ignore-resource", []string{}, "Ignore resources of these kinds found in repositories, specified in <resource>.<group>/<version> format eg jobs.batch/v1")
 	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
 }

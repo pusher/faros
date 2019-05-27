@@ -111,12 +111,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.GitTrack{},
-	})
-	if err != nil {
-		return err
+	if !farosflags.NamespacedOnly {
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &farosv1alpha1.GitTrack{},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -274,14 +276,16 @@ func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (ma
 		}
 	}
 
-	cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
-	err = r.List(context.TODO(), cgtos)
-	if err != nil {
-		return nil, err
-	}
-	for _, cgto := range cgtos.Items {
-		if metav1.IsControlledBy(&cgto, owner) {
-			result[cgto.GetNamespacedName()] = cgto.DeepCopy()
+	if !farosflags.NamespacedOnly {
+		cgtos := &farosv1alpha1.ClusterGitTrackObjectList{}
+		err = r.List(context.TODO(), cgtos)
+		if err != nil {
+			return nil, err
+		}
+		for _, cgto := range cgtos.Items {
+			if metav1.IsControlledBy(&cgto, owner) {
+				result[cgto.GetNamespacedName()] = cgto.DeepCopy()
+			}
 		}
 	}
 
@@ -319,6 +323,7 @@ func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructu
 	if err != nil {
 		return nil, fmt.Errorf("error getting API resource: %v", err)
 	}
+
 	if namespaced {
 		instance = &farosv1alpha1.GitTrackObject{
 			TypeMeta: farosv1alpha1.GitTrackObjectTypeMeta,
@@ -492,6 +497,11 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, st
 		return false, "", err
 	}
 
+	// Ignore namespaced objects in namespaced-only mode
+	if !namespaced && farosflags.NamespacedOnly {
+		r.log.V(1).Info("Object is not namespaced ", "group version resource", gvr.String())
+		return true, "cluster-scoped resources are not managed by this Faros", nil
+	}
 	// Ignore namespaced objects not in the namespace managed by the controller
 	if namespaced && farosflags.Namespace != "" && farosflags.Namespace != u.GetNamespace() {
 		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", farosflags.Namespace)

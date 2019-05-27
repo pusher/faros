@@ -28,6 +28,7 @@ import (
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 
 	"github.com/go-logr/logr"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	"github.com/pusher/faros/pkg/utils"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -102,14 +103,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to ClusterGitTrackObject
-	err = c.Watch(
-		&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}},
-		&handler.EnqueueRequestForObject{},
-		utils.NewOwnerInNamespacePredicate(mgr.GetClient()),
-	)
-	if err != nil {
-		return err
+	if !farosflags.NamespacedOnly {
+		// Watch for changes to ClusterGitTrackObject
+		err = c.Watch(
+			&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}},
+			&handler.EnqueueRequestForObject{},
+			utils.NewOwnerInNamespacePredicate(mgr.GetClient()),
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Watch for events on the reconciler's eventStream channel
