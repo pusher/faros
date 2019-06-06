@@ -281,6 +281,25 @@ var _ = Describe("GitTrackObject Suite", func() {
 					})
 				})
 
+				Context("with a deletion requested annotation", func() {
+					BeforeEach(func() {
+						annotations := map[string]string{"faros.pusher.com/deletion-requested": "true"}
+						gto.SetAnnotations(annotations)
+
+						m.Update(gto, timeout).Should(Succeed())
+						// Wait for the update reconcile
+						Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+					})
+
+					It("should delete the GTO", func() {
+						Eventually(func() error {
+							return c.Get(context.TODO(), types.NamespacedName{Name: "example", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
+						}, timeout).ShouldNot(Succeed())
+
+						m.Eventually(child, timeout).ShouldNot(testutils.WithFinalizers(ContainElement("faros.pusher.com/deletion-protection")))
+					})
+				})
+
 				Context("when the GitTrackObject is updated", func() {
 					BeforeEach(func() {
 						// Make sure the first reconcile has happened
@@ -324,6 +343,11 @@ var _ = Describe("GitTrackObject Suite", func() {
 							m.Consistently(child, consistentlyTimeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
 						})
 					})
+
+					It("should add a finalizer to the child", func() {
+						m.Eventually(child, timeout).
+							Should(testutils.WithFinalizers(ContainElement(ResourceFinalizer)))
+					})
 				})
 
 				Context("if a child resource is deleted", func() {
@@ -331,6 +355,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 					BeforeEach(func() {
 						originalUID = child.GetUID()
+						child.SetFinalizers([]string{})
+						m.Update(child).Should(Succeed())
 						m.Delete(child).Should(Succeed())
 						Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 					})
@@ -553,6 +579,11 @@ var _ = Describe("GitTrackObject Suite", func() {
 						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
 				})
 
+				It("should add a finalizer to the child", func() {
+					m.Eventually(child, timeout).
+						Should(testutils.WithFinalizers(ContainElement(ResourceFinalizer)))
+				})
+
 				Context("when the child has the update strategy", func() {
 					var originalVersion string
 					var originalUID types.UID
@@ -625,6 +656,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 								annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
 								specData.SetAnnotations(annotations)
 								Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+								child.SetFinalizers([]string{})
 								m.Update(gto, timeout).Should(Succeed())
 
 								// Keep a copy of the child, otherwise we'll run into data race issues
@@ -705,6 +737,8 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 					BeforeEach(func() {
 						originalUID = child.GetUID()
+						child.SetFinalizers([]string{})
+						m.Update(child).Should(Succeed())
 						m.Delete(child).Should(Succeed())
 						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
 					})

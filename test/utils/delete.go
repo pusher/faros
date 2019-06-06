@@ -78,6 +78,9 @@ func deleteObj(c client.Client, timeout time.Duration, obj runtime.Object) error
 			return fmt.Errorf("Object has not been deleted")
 		}
 		if len(metaAccessor.GetFinalizers()) > 0 {
+			// Remove existing Finalizers so that delete succeeds on next attempt.
+			metaAccessor.SetFinalizers([]string{})
+			c.Update(context.TODO(), obj)
 			return fmt.Errorf("Object has remaining Finalizers: %v", metaAccessor.GetFinalizers())
 		}
 		// If the object has deletion timestamp and no finalizers,

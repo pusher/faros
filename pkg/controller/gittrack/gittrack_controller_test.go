@@ -30,6 +30,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	"github.com/pusher/faros/pkg/controller/gittrackobject"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testevents "github.com/pusher/faros/test/events"
@@ -566,21 +567,24 @@ var _ = Describe("GitTrack Suite", func() {
 				waitForInstanceCreated(key)
 			})
 
-			It("deletes the removed resources", func() {
+			It("marks the removed resources for deletion", func() {
+				var obj farosv1alpha1.GitTrackObject
 				Eventually(func() error {
-					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
-				}, timeout).ShouldNot(Succeed())
+					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &obj)
+				}, timeout).Should(Succeed())
+
+				Expect(obj.GetAnnotations()[gittrackobject.DeletionRequestedAnnotation]).To(BeEquivalentTo("true"))
 			})
 
 			It("doesn't delete any other resources", func() {
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "configmap-deleted-config", Namespace: "default"}, &farosv1alpha1.GitTrackObject{})
-				}, timeout).ShouldNot(Succeed())
+				}, timeout).Should(Succeed())
 
 				gtos := &farosv1alpha1.GitTrackObjectList{}
 				err := c.List(context.TODO(), gtos, client.InNamespace(instance.Namespace))
 				Expect(err).ToNot(HaveOccurred())
-				Expect(len(gtos.Items)).To(Equal(2))
+				Expect(len(gtos.Items)).To(Equal(3))
 			})
 		})
 
