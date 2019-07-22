@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	v1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	v1alpha2 "github.com/pusher/faros/pkg/apis/faros/v1alpha2"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -59,6 +60,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Faros().V1alpha1().GitTracks().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("gittrackobjects"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Faros().V1alpha1().GitTrackObjects().Informer()}, nil
+
+		// Group=faros.pusher.com, Version=v1alpha2
+	case v1alpha2.SchemeGroupVersion.WithResource("clustergittracks"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Faros().V1alpha2().ClusterGitTracks().Informer()}, nil
 
 	}
 

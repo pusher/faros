@@ -36,6 +36,9 @@ var (
 
 	// ServerDryRun whether to enable Server side dry run or not
 	ServerDryRun bool
+
+	// AllowCrossNamespaceOwnership defines whether cross-namespace ownership is allowed.
+	AllowCrossNamespaceOwnership bool
 )
 
 func init() {
@@ -43,6 +46,7 @@ func init() {
 	FlagSet.StringVar(&Namespace, "namespace", "", "Only manage GitTrack resources in given namespace")
 	FlagSet.StringSliceVar(&ignoredResources, "ignore-resource", []string{}, "Ignore resources of these kinds found in repositories, specified in <resource>.<group>/<version> format eg jobs.batch/v1")
 	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
+	FlagSet.BoolVar(&AllowCrossNamespaceOwnership, "allow-cross-namespace-ownership", true, "Whether cross-namespace ownership should be allowed. Enable with caution! See #143")
 }
 
 // ParseIgnoredResources attempts to parse the ignore-resource flag value and

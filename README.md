@@ -153,6 +153,32 @@ Kubernetes resource it finds referenced within its GitTracks. If however, the
 non-namespaced resource clashes and is defined in another GitTrack within
 another namespace, Faros will ignore the resource. First owner wins.
 
+#### Cross-Namespace Ownership
+
+Faros creates resources in the namespaces as defined by the resource.
+A namespaced GitTrack, however, should never own cluster-scoped resources or
+resources in other namespaces. 
+
+To maintain backward-compatibility, the following flag defaults to true.
+In this mode, a GitTrack can own cluster-scoped resources and resources in all
+namespaces. 
+
+```
+allow-cross-namespace-ownership=true
+```
+
+It is recommended to set it to `false` and create a GitTrack for each namespace
+that Faros should manage.
+
+```
+allow-cross-namespace-ownership=false
+```
+
+In this mode, resources in a namespace not managed by a GitTrack will be ignored.
+
+Alternatively, create a ClusterGitTrack, which can own cluster-scoped resources
+as well as resources in all namespaces.
+
 #### Leader Election
 
 Faros can be run in an active-standby HA configuration using Kubernetes leader

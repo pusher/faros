@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -49,8 +51,11 @@ type GitTrackSpec struct {
 
 // GitTrackDeployKey holds a reference to a secret such as an SSH key or HTTP Basic Auth credentials needed to access the repository
 type GitTrackDeployKey struct {
-	// SecretName is the name of the Secret object containins the key
+	// SecretName is the name of the Secret object containing the key
 	SecretName string `json:"secretName"`
+
+	// SecretNamespace is the namespace of the Secret object containing the key. Defaults to the GitTrack's namespace. Required for ClusterGitTrack.
+	SecretNamespace string `json:"secretNamespace,omitempty"`
 
 	// Key is the key within the Secret object that contains the deploy secret
 	Key string `json:"key"`
@@ -140,6 +145,36 @@ type GitTrack struct {
 
 	Spec   GitTrackSpec   `json:"spec,omitempty"`
 	Status GitTrackStatus `json:"status,omitempty"`
+}
+
+// GetNamespacedName implementes the GitTrack interface
+func (g *GitTrack) GetNamespacedName() string {
+	return fmt.Sprintf("%s/%s", g.Namespace, g.Name)
+}
+
+// GetSpec implements the GitTrack interface
+func (g *GitTrack) GetSpec() GitTrackSpec {
+	return g.Spec
+}
+
+// SetSpec implements the GitTrack interface
+func (g *GitTrack) SetSpec(s GitTrackSpec) {
+	g.Spec = s
+}
+
+// GetStatus implements the GitTrack interface
+func (g *GitTrack) GetStatus() GitTrackStatus {
+	return g.Status
+}
+
+// SetStatus implements the GitTrack interface
+func (g *GitTrack) SetStatus(s GitTrackStatus) {
+	g.Status = s
+}
+
+// DeepCopyInterface implements the GitTrack interface
+func (g *GitTrack) DeepCopyInterface() GitTrackInterface {
+	return g.DeepCopy()
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

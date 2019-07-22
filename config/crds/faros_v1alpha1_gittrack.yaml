@@ -60,8 +60,13 @@ spec:
                     the deploy secret
                   type: string
                 secretName:
-                  description: SecretName is the name of the Secret object containins
+                  description: SecretName is the name of the Secret object containing
                     the key
+                  type: string
+                secretNamespace:
+                  description: SecretNamespace is the namespace of the Secret object
+                    containing the key. Defaults to the GitTrack's namespace. Required
+                    for ClusterGitTrack.
                   type: string
                 type:
                   description: Type is the type of credential. Accepted values are

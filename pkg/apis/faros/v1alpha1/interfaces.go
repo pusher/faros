@@ -22,6 +22,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// GitTrackInterface represents an interface implemented by both
+// GitTrack and ClusterGitTrack to allow them to be passed
+// interchangably.
+type GitTrackInterface interface {
+	runtime.Object
+	v1.Object
+	schema.ObjectKind
+	GetNamespacedName() string
+	GetSpec() GitTrackSpec
+	SetSpec(GitTrackSpec)
+	GetStatus() GitTrackStatus
+	SetStatus(GitTrackStatus)
+	DeepCopyInterface() GitTrackInterface
+}
+
 // GitTrackObjectInterface represents an interface implemented by both
 // GitTrackObject and ClusterGitTrackObject to allow them to be passed
 // interchangably.

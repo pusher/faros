@@ -22,6 +22,8 @@ import (
 	clientset "github.com/pusher/faros/pkg/client/clientset"
 	farosv1alpha1 "github.com/pusher/faros/pkg/client/clientset/typed/faros/v1alpha1"
 	fakefarosv1alpha1 "github.com/pusher/faros/pkg/client/clientset/typed/faros/v1alpha1/fake"
+	farosv1alpha2 "github.com/pusher/faros/pkg/client/clientset/typed/faros/v1alpha2"
+	fakefarosv1alpha2 "github.com/pusher/faros/pkg/client/clientset/typed/faros/v1alpha2/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -79,4 +81,9 @@ func (c *Clientset) FarosV1alpha1() farosv1alpha1.FarosV1alpha1Interface {
 // Faros retrieves the FarosV1alpha1Client
 func (c *Clientset) Faros() farosv1alpha1.FarosV1alpha1Interface {
 	return &fakefarosv1alpha1.FakeFarosV1alpha1{Fake: &c.Fake}
+}
+
+// FarosV1alpha2 retrieves the FarosV1alpha2Client
+func (c *Clientset) FarosV1alpha2() farosv1alpha2.FarosV1alpha2Interface {
+	return &fakefarosv1alpha2.FakeFarosV1alpha2{Fake: &c.Fake}
 }

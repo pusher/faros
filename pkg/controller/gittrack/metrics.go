@@ -37,7 +37,7 @@ func newMetricOpts(status *statusOpts) *metricsOpts {
 	}
 }
 
-func (r *ReconcileGitTrack) updateMetrics(gt *farosv1alpha1.GitTrack, opts *metricsOpts) error {
+func (r *ReconcileGitTrack) updateMetrics(gt farosv1alpha1.GitTrackInterface, opts *metricsOpts) error {
 	if gt == nil {
 		return nil
 	}

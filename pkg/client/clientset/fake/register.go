@@ -20,6 +20,7 @@ package fake
 
 import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	farosv1alpha2 "github.com/pusher/faros/pkg/apis/faros/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,6 +33,7 @@ var codecs = serializer.NewCodecFactory(scheme)
 var parameterCodec = runtime.NewParameterCodec(scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	farosv1alpha1.AddToScheme,
+	farosv1alpha2.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
