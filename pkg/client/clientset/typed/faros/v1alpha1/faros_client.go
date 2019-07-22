@@ -27,6 +27,7 @@ import (
 
 type FarosV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	ClusterGitTracksGetter
 	ClusterGitTrackObjectsGetter
 	GitTracksGetter
 	GitTrackObjectsGetter
@@ -35,6 +36,10 @@ type FarosV1alpha1Interface interface {
 // FarosV1alpha1Client is used to interact with features provided by the faros.pusher.com group.
 type FarosV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *FarosV1alpha1Client) ClusterGitTracks() ClusterGitTrackInterface {
+	return newClusterGitTracks(c)
 }
 
 func (c *FarosV1alpha1Client) ClusterGitTrackObjects() ClusterGitTrackObjectInterface {

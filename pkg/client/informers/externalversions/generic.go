@@ -53,6 +53,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=faros.pusher.com, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("clustergittracks"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Faros().V1alpha1().ClusterGitTracks().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clustergittrackobjects"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Faros().V1alpha1().ClusterGitTrackObjects().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("gittracks"):

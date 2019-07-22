@@ -19,6 +19,18 @@ rules:
 - apiGroups:
   - faros.pusher.com
   resources:
+  - clustergittracks
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - faros.pusher.com
+  resources:
   - gittrackobjects
   verbs:
   - get
