@@ -125,6 +125,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &farosv1alpha2.ClusterGitTrack{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &farosv1alpha2.ClusterGitTrack{},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

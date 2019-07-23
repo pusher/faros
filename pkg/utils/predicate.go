@@ -20,13 +20,15 @@ import (
 	"context"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	farosv1alpha2 "github.com/pusher/faros/pkg/apis/faros/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 const (
-	farosGroupVersion = "faros.pusher.com/v1alpha1"
+	farosGroupVersionAlpha1 = "faros.pusher.com/v1alpha1"
+	farosGroupVersionAlpha2 = "faros.pusher.com/v1alpha2"
 )
 
 // OwnerInNamespacePredicate filters events to check the owner of the event
@@ -63,16 +65,30 @@ func (p OwnerInNamespacePredicate) Generic(e event.GenericEvent) bool {
 // When it is restricted to a namespace this should only be the GitTracks
 // in the namespace the controller is managing.
 func (p OwnerInNamespacePredicate) ownerInNamespace(ownerRefs []metav1.OwnerReference) bool {
-	gtList := &farosv1alpha1.GitTrackList{}
-	err := p.client.List(context.TODO(), gtList)
+	cgtList := &farosv1alpha2.ClusterGitTrackList{}
+	err := p.client.List(context.TODO(), cgtList)
 	if err != nil {
 		// We can't list CGTOs so fail closed and ignore the requests
 		return false
 	}
+	gtList := &farosv1alpha1.GitTrackList{}
+	err = p.client.List(context.TODO(), gtList)
+	if err != nil {
+		// We can't list CGTOs so fail closed and ignore the requests
+		return false
+	}
+
 	for _, ref := range ownerRefs {
-		if ref.Kind == "GitTrack" && ref.APIVersion == farosGroupVersion {
+		if ref.Kind == "GitTrack" && ref.APIVersion == farosGroupVersionAlpha1 {
 			for _, gt := range gtList.Items {
 				if ref.UID == gt.UID {
+					return true
+				}
+			}
+		}
+		if ref.Kind == "ClusterGitTrack" && ref.APIVersion == farosGroupVersionAlpha2 {
+			for _, cgt := range cgtList.Items {
+				if ref.UID == cgt.UID {
 					return true
 				}
 			}
@@ -116,7 +132,7 @@ func (p OwnersOwnerInNamespacePredicate) Generic(e event.GenericEvent) bool {
 }
 
 // ownersOwnerInNamespace returns true if the the GitTrackObject's GitTrack
-// owner of the event object is in the namespace  managed by the controller
+// owner of the event object is in the namespace managed by the controller
 //
 // This works on the premise that listing objects from the client will only
 // return those in its cache.
@@ -137,14 +153,14 @@ func (p OwnersOwnerInNamespacePredicate) ownersOwnerInNamespace(ownerRefs []meta
 	}
 
 	for _, ref := range ownerRefs {
-		if ref.Kind == "GitTrackObject" && ref.APIVersion == farosGroupVersion {
+		if ref.Kind == "GitTrackObject" && ref.APIVersion == farosGroupVersionAlpha1 {
 			for _, gto := range gtoList.Items {
 				if ref.UID == gto.UID {
 					return p.ownerInNamespacePredicate.ownerInNamespace(gto.GetOwnerReferences())
 				}
 			}
 		}
-		if ref.Kind == "ClusterGitTrackObject" && ref.APIVersion == farosGroupVersion {
+		if ref.Kind == "ClusterGitTrackObject" && ref.APIVersion == farosGroupVersionAlpha1 {
 			for _, cgto := range cgtoList.Items {
 				if ref.UID == cgto.UID {
 					return p.ownerInNamespacePredicate.ownerInNamespace(cgto.GetOwnerReferences())
