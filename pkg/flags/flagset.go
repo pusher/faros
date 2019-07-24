@@ -19,6 +19,7 @@ package flags
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,6 +37,9 @@ var (
 
 	// ServerDryRun whether to enable Server side dry run or not
 	ServerDryRun bool
+
+	// FetchTimeout in seconds for fetching changes from repositories
+	FetchTimeout time.Duration
 )
 
 func init() {
@@ -43,6 +47,7 @@ func init() {
 	FlagSet.StringVar(&Namespace, "namespace", "", "Only manage GitTrack resources in given namespace")
 	FlagSet.StringSliceVar(&ignoredResources, "ignore-resource", []string{}, "Ignore resources of these kinds found in repositories, specified in <resource>.<group>/<version> format eg jobs.batch/v1")
 	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
+	FlagSet.DurationVar(&FetchTimeout, "fetch-timeout", 30*time.Second, "Timeout in seconds for fetching changes from repositories")
 }
 
 // ParseIgnoredResources attempts to parse the ignore-resource flag value and

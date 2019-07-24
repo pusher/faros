@@ -151,13 +151,26 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 	if err != nil {
 		return &gitstore.Repo{}, err
 	}
-	repo, err := r.store.Get(repoRef)
+	rc, done, err := r.store.GetAsync(repoRef)
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to get repository '%s': %v'", url, err)
 	}
+	repo := &gitstore.Repo{}
+
+	select {
+	case <-done:
+		if rc.Error != nil {
+			return repo, fmt.Errorf("failed to get repository '%s': %v'", url, rc.Error)
+		}
+		repo = rc.Repo
+	case <-time.After(farosflags.FetchTimeout):
+		return repo, fmt.Errorf("timed out getting repository '%s'", url)
+	}
 
 	r.log.V(1).Info("Checking out reference", "reference", ref)
-	err = repo.Checkout(ref)
+	ctx, cancel := context.WithTimeout(context.Background(), farosflags.FetchTimeout)
+	defer cancel()
+	err = repo.CheckoutContext(ctx, ref)
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to checkout '%s': %v", ref, err)
 	}
