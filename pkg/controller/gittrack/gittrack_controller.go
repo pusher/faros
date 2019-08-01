@@ -174,6 +174,11 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to checkout '%s': %v", ref, err)
 	}
+	commit, err := repo.HeadCommit()
+	if err != nil {
+		return &gitstore.Repo{}, fmt.Errorf("failed to get commit SHA '%s': %v", ref, err)
+	}
+	r.log.V(1).Info("Checked out reference at SHA", "reference", ref, "SHA", commit.Hash.String())
 
 	lastUpdated, err := repo.LastUpdated()
 	if err != nil {

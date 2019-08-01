@@ -644,12 +644,12 @@
   revision = "418d78d0b9a7b7de3a6bbc8a23def624cc977bb2"
 
 [[projects]]
-  digest = "1:086640ee59876950602f4087bfdc5f3d2848833328c31cf894081eefbd0f0a59"
+  branch = "repo-head-commit"
+  digest = "1:4296bfe3bb3395d1ea9065b1c8d1b15c0491967de3700e6de4a4b6c66ea52948"
   name = "github.com/pusher/git-store"
   packages = ["."]
   pruneopts = "T"
-  revision = "92d78f03e11486978999b034c177aa844e7c6041"
-  version = "v0.6.0"
+  revision = "99930cf477bd162086fd0758ce57898abc42889d"
 
 [[projects]]
   digest = "1:40e527269f1feb16b3069bfe80ff05a462d190eacfe07eb0a59fa25c381db7af"
