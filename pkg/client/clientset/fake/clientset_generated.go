@@ -75,8 +75,3 @@ var _ clientset.Interface = &Clientset{}
 func (c *Clientset) FarosV1alpha1() farosv1alpha1.FarosV1alpha1Interface {
 	return &fakefarosv1alpha1.FakeFarosV1alpha1{Fake: &c.Fake}
 }
-
-// Faros retrieves the FarosV1alpha1Client
-func (c *Clientset) Faros() farosv1alpha1.FarosV1alpha1Interface {
-	return &fakefarosv1alpha1.FakeFarosV1alpha1{Fake: &c.Fake}
-}
