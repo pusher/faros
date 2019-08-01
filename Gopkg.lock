@@ -298,6 +298,14 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:0bfbe13936953a98ae3cfe8ed6670d396ad81edf069a806d2f6515d7bb6950df"
+  name = "github.com/google/btree"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "4030bb1f1f0c35b30ca7009e9ebd06849dd45306"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:3ee90c0d94da31b442dde97c99635aaafec68d0b8a3c12ee2075c6bdabeec6bb"
   name = "github.com/google/gofuzz"
   packages = ["."]
@@ -331,6 +339,17 @@
   ]
   pruneopts = "T"
   revision = "185230dfbd12fc178f22e1e2a5c4cf0e3ef5ae45"
+
+[[projects]]
+  branch = "master"
+  digest = "1:3fd71568acc0a8122ddfda5873fb47ce0f40da6788a6d8872f4cc20ff7e8f502"
+  name = "github.com/gregjones/httpcache"
+  packages = [
+    ".",
+    "diskcache",
+  ]
+  pruneopts = "T"
+  revision = "901d90724c7919163f472a9812253fb26761123d"
 
 [[projects]]
   digest = "1:cf296baa185baae04a9a7004efee8511d08e2f5f51d4cbe5375da89722d681db"
@@ -570,6 +589,22 @@
   pruneopts = "T"
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
   version = "v0.2.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:e3c9ed9dca0ac77a50165f6752391fd915b26a020691a731d778304e7b17725b"
+  name = "github.com/petar/GoLLRB"
+  packages = ["llrb"]
+  pruneopts = "T"
+  revision = "33fb24c13b99c46c93183c291836c573ac382536"
+
+[[projects]]
+  digest = "1:d7a1d3a7087a69064f1055538e59873c01dac493e5ff30893b1bcaeb822686c4"
+  name = "github.com/peterbourgon/diskv"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "0be1b92a6df0e4f5cb0a5d15fb7f643d0ad93ce6"
+  version = "v3.0.0"
 
 [[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
@@ -1206,29 +1241,32 @@
   version = "kubernetes-1.14.4"
 
 [[projects]]
-  branch = "master"
-  digest = "1:d452565d61cae6f066b9cacff7657d6514adfb1214e008afe9b68300434eae35"
+  digest = "1:8f7c9608a4a3a1078d7d0184be35e0f89f5831d7b88abc56a8303f39f8e42eb3"
   name = "k8s.io/cli-runtime"
   packages = [
     "pkg/genericclioptions",
-    "pkg/genericclioptions/printers",
-    "pkg/genericclioptions/resource",
+    "pkg/kustomize",
     "pkg/kustomize/k8sdeps",
     "pkg/kustomize/k8sdeps/configmapandsecret",
     "pkg/kustomize/k8sdeps/kunstruct",
+    "pkg/kustomize/k8sdeps/kv",
     "pkg/kustomize/k8sdeps/transformer",
     "pkg/kustomize/k8sdeps/transformer/hash",
     "pkg/kustomize/k8sdeps/transformer/patch",
     "pkg/kustomize/k8sdeps/validator",
+    "pkg/printers",
+    "pkg/resource",
   ]
   pruneopts = "T"
-  revision = "31214e12222d5ddfec04d05163ba91b55336ef07"
+  revision = "d3fdc7d0625abc8785f510d737c4956ca2ea3a2d"
+  version = "kubernetes-1.14.4"
 
 [[projects]]
   digest = "1:cc1ba75c11e8127212c347bf215e0bac83bd999a1429281e2325ce053b798aa4"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
+    "discovery/cached/disk",
     "discovery/fake",
     "dynamic",
     "informers",
@@ -1469,22 +1507,22 @@
   revision = "f08db293d3ef80052d6513ece19792642a289fea"
 
 [[projects]]
-  digest = "1:1d43b0f0d3413ac5cbe2076e47c505b7473be8e17d667c38ec6fc62df8c2b96a"
+  digest = "1:17316c2e91c840fa9975f229b5f1a6393e1cce5206320ccd0ff0896a480d4493"
   name = "k8s.io/kubernetes"
   packages = [
     "pkg/kubectl/cmd/util",
     "pkg/kubectl/cmd/util/openapi",
     "pkg/kubectl/cmd/util/openapi/validation",
     "pkg/kubectl/scheme",
+    "pkg/kubectl/util/interrupt",
     "pkg/kubectl/util/templates",
     "pkg/kubectl/util/term",
     "pkg/kubectl/validation",
-    "pkg/util/interrupt",
-    "pkg/version",
+    "pkg/kubectl/version",
   ]
   pruneopts = "T"
-  revision = "8d69dc630ba66d05ad95146583a7482ed1eb3f82"
-  version = "v1.15.0-alpha.0"
+  revision = "4485c6f18cee9a5d3c3b4e523bd27972b1b53892"
+  version = "v1.15.1"
 
 [[projects]]
   branch = "master"
@@ -1652,7 +1690,7 @@
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apimachinery/pkg/util/yaml",
     "k8s.io/apimachinery/pkg/watch",
-    "k8s.io/cli-runtime/pkg/genericclioptions/resource",
+    "k8s.io/cli-runtime/pkg/resource",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/dynamic",

@@ -45,6 +45,10 @@ name="k8s.io/client-go"
 version="kubernetes-1.14.4"
 
 [[override]]
+name="k8s.io/cli-runtime"
+version="kubernetes-1.14.4"
+
+[[override]]
 name="k8s.io/kube-aggregator"
 version="kubernetes-1.14.4"
 
