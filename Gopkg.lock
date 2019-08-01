@@ -232,12 +232,12 @@
   version = "v0.18.0"
 
 [[projects]]
-  digest = "1:37f1fc11c4cc72c037dff8f34f452384647105e81d3832fc901d6389af9afe0d"
-  name = "github.com/gobuffalo/envy"
+  digest = "1:182ea57e81f7d0e176206790b1e04d6d1cbcccb326a969b398a5e129d021d1e1"
+  name = "github.com/gobuffalo/flect"
   packages = ["."]
   pruneopts = "T"
-  revision = "2d0f467653f3d961ce9ada4d32a230bdcb3bfe11"
-  version = "v1.6.3"
+  revision = "751c52157d8840ef1ebfeb65917fb9680ef51f24"
+  version = "v0.1.5"
 
 [[projects]]
   digest = "1:0a5d2a670ac050354afcf572e65aceabefdebdbb90973ea729d8640fa211a9e2"
@@ -400,14 +400,6 @@
   revision = "d14ea06fba99483203c19d92cfcd13ebe73135f4"
 
 [[projects]]
-  digest = "1:596517ffade0ace2491d4fe696b360720296d6f6282ae0f54b980a859d153844"
-  name = "github.com/joho/godotenv"
-  packages = ["."]
-  pruneopts = "T"
-  revision = "a79fa1e548e2c689c241d10173efd51e5d689d5b"
-  version = "v1.2.0"
-
-[[projects]]
   digest = "1:75ab90ae3f5d876167e60f493beadfe66f0ed861a710f283fb06c86437a09538"
   name = "github.com/jonboulle/clockwork"
   packages = ["."]
@@ -475,14 +467,6 @@
   ]
   pruneopts = "T"
   revision = "60711f1a8329503b04e1c88535f419d0bb440bff"
-
-[[projects]]
-  digest = "1:e60b8e2ad986a90b522fd74a87c4f5b3bb173c6a6bc5d88744d70cb0c760afdd"
-  name = "github.com/markbates/inflect"
-  packages = ["."]
-  pruneopts = "T"
-  revision = "dd7de90c06bca70f18136e59dec2270c19a401e7"
-  version = "v1.0.0"
 
 [[projects]]
   digest = "1:a8e3d14801bed585908d130ebfc3b925ba642208e6f30d879437ddfc7bb9b413"
@@ -1507,22 +1491,22 @@
   revision = "f08db293d3ef80052d6513ece19792642a289fea"
 
 [[projects]]
-  digest = "1:17316c2e91c840fa9975f229b5f1a6393e1cce5206320ccd0ff0896a480d4493"
+  digest = "1:2fd38ba4693970d9cf8ebbac0e7bc4d5e54b9d23680d0f2dfb508b04b6f02a13"
   name = "k8s.io/kubernetes"
   packages = [
     "pkg/kubectl/cmd/util",
     "pkg/kubectl/cmd/util/openapi",
     "pkg/kubectl/cmd/util/openapi/validation",
     "pkg/kubectl/scheme",
-    "pkg/kubectl/util/interrupt",
     "pkg/kubectl/util/templates",
     "pkg/kubectl/util/term",
     "pkg/kubectl/validation",
-    "pkg/kubectl/version",
+    "pkg/util/interrupt",
+    "pkg/version",
   ]
   pruneopts = "T"
-  revision = "4485c6f18cee9a5d3c3b4e523bd27972b1b53892"
-  version = "v1.15.1"
+  revision = "a87e9a978f65a8303aa9467537aa59c18122cbf9"
+  version = "v1.14.4"
 
 [[projects]]
   branch = "master"
@@ -1582,7 +1566,7 @@
   version = "v0.2.0-beta.4"
 
 [[projects]]
-  digest = "1:2aec1bbf1553a2d433b3a85f9359930655de83e2dceed4aca44577a720396da8"
+  digest = "1:46aa448122b04f923ce877ab57d4649dfe5437a028ae8700876d7c5070909b08"
   name = "sigs.k8s.io/controller-tools"
   packages = [
     "cmd/controller-gen",
@@ -1596,8 +1580,8 @@
     "pkg/webhook",
   ]
   pruneopts = "T"
-  revision = "b8adde9bc6d7f3fba449d306613a9daed23676c8"
-  version = "v0.1.10"
+  revision = "eb20812245b721a69012140fcf07e887b4f2e5d8"
+  version = "v0.1.12"
 
 [[projects]]
   digest = "1:5adcdd7521b074ff155b54d881c990ad837fa27d55ee7e0194dfbaf2cd90c54c"

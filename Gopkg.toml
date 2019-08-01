@@ -29,6 +29,10 @@ name="gopkg.in/src-d/go-git.v4"
 version="v4.8.1"
 
 [[override]]
+name="k8s.io/kubernetes"
+version="=1.14.4"
+
+[[override]]
 name="k8s.io/api"
 version="kubernetes-1.14.4"
 
@@ -66,7 +70,7 @@ version="v0.2.0-beta.4"
 
 [[override]]
 name="sigs.k8s.io/controller-tools"
-version="v0.1.10"
+version="v0.1.12"
 
 [[override]]
 name="sigs.k8s.io/testing_frameworks"
