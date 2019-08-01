@@ -146,7 +146,7 @@ func (r *ReconcileGitTrack) withValues(keysAndValues ...interface{}) *ReconcileG
 
 // checkoutRepo checks out the repository at reference and returns a pointer to said repository
 func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCredentials) (*gitstore.Repo, error) {
-	r.log.V(1).Info("Getting repository", "url", url)
+	r.log.V(0).Info("Getting repository", "url", url)
 	repoRef, err := createRepoRefFromCreds(url, gitCreds)
 	if err != nil {
 		return &gitstore.Repo{}, err
@@ -167,7 +167,7 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 		return repo, fmt.Errorf("timed out getting repository '%s'", url)
 	}
 
-	r.log.V(1).Info("Checking out reference", "reference", ref)
+	r.log.V(0).Info("Checking out reference", "reference", ref)
 	ctx, cancel := context.WithTimeout(context.Background(), farosflags.FetchTimeout)
 	defer cancel()
 	err = repo.CheckoutContext(ctx, ref)
@@ -178,7 +178,7 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 	if err != nil {
 		return &gitstore.Repo{}, fmt.Errorf("failed to get commit SHA '%s': %v", ref, err)
 	}
-	r.log.V(1).Info("Checked out reference at SHA", "reference", ref, "SHA", commit.Hash.String())
+	r.log.V(0).Info("Checked out reference at SHA", "reference", ref, "SHA", commit.Hash.String())
 
 	lastUpdated, err := repo.LastUpdated()
 	if err != nil {
@@ -539,7 +539,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		"namespace", instance.GetNamespace(),
 		"name", instance.GetName(),
 	)
-	reconciler.log.V(1).Info("Reconcile started")
+	reconciler.log.V(0).Info("Reconcile started")
 
 	sOpts := newStatusOpts()
 	mOpts := newMetricOpts(sOpts)
@@ -549,7 +549,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		err := reconciler.updateStatus(instance, sOpts)
 		mErr := reconciler.updateMetrics(instance, mOpts)
 
-		reconciler.log.V(1).Info("Reconcile finished")
+		reconciler.log.V(0).Info("Reconcile finished")
 		// Print out any errors that may have occurred
 		for _, e := range []error{
 			err,
