@@ -169,7 +169,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		}
 	}
 
-	options := metav1.UpdateOptions{}
+	options := metav1.PatchOptions{}
 	if p.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
