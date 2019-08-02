@@ -1584,7 +1584,7 @@
   version = "v0.1.12"
 
 [[projects]]
-  digest = "1:5adcdd7521b074ff155b54d881c990ad837fa27d55ee7e0194dfbaf2cd90c54c"
+  digest = "1:663cc8454702691d4d089e6df5acc61d87b9c9a933a28b7615200e5b5a4f0cfd"
   name = "sigs.k8s.io/kustomize"
   packages = [
     "pkg/commands/build",
@@ -1592,9 +1592,11 @@
     "pkg/expansion",
     "pkg/factory",
     "pkg/fs",
+    "pkg/git",
     "pkg/gvk",
     "pkg/ifc",
     "pkg/ifc/transformer",
+    "pkg/image",
     "pkg/internal/error",
     "pkg/loader",
     "pkg/patch",
@@ -1609,8 +1611,8 @@
     "pkg/types",
   ]
   pruneopts = "T"
-  revision = "8f701a00417a812558a7b785e8354957afa469ae"
-  version = "v1.0.11"
+  revision = "a6f65144121d1955266b0cd836ce954c04122dc8"
+  version = "v2.0.3"
 
 [[projects]]
   digest = "1:290b4da306982122bcdff12dbababbb95c6e4a94a2995db88baf235ef2f6e93e"
