@@ -263,7 +263,10 @@ func (a *Applier) update(ctx context.Context, opts *ApplyOptions, current, modif
 		return fmt.Errorf("unable to construct patcher: %v", err)
 	}
 	source := metadata.GetSelfLink() // This is optional and would normally be the file path
-	_, patchedObj, err := patcher.Patch(current, modifiedJSON, source, metadata.GetNamespace(), metadata.GetName(), nil)
+	patchBytes, patchedObj, err := patcher.Patch(current, modifiedJSON, source, metadata.GetNamespace(), metadata.GetName(), nil)
+	if patchString := string(patchBytes); patchString != "{}" {
+		log.V(2).Info("applied patch", "patch", patchString)
+	}
 	if err != nil {
 		return fmt.Errorf("unable to patch object: %v", err)
 	}
