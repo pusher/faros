@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	FarosV1alpha1() farosv1alpha1.FarosV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Faros() farosv1alpha1.FarosV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // FarosV1alpha1 retrieves the FarosV1alpha1Client
 func (c *Clientset) FarosV1alpha1() farosv1alpha1.FarosV1alpha1Interface {
-	return c.farosV1alpha1
-}
-
-// Deprecated: Faros retrieves the default version of FarosClient.
-// Please explicitly pick a version.
-func (c *Clientset) Faros() farosv1alpha1.FarosV1alpha1Interface {
 	return c.farosV1alpha1
 }
 
