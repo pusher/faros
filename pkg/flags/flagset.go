@@ -40,6 +40,11 @@ var (
 
 	// FetchTimeout in seconds for fetching changes from repositories
 	FetchTimeout time.Duration
+
+	// RepositoryDir is the folder on the local filesystem in which Faros should
+	// check out repositories. If left empty, Faros will check out repositories
+	// in memory
+	RepositoryDir string
 )
 
 func init() {
@@ -48,6 +53,7 @@ func init() {
 	FlagSet.StringSliceVar(&ignoredResources, "ignore-resource", []string{}, "Ignore resources of these kinds found in repositories, specified in <resource>.<group>/<version> format eg jobs.batch/v1")
 	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
 	FlagSet.DurationVar(&FetchTimeout, "fetch-timeout", 30*time.Second, "Timeout in seconds for fetching changes from repositories")
+	FlagSet.StringVar(&RepositoryDir, "repository-dir", "", "Directory in which to clone repositories. Defaults to cloning in memory if unset.")
 }
 
 // ParseIgnoredResources attempts to parse the ignore-resource flag value and

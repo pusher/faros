@@ -78,7 +78,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileGitTrack{
 		Client:          mgr.GetClient(),
 		scheme:          mgr.GetScheme(),
-		store:           gitstore.NewRepoStore(),
+		store:           gitstore.NewRepoStore(farosflags.RepositoryDir),
 		restMapper:      restMapper,
 		recorder:        mgr.GetEventRecorderFor("gittrack-controller"),
 		ignoredGVRs:     gvrs,
