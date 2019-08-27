@@ -51,12 +51,12 @@ func newStatusOpts() *statusOpts {
 	}
 }
 
-func updateGitTrackStatus(gt *farosv1alpha1.GitTrack, opts *statusOpts) (updated bool) {
+func updateGitTrackStatus(gt farosv1alpha1.GitTrackInterface, opts *statusOpts) (updated bool) {
 	if gt == nil {
 		return
 	}
 
-	status := gt.Status
+	status := gt.GetStatus()
 
 	status.ObjectsApplied = opts.applied
 	status.ObjectsDiscovered = opts.discovered
@@ -68,8 +68,8 @@ func updateGitTrackStatus(gt *farosv1alpha1.GitTrack, opts *statusOpts) (updated
 	setCondition(&status, farosv1alpha1.ChildrenGarbageCollectedType, opts.gcError, opts.gcReason)
 	setCondition(&status, farosv1alpha1.ChildrenUpToDateType, opts.upToDateError, opts.upToDateReason)
 
-	if !reflect.DeepEqual(gt.Status, status) {
-		gt.Status = status
+	if !reflect.DeepEqual(gt.GetStatus(), status) {
+		gt.SetStatus(status)
 		updated = true
 	}
 	return
@@ -100,9 +100,9 @@ func setCondition(status *farosv1alpha1.GitTrackStatus, condType farosv1alpha1.G
 
 // updateStatus calculates a new status for the GitTrack and then updates
 // the resource on the API if the status differs from before.
-func (r *ReconcileGitTrack) updateStatus(original *farosv1alpha1.GitTrack, opts *statusOpts) error {
+func (r *ReconcileGitTrack) updateStatus(original farosv1alpha1.GitTrackInterface, opts *statusOpts) error {
 	// Update the GitTrack's status
-	gt := original.DeepCopy()
+	gt := original.DeepCopyInterface()
 	gtUpdated := updateGitTrackStatus(gt, opts)
 
 	// If the status was modified, update the GitTrack on the API

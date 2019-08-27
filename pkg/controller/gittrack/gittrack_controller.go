@@ -221,21 +221,21 @@ func (r *ReconcileGitTrack) fetchGitCredentials(namespace string, deployKey faro
 
 // getFiles checks out the Spec.Repository at Spec.Reference and returns a map of filename to
 // gitstore.File pointers
-func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gitstore.File, error) {
-	r.recorder.Eventf(gt, apiv1.EventTypeNormal, "CheckoutStarted", "Checking out '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
-	gitCreds, err := r.fetchGitCredentials(gt.Namespace, gt.Spec.DeployKey)
+func (r *ReconcileGitTrack) getFiles(gt farosv1alpha1.GitTrackInterface) (map[string]*gitstore.File, error) {
+	r.recorder.Eventf(gt, apiv1.EventTypeNormal, "CheckoutStarted", "Checking out '%s' at '%s'", gt.GetSpec().Repository, gt.GetSpec().Reference)
+	gitCreds, err := r.fetchGitCredentials(gt.GetNamespace(), gt.GetSpec().DeployKey)
 	if err != nil {
-		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.GetSpec().Repository, gt.GetSpec().Reference)
 		return nil, fmt.Errorf("unable to retrieve git credentials from secret: %v", err)
 	}
 
-	repo, err := r.checkoutRepo(gt.Spec.Repository, gt.Spec.Reference, gitCreds)
+	repo, err := r.checkoutRepo(gt.GetSpec().Repository, gt.GetSpec().Reference, gitCreds)
 	if err != nil {
-		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.Spec.Repository, gt.Spec.Reference)
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.GetSpec().Repository, gt.GetSpec().Reference)
 		return nil, err
 	}
 
-	subPath := gt.Spec.SubPath
+	subPath := gt.GetSpec().SubPath
 	if !strings.HasSuffix(subPath, "/") {
 		subPath += "/"
 	}
@@ -244,11 +244,11 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 	globbedSubPath := strings.TrimPrefix(subPath, "/") + "{**/*,*}.{yaml,yml,json}"
 	files, err := repo.GetAllFiles(globbedSubPath, true)
 	if err != nil {
-		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to get files for SubPath '%s'", gt.Spec.SubPath)
-		return nil, fmt.Errorf("failed to get all files for subpath '%s': %v", gt.Spec.SubPath, err)
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to get files for SubPath '%s'", gt.GetSpec().SubPath)
+		return nil, fmt.Errorf("failed to get all files for subpath '%s': %v", gt.GetSpec().SubPath, err)
 	} else if len(files) == 0 {
-		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "No files for SubPath '%s'", gt.Spec.SubPath)
-		return nil, fmt.Errorf("no files for subpath '%s'", gt.Spec.SubPath)
+		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "No files for SubPath '%s'", gt.GetSpec().SubPath)
+		return nil, fmt.Errorf("no files for subpath '%s'", gt.GetSpec().SubPath)
 	}
 
 	r.log.V(1).Info("Loaded files from repository", "file count", len(files))
@@ -256,7 +256,7 @@ func (r *ReconcileGitTrack) getFiles(gt *farosv1alpha1.GitTrack) (map[string]*gi
 }
 
 // fetchInstance attempts to fetch the GitTrack resource by the name in the given Request
-func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1.GitTrack, error) {
+func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (farosv1alpha1.GitTrackInterface, error) {
 	instance := &farosv1alpha1.GitTrack{}
 	err := r.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
@@ -273,7 +273,7 @@ func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (*farosv1alpha1
 
 // listObjectsByName lists and filters GitTrackObjects by the `faros.pusher.com/owned-by` label,
 // and returns a map of names to GitTrackObject mappings
-func (r *ReconcileGitTrack) listObjectsByName(owner *farosv1alpha1.GitTrack) (map[string]farosv1alpha1.GitTrackObjectInterface, error) {
+func (r *ReconcileGitTrack) listObjectsByName(owner farosv1alpha1.GitTrackInterface) (map[string]farosv1alpha1.GitTrackObjectInterface, error) {
 	result := make(map[string]farosv1alpha1.GitTrackObjectInterface)
 
 	gtos := &farosv1alpha1.GitTrackObjectList{}
@@ -363,7 +363,7 @@ func objectName(u *unstructured.Unstructured) string {
 }
 
 // handleObject either creates or updates a GitTrackObject
-func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *farosv1alpha1.GitTrack) result {
+func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner farosv1alpha1.GitTrackInterface) result {
 	name := objectName(u)
 	gto, err := r.newGitTrackObjectInterface(name, u)
 	if err != nil {
@@ -380,7 +380,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner *fa
 	}
 
 	r.mutex.RLock()
-	timeToDeploy := time.Now().Sub(r.lastUpdateTimes[owner.Spec.Repository])
+	timeToDeploy := time.Now().Sub(r.lastUpdateTimes[owner.GetSpec().Repository])
 	r.mutex.RUnlock()
 
 	if err = controllerutil.SetControllerReference(owner, gto, r.scheme); err != nil {
@@ -423,7 +423,7 @@ func childInSync(child farosv1alpha1.GitTrackObjectInterface) bool {
 	return false
 }
 
-func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration, owner *farosv1alpha1.GitTrack, foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) result {
+func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration, owner farosv1alpha1.GitTrackInterface, foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) result {
 	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
 	if err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, childGTO); err != nil {
 		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
@@ -484,14 +484,14 @@ func objectsFrom(files map[string]*gitstore.File) ([]*unstructured.Unstructured,
 
 // checkOwner checks the owner reference of an object from the API to see if it
 // is owned by the current GitTrack.
-func checkOwner(owner *farosv1alpha1.GitTrack, child farosv1alpha1.GitTrackObjectInterface, s *runtime.Scheme) error {
+func checkOwner(owner farosv1alpha1.GitTrackInterface, child farosv1alpha1.GitTrackObjectInterface, s *runtime.Scheme) error {
 	gvk, err := apiutil.GVKForObject(owner, s)
 	if err != nil {
 		return err
 	}
 
 	for _, ref := range child.GetOwnerReferences() {
-		if ref.Kind == gvk.Kind && ref.UID != owner.UID {
+		if ref.Kind == gvk.Kind && ref.UID != owner.GetUID() {
 			return fmt.Errorf("child object is owned by '%s'", ref.Name)
 		}
 	}
@@ -561,7 +561,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}()
 
 	// Set the repository for metrics
-	mOpts.repository = instance.Spec.Repository
+	mOpts.repository = instance.GetSpec().Repository
 
 	// Get a map of the files that are in the Spec
 	files, err := reconciler.getFiles(instance)
@@ -572,7 +572,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 	// Git successful, set condition
 	sOpts.gitReason = gittrackutils.GitFetchSuccess
-	reconciler.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.Spec.Repository, instance.Spec.Reference)
+	reconciler.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.GetSpec().Repository, instance.GetSpec().Reference)
 
 	// Attempt to parse k8s objects from files
 	objects, fileErrors := objectsFrom(files)
