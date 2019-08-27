@@ -123,6 +123,7 @@ var _ = Describe("GitTrack Suite", func() {
 		close(stop)
 		testutils.DeleteAll(cfg, timeout,
 			&farosv1alpha1.GitTrackList{},
+			&farosv1alpha1.ClusterGitTrackList{},
 			&farosv1alpha1.GitTrackObjectList{},
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&v1.EventList{},
@@ -926,7 +927,6 @@ var _ = Describe("GitTrack Suite", func() {
 	Context("When a GitTrack has a DeployKey, the Reconciler should", func() {
 		var reconciler *ReconcileGitTrack
 		var s *v1.Secret
-		var keyRef farosv1alpha1.GitTrackDeployKey
 		var expectedKey []byte
 
 		keysMustBeSetErr := errors.New("if using a deploy key, both SecretName and Key must be set")
@@ -937,10 +937,13 @@ var _ = Describe("GitTrack Suite", func() {
 			reconciler, ok = r.(*ReconcileGitTrack)
 			Expect(ok).To(BeTrue())
 
-			keyRef = farosv1alpha1.GitTrackDeployKey{
+			keyRef := farosv1alpha1.GitTrackDeployKey{
 				SecretName: "foosecret",
 				Key:        "privatekey",
 			}
+			spec := instance.GetSpec()
+			spec.DeployKey = keyRef
+			instance.SetSpec(spec)
 
 			expectedKey = []byte("PrivateKey")
 			s = &v1.Secret{
@@ -960,34 +963,43 @@ var _ = Describe("GitTrack Suite", func() {
 		})
 
 		It("do nothing if the secret name and key are empty", func() {
-			key, err := reconciler.fetchGitCredentials("default", farosv1alpha1.GitTrackDeployKey{})
+			key, err := reconciler.fetchGitCredentials(&farosv1alpha1.GitTrack{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(key).To(BeNil())
 		})
 
 		It("get the key from the secret", func() {
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(key.secret).To(Equal(expectedKey))
 		})
 
 		It("return an error if the secret doesn't exist", func() {
-			keyRef.SecretName = "nonExistSecret"
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			spec := instance.GetSpec()
+			spec.DeployKey.SecretName = "nonExistSecret"
+			instance.SetSpec(spec)
+
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).To(Equal(secretNotFoundErr))
 			Expect(key).To(BeNil())
 		})
 
 		It("return an error if the secret name isnt set, but the key is", func() {
-			keyRef.SecretName = ""
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			spec := instance.GetSpec()
+			spec.DeployKey.SecretName = ""
+			instance.SetSpec(spec)
+
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).To(Equal(keysMustBeSetErr))
 			Expect(key).To(BeNil())
 		})
 
 		It("return an error if the key isnt set, but the secret name is", func() {
-			keyRef.Key = ""
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			spec := instance.GetSpec()
+			spec.DeployKey.Key = ""
+			instance.SetSpec(spec)
+
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).To(Equal(keysMustBeSetErr))
 			Expect(key).To(BeNil())
 		})
