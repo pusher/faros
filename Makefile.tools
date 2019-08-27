@@ -37,8 +37,9 @@ kustomize:
 	fi
 
 .PHONY: snyk
+snyk:
 	@ if [ ! $$(which snyk) ]; then \
-		npm install -g snyk
+		npm install -g snyk; \
 	fi
 
 .PHONY: kubebuilder-tools-1.14
