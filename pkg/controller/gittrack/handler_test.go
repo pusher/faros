@@ -102,6 +102,15 @@ var _ = Describe("Handler Suite", func() {
 		var gto farosv1alpha1.GitTrackObjectInterface
 		var result handlerResult
 
+		var AssertNoErrors = func() {
+			It("should return no errors", func() {
+				Expect(result.parseError).ToNot(HaveOccurred())
+				Expect(result.gitError).ToNot(HaveOccurred())
+				Expect(result.gcError).ToNot(HaveOccurred())
+				Expect(result.upToDateError).ToNot(HaveOccurred())
+			})
+		}
+
 		var AssertChild = func() {
 			It("creates a GitTrackObject the child", func() {
 				m.Get(gto, timeout).Should(Succeed())
@@ -137,12 +146,7 @@ var _ = Describe("Handler Suite", func() {
 				AssertChild()
 			})
 
-			It("should return no errors", func() {
-				Expect(result.parseError).ToNot(HaveOccurred())
-				Expect(result.gitError).ToNot(HaveOccurred())
-				Expect(result.gcError).ToNot(HaveOccurred())
-				Expect(result.upToDateError).ToNot(HaveOccurred())
-			})
+			AssertNoErrors()
 		}
 
 		var AssertMultiDocument = func() {
@@ -164,12 +168,20 @@ var _ = Describe("Handler Suite", func() {
 				AssertChild()
 			})
 
-			It("should return no errors", func() {
-				Expect(result.parseError).ToNot(HaveOccurred())
-				Expect(result.gitError).ToNot(HaveOccurred())
-				Expect(result.gcError).ToNot(HaveOccurred())
-				Expect(result.upToDateError).ToNot(HaveOccurred())
+			AssertNoErrors()
+		}
+
+		var AssertClusterScopedResource = func() {
+			Context("for the namespace file", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+					gto.SetName("namespace-test")
+				})
+
+				AssertChild()
 			})
+
+			AssertNoErrors()
 		}
 
 		Context("with a GitTrack", func() {
@@ -202,6 +214,14 @@ var _ = Describe("Handler Suite", func() {
 
 				AssertMultiDocument()
 			})
+
+			Context("with a cluster scoped resource", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42"), timeout).Should(Succeed())
+				})
+
+				AssertClusterScopedResource()
+			})
 		})
 
 		Context("with a ClusterGitTrack", func() {
@@ -233,6 +253,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertMultiDocument()
+			})
+
+			Context("with a cluster scoped resource", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42"), timeout).Should(Succeed())
+				})
+
+				AssertClusterScopedResource()
 			})
 		})
 	})
