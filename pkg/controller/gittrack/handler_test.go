@@ -87,19 +87,45 @@ var _ = Describe("Handler Suite", func() {
 	})
 
 	Context("handleGitTrack", func() {
+		var gt farosv1alpha1.GitTrackInterface
 		var result handlerResult
 
 		var AssertValidChildren = func() {
-			It("creates a GitTrackObject for the child deployment", func() {
-				gto := testutils.ExampleGitTrackObject.DeepCopy()
-				gto.SetName("deployment-nginx")
-				m.Get(gto, timeout).Should(Succeed())
+			var gto farosv1alpha1.GitTrackObjectInterface
+
+			var AssertChild = func() {
+				It("creates a GitTrackObject the child", func() {
+					m.Get(gto, timeout).Should(Succeed())
+				})
+
+				It("adds an ownerreference to the child", func() {
+					m.Eventually(gto, timeout).
+						Should(testutils.WithOwnerReferences(ContainElement(testutils.GetGitTrackInterfaceOwnerRef(gt))))
+				})
+
+				It("should add a last applied annotation to the child", func() {
+					m.Eventually(gto, timeout).
+						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
+				})
+			}
+
+
+			Context("for the deployment file", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("deployment-nginx")
+				})
+
+				AssertChild()
 			})
 
-			It("creates a GitTrackObject for the child service", func() {
-				gto := testutils.ExampleGitTrackObject.DeepCopy()
-				gto.SetName("service-nginx")
-				m.Get(gto, timeout).Should(Succeed())
+			Context("for the service file", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("service-nginx")
+				})
+
+				AssertChild()
 			})
 
 			It("should return no errors", func() {
@@ -111,8 +137,6 @@ var _ = Describe("Handler Suite", func() {
 		}
 
 		Context("with a GitTrack", func() {
-			var gt *farosv1alpha1.GitTrack
-
 			BeforeEach(func() {
 				gt = testutils.ExampleGitTrack.DeepCopy()
 				setGitTrackReference(gt, repositoryURL, "a14443638218c782b84cae56a14f1090ee9e5c9c")
@@ -137,8 +161,6 @@ var _ = Describe("Handler Suite", func() {
 		})
 
 		Context("with a ClusterGitTrack", func() {
-			var gt *farosv1alpha1.ClusterGitTrack
-
 			BeforeEach(func() {
 				gt = testutils.ExampleClusterGitTrack.DeepCopy()
 				setGitTrackReference(gt, repositoryURL, "a14443638218c782b84cae56a14f1090ee9e5c9c")
