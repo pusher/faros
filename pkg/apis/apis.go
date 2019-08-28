@@ -23,7 +23,7 @@ limitations under the License.
 // Generate listers for apis
 //go:generate go run ../../vendor/k8s.io/code-generator/cmd/lister-gen/main.go --input-dirs=github.com/pusher/faros/pkg/apis/faros/v1alpha1 -p github.com/pusher/faros/pkg/client/listers -h ../../hack/boilerplate.go.txt
 
-// Generate infromers for apis
+// Generate informers for apis
 //go:generate go run ../../vendor/k8s.io/code-generator/cmd/informer-gen/main.go --input-dirs=github.com/pusher/faros/pkg/apis/faros/v1alpha1 -p github.com/pusher/faros/pkg/client/informers --listers-package github.com/pusher/faros/pkg/client/listers --versioned-clientset-package github.com/pusher/faros/pkg/client/clientset -h ../../hack/boilerplate.go.txt
 
 // Package apis contains Kubernetes API groups.

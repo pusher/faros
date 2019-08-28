@@ -28,6 +28,10 @@ type FakeFarosV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeFarosV1alpha1) ClusterGitTracks() v1alpha1.ClusterGitTrackInterface {
+	return &FakeClusterGitTracks{c}
+}
+
 func (c *FakeFarosV1alpha1) ClusterGitTrackObjects() v1alpha1.ClusterGitTrackObjectInterface {
 	return &FakeClusterGitTrackObjects{c}
 }

@@ -4,7 +4,7 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: gittracks.faros.pusher.com
+  name: clustergittracks.faros.pusher.com
 spec:
   additionalPrinterColumns:
   - JSONPath: .spec.repository
@@ -31,9 +31,9 @@ spec:
     type: date
   group: faros.pusher.com
   names:
-    kind: GitTrack
-    plural: gittracks
-  scope: Namespaced
+    kind: ClusterGitTrack
+    plural: clustergittracks
+  scope: Cluster
   validation:
     openAPIV3Schema:
       properties:

@@ -29,6 +29,7 @@ const (
 
 	GitTrackKind              = "GitTrack"
 	GitTrackObjectKind        = "GitTrackObject"
+	ClusterGitTrackKind       = "ClusterGitTrack"
 	ClusterGitTrackObjectKind = "ClusterGitTrackObject"
 )
 
@@ -46,6 +47,10 @@ var (
 	GitTrackObjectTypeMeta = metav1.TypeMeta{
 		APIVersion: GroupVersion.String(),
 		Kind:       GitTrackObjectKind,
+	}
+	ClusterGitTrackTypeMeta = metav1.TypeMeta{
+		APIVersion: GroupVersion.String(),
+		Kind:       ClusterGitTrackKind,
 	}
 	ClusterGitTrackObjectTypeMeta = metav1.TypeMeta{
 		APIVersion: GroupVersion.String(),

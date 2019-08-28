@@ -51,8 +51,11 @@ type GitTrackSpec struct {
 
 // GitTrackDeployKey holds a reference to a secret such as an SSH key or HTTP Basic Auth credentials needed to access the repository
 type GitTrackDeployKey struct {
-	// SecretName is the name of the Secret object containins the key
+	// SecretName is the name of the Secret object containing the key
 	SecretName string `json:"secretName"`
+
+	// SecretNamespace is the namespace of the Secret object containing the key. Defaults to the GitTrack's namespace. Required for ClusterGitTrack.
+	SecretNamespace string `json:"secretNamespace,omitempty"`
 
 	// Key is the key within the Secret object that contains the deploy secret
 	Key string `json:"key"`

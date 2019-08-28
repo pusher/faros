@@ -103,6 +103,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to ClusterGitTrack
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrack{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
 	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &farosv1alpha1.GitTrack{},
@@ -114,6 +120,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &farosv1alpha1.GitTrack{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &farosv1alpha1.ClusterGitTrack{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &farosv1alpha1.ClusterGitTrack{},
 	})
 	if err != nil {
 		return err
@@ -188,7 +210,9 @@ func (r *ReconcileGitTrack) checkoutRepo(url string, ref string, gitCreds *gitCr
 }
 
 // fetchGitCredentials creates git credentials data from a given deployKey secret reference
-func (r *ReconcileGitTrack) fetchGitCredentials(namespace string, deployKey farosv1alpha1.GitTrackDeployKey) (*gitCredentials, error) {
+func (r *ReconcileGitTrack) fetchGitCredentials(gt farosv1alpha1.GitTrackInterface) (*gitCredentials, error) {
+	deployKey := gt.GetSpec().DeployKey
+
 	// Check if the deployKey is empty, do nothing if it is
 	emptyKey := farosv1alpha1.GitTrackDeployKey{}
 	if deployKey == emptyKey {
@@ -199,10 +223,26 @@ func (r *ReconcileGitTrack) fetchGitCredentials(namespace string, deployKey faro
 		return nil, fmt.Errorf("if using a deploy key, both SecretName and Key must be set")
 	}
 
+	// Set the SecretNamespace to match the GitTrack Namespace
+	// Users must set this for ClusterGitTracks
+	switch gt.(type) {
+	case *farosv1alpha1.GitTrack:
+		if deployKey.SecretNamespace != "" && deployKey.SecretNamespace != gt.GetNamespace() {
+			return nil, fmt.Errorf("DeployKey namespace must match GitTrack namespace or be empty")
+		}
+		deployKey.SecretNamespace = gt.GetNamespace()
+	case *farosv1alpha1.ClusterGitTrack:
+		if deployKey.SecretNamespace == "" {
+			return nil, fmt.Errorf("No Secret Namespace set for DeployKey")
+		}
+	default:
+		panic(fmt.Errorf("This code should not be reachable"))
+	}
+
 	// Fetch the secret from the API
 	secret := &apiv1.Secret{}
 	err := r.Get(context.TODO(), types.NamespacedName{
-		Namespace: namespace,
+		Namespace: deployKey.SecretNamespace,
 		Name:      deployKey.SecretName,
 	}, secret)
 	if err != nil {
@@ -223,7 +263,7 @@ func (r *ReconcileGitTrack) fetchGitCredentials(namespace string, deployKey faro
 // gitstore.File pointers
 func (r *ReconcileGitTrack) getFiles(gt farosv1alpha1.GitTrackInterface) (map[string]*gitstore.File, error) {
 	r.recorder.Eventf(gt, apiv1.EventTypeNormal, "CheckoutStarted", "Checking out '%s' at '%s'", gt.GetSpec().Repository, gt.GetSpec().Reference)
-	gitCreds, err := r.fetchGitCredentials(gt.GetNamespace(), gt.GetSpec().DeployKey)
+	gitCreds, err := r.fetchGitCredentials(gt)
 	if err != nil {
 		r.recorder.Eventf(gt, apiv1.EventTypeWarning, "CheckoutFailed", "Failed to checkout '%s' at '%s'", gt.GetSpec().Repository, gt.GetSpec().Reference)
 		return nil, fmt.Errorf("unable to retrieve git credentials from secret: %v", err)
@@ -257,7 +297,12 @@ func (r *ReconcileGitTrack) getFiles(gt farosv1alpha1.GitTrackInterface) (map[st
 
 // fetchInstance attempts to fetch the GitTrack resource by the name in the given Request
 func (r *ReconcileGitTrack) fetchInstance(req reconcile.Request) (farosv1alpha1.GitTrackInterface, error) {
-	instance := &farosv1alpha1.GitTrack{}
+	var instance farosv1alpha1.GitTrackInterface
+	if req.Namespace != "" {
+		instance = &farosv1alpha1.GitTrack{}
+	} else {
+		instance = &farosv1alpha1.ClusterGitTrack{}
+	}
 	err := r.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {

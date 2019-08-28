@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
+// ClusterGitTrackListerExpansion allows custom methods to be added to
+// ClusterGitTrackLister.
+type ClusterGitTrackListerExpansion interface{}
+
 // ClusterGitTrackObjectListerExpansion allows custom methods to be added to
 // ClusterGitTrackObjectLister.
 type ClusterGitTrackObjectListerExpansion interface{}

@@ -48,7 +48,7 @@ import (
 
 var c client.Client
 var mgr manager.Manager
-var instance *farosv1alpha1.GitTrack
+var instance farosv1alpha1.GitTrackInterface
 var requests chan reconcile.Request
 var stop chan struct{}
 var r reconcile.Reconciler
@@ -62,8 +62,10 @@ const doesNotExistPath = "does-not-exist"
 const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
 
 var _ = Describe("GitTrack Suite", func() {
-	var createInstance = func(gt *farosv1alpha1.GitTrack, ref string) {
-		gt.Spec.Reference = ref
+	var createInstance = func(gt farosv1alpha1.GitTrackInterface, ref string) {
+		spec := gt.GetSpec()
+		spec.Reference = ref
+		gt.SetSpec(spec)
 		err := c.Create(context.TODO(), gt)
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -123,6 +125,7 @@ var _ = Describe("GitTrack Suite", func() {
 		close(stop)
 		testutils.DeleteAll(cfg, timeout,
 			&farosv1alpha1.GitTrackList{},
+			&farosv1alpha1.ClusterGitTrackList{},
 			&farosv1alpha1.GitTrackObjectList{},
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&v1.EventList{},
@@ -140,10 +143,10 @@ var _ = Describe("GitTrack Suite", func() {
 			It("updates its status", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				two, zero := int64(2), int64(0)
-				Expect(instance.Status.ObjectsDiscovered).To(Equal(two))
-				Expect(instance.Status.ObjectsApplied).To(Equal(two))
-				Expect(instance.Status.ObjectsIgnored).To(Equal(zero))
-				Expect(instance.Status.ObjectsInSync).To(Equal(zero))
+				Expect(instance.GetStatus().ObjectsDiscovered).To(Equal(two))
+				Expect(instance.GetStatus().ObjectsApplied).To(Equal(two))
+				Expect(instance.GetStatus().ObjectsIgnored).To(Equal(zero))
+				Expect(instance.GetStatus().ObjectsInSync).To(Equal(zero))
 
 				deployGto := &farosv1alpha1.GitTrackObject{}
 				Eventually(func() error {
@@ -165,12 +168,12 @@ var _ = Describe("GitTrack Suite", func() {
 				// Wait for reconcile for status
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Status.ObjectsInSync).To(Equal(int64(1)))
+				Expect(instance.GetStatus().ObjectsInSync).To(Equal(int64(1)))
 			})
 
 			It("sets the status conditions", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				conditions := instance.Status.Conditions
+				conditions := instance.GetStatus().Conditions
 				Expect(len(conditions)).To(Equal(4))
 				parseErrorCondition := conditions[0]
 				gitErrorCondition := conditions[1]
@@ -316,7 +319,7 @@ var _ = Describe("GitTrack Suite", func() {
 			It("updates the FilesFetched condition", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
-				c := instance.Status.Conditions[1]
+				c := instance.GetStatus().Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
@@ -341,7 +344,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with an invalid SubPath", func() {
 			BeforeEach(func() {
-				instance.Spec.SubPath = doesNotExistPath
+				spec := instance.GetSpec()
+				spec.SubPath = doesNotExistPath
+				instance.SetSpec(spec)
 				createInstance(instance, "master")
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
@@ -350,7 +355,7 @@ var _ = Describe("GitTrack Suite", func() {
 			It("updates the FilesFetched condition", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
-				c := instance.Status.Conditions[1]
+				c := instance.GetStatus().Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 				Expect(c.Status).To(Equal(v1.ConditionFalse))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
@@ -375,7 +380,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 		Context("with files from an unmanaged namespace", func() {
 			BeforeEach(func() {
-				instance.Spec.SubPath = "foo"
+				spec := instance.GetSpec()
+				spec.SubPath = "foo"
+				instance.SetSpec(spec)
 				createInstance(instance, "4c31dbdd7103dc209c8bb21b75d78b3efafadc31")
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
@@ -385,7 +392,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				// TODO: don't rely on ordering
-				c := instance.Status.Conditions[3]
+				c := instance.GetStatus().Conditions[3]
 				Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
 				Expect(c.Status).To(Equal(v1.ConditionTrue))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
@@ -393,18 +400,18 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
 				Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
 
-				Expect(instance.Status.ObjectsIgnored).To(Equal(int64(2)))
+				Expect(instance.GetStatus().ObjectsIgnored).To(Equal(int64(2)))
 			})
 
 			It("adds a message to the ignoredFiles status", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("foo/deployment-nginx", "namespace `foo` is not managed by this Faros"))
-				Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("foo/service-nginx", "namespace `foo` is not managed by this Faros"))
+				Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("foo/deployment-nginx", "namespace `foo` is not managed by this Faros"))
+				Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("foo/service-nginx", "namespace `foo` is not managed by this Faros"))
 			})
 
 			It("includes the ignored files in ignoredObjects count", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Status.IgnoredFiles).To(HaveLen(int(instance.Status.ObjectsIgnored)))
+				Expect(instance.GetStatus().IgnoredFiles).To(HaveLen(int(instance.GetStatus().ObjectsIgnored)))
 			})
 		})
 
@@ -459,7 +466,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 				// TODO: don't rely on ordering
-				c := instance.Status.Conditions[3]
+				c := instance.GetStatus().Conditions[3]
 				Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
 				Expect(c.Status).To(Equal(v1.ConditionTrue))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
@@ -467,7 +474,7 @@ var _ = Describe("GitTrack Suite", func() {
 				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
 				Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
 
-				Expect(instance.Status.ObjectsIgnored).To(Equal(int64(3)))
+				Expect(instance.GetStatus().ObjectsIgnored).To(Equal(int64(3)))
 			})
 		})
 
@@ -496,7 +503,7 @@ var _ = Describe("GitTrack Suite", func() {
 					},
 				}
 				Expect(c.Create(context.TODO(), ns)).NotTo(HaveOccurred())
-				instance.Namespace = "not-default"
+				instance.SetNamespace("not-default")
 				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 			})
 
@@ -521,13 +528,15 @@ var _ = Describe("GitTrack Suite", func() {
 			It("creates the new resources", func() {
 				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Spec.Reference).To(Equal("28928ccaeb314b96293e18cc8889997f0f46b79b"))
+				Expect(instance.GetSpec().Reference).To(Equal("28928ccaeb314b96293e18cc8889997f0f46b79b"))
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "ingress-example", Namespace: "default"}, before)
 				}, timeout).ShouldNot(Succeed())
 
-				instance.Spec.Reference = "09d24c51c191b4caacd35cda23bd44c86f16edc6"
+				spec := instance.GetSpec()
+				spec.Reference = "09d24c51c191b4caacd35cda23bd44c86f16edc6"
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -550,7 +559,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 				// Check the instance created
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Spec.Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
+				Expect(instance.GetSpec().Reference).To(Equal("4532b487a5aaf651839f5401371556aa16732a6e"))
 
 				// Check the configmap to be deleted was created
 				Eventually(func() error {
@@ -558,7 +567,9 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 
 				// Update the repository
-				instance.Spec.Reference = "28928ccaeb314b96293e18cc8889997f0f46b79b"
+				spec := instance.GetSpec()
+				spec.Reference = "28928ccaeb314b96293e18cc8889997f0f46b79b"
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -578,7 +589,7 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).ShouldNot(Succeed())
 
 				gtos := &farosv1alpha1.GitTrackObjectList{}
-				err := c.List(context.TODO(), gtos, client.InNamespace(instance.Namespace))
+				err := c.List(context.TODO(), gtos, client.InNamespace(instance.GetNamespace()))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(len(gtos.Items)).To(Equal(2))
 			})
@@ -594,13 +605,15 @@ var _ = Describe("GitTrack Suite", func() {
 			It("updates the updated resources", func() {
 				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
+				Expect(instance.GetSpec().Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "deployment-nginx", Namespace: "default"}, before)
 				}, timeout).Should(Succeed())
 
-				instance.Spec.Reference = repeatedReference
+				spec := instance.GetSpec()
+				spec.Reference = repeatedReference
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -624,13 +637,15 @@ var _ = Describe("GitTrack Suite", func() {
 			It("doesn't modify any other resources", func() {
 				before, after := &farosv1alpha1.GitTrackObject{}, &farosv1alpha1.GitTrackObject{}
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
+				Expect(instance.GetSpec().Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
 
 				Eventually(func() error {
 					return c.Get(context.TODO(), types.NamespacedName{Name: "service-nginx", Namespace: "default"}, before)
 				}, timeout).Should(Succeed())
 
-				instance.Spec.Reference = repeatedReference
+				spec := instance.GetSpec()
+				spec.Reference = repeatedReference
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -647,7 +662,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends events about updating resources", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.Reference = repeatedReference
+				spec := instance.GetSpec()
+				spec.Reference = repeatedReference
+				instance.SetSpec(spec)
 				Expect(c.Update(context.TODO(), instance)).ToNot(HaveOccurred())
 				// Wait for reconcile for update
 				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
@@ -683,10 +700,12 @@ var _ = Describe("GitTrack Suite", func() {
 				metrics.TimeToDeploy.Reset()
 
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.Spec.Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
+				Expect(instance.GetSpec().Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
 
 				// Update the reference
-				instance.Spec.Reference = repeatedReference
+				spec := instance.GetSpec()
+				spec.Reference = repeatedReference
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -698,7 +717,7 @@ var _ = Describe("GitTrack Suite", func() {
 					labels := map[string]string{
 						"name":       instance.GetName(),
 						"namespace":  instance.GetNamespace(),
-						"repository": instance.Spec.Repository,
+						"repository": instance.GetSpec().Repository,
 					}
 					histObserver := metrics.TimeToDeploy.With(labels)
 					hist := histObserver.(prometheus.Histogram)
@@ -734,7 +753,9 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
-				instance.Spec.Reference = doesNotExistPath
+				spec := instance.GetSpec()
+				spec.Reference = doesNotExistPath
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -755,7 +776,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("updates the FilesFetched condition", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.Reference = doesNotExistPath
+				spec := instance.GetSpec()
+				spec.Reference = doesNotExistPath
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -767,14 +790,14 @@ var _ = Describe("GitTrack Suite", func() {
 					if err != nil {
 						return err
 					}
-					c := instance.Status.Conditions[1]
+					c := instance.GetStatus().Conditions[1]
 					if c.Status != v1.ConditionFalse {
 						return fmt.Errorf("condition hasn't updated yet")
 					}
 					return nil
 				}, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
-				c := instance.Status.Conditions[1]
+				c := instance.GetStatus().Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
@@ -785,7 +808,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends a CheckoutFailed event", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.Reference = doesNotExistPath
+				spec := instance.GetSpec()
+				spec.Reference = doesNotExistPath
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -834,7 +859,9 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
-				instance.Spec.SubPath = doesNotExistPath
+				spec := instance.GetSpec()
+				spec.SubPath = doesNotExistPath
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -855,7 +882,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("updates the FilesFetched condition", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.SubPath = doesNotExistPath
+				spec := instance.GetSpec()
+				spec.SubPath = doesNotExistPath
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -867,14 +896,14 @@ var _ = Describe("GitTrack Suite", func() {
 					if err != nil {
 						return err
 					}
-					c := instance.Status.Conditions[1]
+					c := instance.GetStatus().Conditions[1]
 					if c.Status != v1.ConditionFalse {
 						return fmt.Errorf("condition hasn't updated yet")
 					}
 					return nil
 				}, timeout).Should(Succeed())
 				// TODO: don't rely on ordering
-				c := instance.Status.Conditions[1]
+				c := instance.GetStatus().Conditions[1]
 				Expect(c.Type).To(Equal(farosv1alpha1.FilesFetchedType))
 				Expect(c.LastUpdateTime).NotTo(BeNil())
 				Expect(c.LastTransitionTime).NotTo(BeNil())
@@ -885,7 +914,9 @@ var _ = Describe("GitTrack Suite", func() {
 
 			It("sends a CheckoutFailed event", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				instance.Spec.SubPath = doesNotExistPath
+				spec := instance.GetSpec()
+				spec.SubPath = doesNotExistPath
+				instance.SetSpec(spec)
 				err := c.Update(context.TODO(), instance)
 				Expect(err).ToNot(HaveOccurred())
 				// Wait for reconcile for update
@@ -926,7 +957,6 @@ var _ = Describe("GitTrack Suite", func() {
 	Context("When a GitTrack has a DeployKey, the Reconciler should", func() {
 		var reconciler *ReconcileGitTrack
 		var s *v1.Secret
-		var keyRef farosv1alpha1.GitTrackDeployKey
 		var expectedKey []byte
 
 		keysMustBeSetErr := errors.New("if using a deploy key, both SecretName and Key must be set")
@@ -937,10 +967,13 @@ var _ = Describe("GitTrack Suite", func() {
 			reconciler, ok = r.(*ReconcileGitTrack)
 			Expect(ok).To(BeTrue())
 
-			keyRef = farosv1alpha1.GitTrackDeployKey{
+			keyRef := farosv1alpha1.GitTrackDeployKey{
 				SecretName: "foosecret",
 				Key:        "privatekey",
 			}
+			spec := instance.GetSpec()
+			spec.DeployKey = keyRef
+			instance.SetSpec(spec)
 
 			expectedKey = []byte("PrivateKey")
 			s = &v1.Secret{
@@ -960,34 +993,43 @@ var _ = Describe("GitTrack Suite", func() {
 		})
 
 		It("do nothing if the secret name and key are empty", func() {
-			key, err := reconciler.fetchGitCredentials("default", farosv1alpha1.GitTrackDeployKey{})
+			key, err := reconciler.fetchGitCredentials(&farosv1alpha1.GitTrack{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(key).To(BeNil())
 		})
 
 		It("get the key from the secret", func() {
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(key.secret).To(Equal(expectedKey))
 		})
 
 		It("return an error if the secret doesn't exist", func() {
-			keyRef.SecretName = "nonExistSecret"
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			spec := instance.GetSpec()
+			spec.DeployKey.SecretName = "nonExistSecret"
+			instance.SetSpec(spec)
+
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).To(Equal(secretNotFoundErr))
 			Expect(key).To(BeNil())
 		})
 
 		It("return an error if the secret name isnt set, but the key is", func() {
-			keyRef.SecretName = ""
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			spec := instance.GetSpec()
+			spec.DeployKey.SecretName = ""
+			instance.SetSpec(spec)
+
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).To(Equal(keysMustBeSetErr))
 			Expect(key).To(BeNil())
 		})
 
 		It("return an error if the key isnt set, but the secret name is", func() {
-			keyRef.Key = ""
-			key, err := reconciler.fetchGitCredentials("default", keyRef)
+			spec := instance.GetSpec()
+			spec.DeployKey.Key = ""
+			instance.SetSpec(spec)
+
+			key, err := reconciler.fetchGitCredentials(instance)
 			Expect(err).To(Equal(keysMustBeSetErr))
 			Expect(key).To(BeNil())
 		})
@@ -1019,12 +1061,12 @@ var _ = Describe("GitTrack Suite", func() {
 
 		It("adds a message to the ignoredFiles status", func() {
 			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("invalid_file.yaml", "unable to parse 'invalid_file.yaml': unable to unmarshal JSON: Object 'Kind' is missing in '{\"I\":\"a;m an \\\"invalid Kubernetes manifest.)\"}'\n"))
+			Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("invalid_file.yaml", "unable to parse 'invalid_file.yaml': unable to unmarshal JSON: Object 'Kind' is missing in '{\"I\":\"a;m an \\\"invalid Kubernetes manifest.)\"}'\n"))
 		})
 
 		It("includes the invalid file in ignoredObjects count", func() {
 			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.Status.IgnoredFiles).To(HaveLen(int(instance.Status.ObjectsIgnored)))
+			Expect(instance.GetStatus().IgnoredFiles).To(HaveLen(int(instance.GetStatus().ObjectsIgnored)))
 		})
 	})
 
@@ -1049,7 +1091,7 @@ var _ = Describe("GitTrack Suite", func() {
 			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
 
 			// TODO: don't rely on ordering
-			c := instance.Status.Conditions[3]
+			c := instance.GetStatus().Conditions[3]
 			Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
 			Expect(c.Status).To(Equal(v1.ConditionTrue))
 			Expect(c.LastUpdateTime).NotTo(BeNil())
@@ -1057,17 +1099,17 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
 			Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
 
-			Expect(instance.Status.ObjectsIgnored).To(Equal(int64(1)))
+			Expect(instance.GetStatus().ObjectsIgnored).To(Equal(int64(1)))
 		})
 
 		It("adds a message to the ignoredFiles status", func() {
 			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.Status.IgnoredFiles).To(HaveKeyWithValue("default/deployment-nginx", "resource `deployments.apps/v1` ignored globally by flag"))
+			Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("default/deployment-nginx", "resource `deployments.apps/v1` ignored globally by flag"))
 		})
 
 		It("includes the ignored files in ignoredObjects count", func() {
 			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.Status.IgnoredFiles).To(HaveLen(int(instance.Status.ObjectsIgnored)))
+			Expect(instance.GetStatus().IgnoredFiles).To(HaveLen(int(instance.GetStatus().ObjectsIgnored)))
 		})
 	})
 

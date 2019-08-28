@@ -18,6 +18,8 @@ limitations under the License.
 
 package v1alpha1
 
+type ClusterGitTrackExpansion interface{}
+
 type ClusterGitTrackObjectExpansion interface{}
 
 type GitTrackExpansion interface{}
