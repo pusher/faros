@@ -346,8 +346,8 @@ func (r *ReconcileGitTrack) listObjectsByName(owner farosv1alpha1.GitTrackInterf
 	return result, nil
 }
 
-// result represents the result of creating or updating a GitTrackObject
-type result struct {
+// objectResult represents the result of creating or updating a GitTrackObject
+type objectResult struct {
 	NamespacedName string
 	Error          error
 	Ignored        bool
@@ -357,18 +357,18 @@ type result struct {
 }
 
 // errorResult is a convenience function for creating an error result
-func errorResult(namespacedName string, err error) result {
-	return result{NamespacedName: namespacedName, Error: err, Ignored: true}
+func errorResult(namespacedName string, err error) objectResult {
+	return objectResult{NamespacedName: namespacedName, Error: err, Ignored: true}
 }
 
-// ignoreResult is a convenience function for creating an ignore result
-func ignoreResult(namespacedName string, reason string) result {
-	return result{NamespacedName: namespacedName, Ignored: true, Reason: reason}
+// ignoreResult is a convenience function for creating an ignore objectResult
+func ignoreResult(namespacedName string, reason string) objectResult {
+	return objectResult{NamespacedName: namespacedName, Ignored: true, Reason: reason}
 }
 
-// successResult is a convenience function for creating a success result
-func successResult(namespacedName string, timeToDeploy time.Duration, inSync bool) result {
-	return result{NamespacedName: namespacedName, TimeToDeploy: timeToDeploy, InSync: inSync}
+// successResult is a convenience function for creating a success objectResult
+func successResult(namespacedName string, timeToDeploy time.Duration, inSync bool) objectResult {
+	return objectResult{NamespacedName: namespacedName, TimeToDeploy: timeToDeploy, InSync: inSync}
 }
 
 func (r *ReconcileGitTrack) newGitTrackObjectInterface(name string, u *unstructured.Unstructured) (farosv1alpha1.GitTrackObjectInterface, error) {
@@ -408,7 +408,7 @@ func objectName(u *unstructured.Unstructured) string {
 }
 
 // handleObject either creates or updates a GitTrackObject
-func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner farosv1alpha1.GitTrackInterface) result {
+func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner farosv1alpha1.GitTrackInterface) objectResult {
 	name := objectName(u)
 	gto, err := r.newGitTrackObjectInterface(name, u)
 	if err != nil {
@@ -468,7 +468,7 @@ func childInSync(child farosv1alpha1.GitTrackObjectInterface) bool {
 	return false
 }
 
-func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration, owner farosv1alpha1.GitTrackInterface, foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) result {
+func (r *ReconcileGitTrack) createChild(name string, timeToDeploy time.Duration, owner farosv1alpha1.GitTrackInterface, foundGTO, childGTO farosv1alpha1.GitTrackObjectInterface) objectResult {
 	r.recorder.Eventf(owner, apiv1.EventTypeNormal, "CreateStarted", "Creating child '%s'", name)
 	if err := r.applier.Apply(context.TODO(), &farosclient.ApplyOptions{}, childGTO); err != nil {
 		r.recorder.Eventf(owner, apiv1.EventTypeWarning, "CreateFailed", "Failed to create child '%s'", name)
@@ -643,7 +643,7 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		return reconcile.Result{}, err
 	}
 	// Process the objects and feed back the results
-	resultsChan := make(chan result, len(objects))
+	resultsChan := make(chan objectResult, len(objects))
 	for _, obj := range objects {
 		go func(obj *unstructured.Unstructured) {
 			resultsChan <- reconciler.handleObject(obj, instance)
