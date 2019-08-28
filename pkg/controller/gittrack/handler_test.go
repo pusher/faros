@@ -47,6 +47,17 @@ var _ = Describe("Handler Suite", func() {
 		gt.SetSpec(spec)
 	}
 
+	var setGitTrackReferenceFunc = func(repo, reference string) func(testutils.Object) testutils.Object {
+		return func (obj testutils.Object) testutils.Object {
+			gt, ok := obj.(farosv1alpha1.GitTrackInterface)
+			if !ok {
+				panic("expected GitTrackInterface")
+			}
+			setGitTrackReference(gt, repo, reference)
+			return gt
+		}
+	}
+
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
@@ -88,28 +99,26 @@ var _ = Describe("Handler Suite", func() {
 
 	Context("handleGitTrack", func() {
 		var gt farosv1alpha1.GitTrackInterface
+		var gto farosv1alpha1.GitTrackObjectInterface
 		var result handlerResult
 
+		var AssertChild = func() {
+			It("creates a GitTrackObject the child", func() {
+				m.Get(gto, timeout).Should(Succeed())
+			})
+
+			It("adds an ownerreference to the child", func() {
+				m.Eventually(gto, timeout).
+					Should(testutils.WithOwnerReferences(ContainElement(testutils.GetGitTrackInterfaceOwnerRef(gt))))
+			})
+
+			It("should add a last applied annotation to the child", func() {
+				m.Eventually(gto, timeout).
+					Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
+			})
+		}
+
 		var AssertValidChildren = func() {
-			var gto farosv1alpha1.GitTrackObjectInterface
-
-			var AssertChild = func() {
-				It("creates a GitTrackObject the child", func() {
-					m.Get(gto, timeout).Should(Succeed())
-				})
-
-				It("adds an ownerreference to the child", func() {
-					m.Eventually(gto, timeout).
-						Should(testutils.WithOwnerReferences(ContainElement(testutils.GetGitTrackInterfaceOwnerRef(gt))))
-				})
-
-				It("should add a last applied annotation to the child", func() {
-					m.Eventually(gto, timeout).
-						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
-				})
-			}
-
-
 			Context("for the deployment file", func() {
 				BeforeEach(func() {
 					gto = testutils.ExampleGitTrackObject.DeepCopy()
@@ -123,6 +132,33 @@ var _ = Describe("Handler Suite", func() {
 				BeforeEach(func() {
 					gto = testutils.ExampleGitTrackObject.DeepCopy()
 					gto.SetName("service-nginx")
+				})
+
+				AssertChild()
+			})
+
+			It("should return no errors", func() {
+				Expect(result.parseError).ToNot(HaveOccurred())
+				Expect(result.gitError).ToNot(HaveOccurred())
+				Expect(result.gcError).ToNot(HaveOccurred())
+				Expect(result.upToDateError).ToNot(HaveOccurred())
+			})
+		}
+
+		var AssertMultiDocument = func() {
+			Context("for the daemonset in the file", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("daemonset-fluentd")
+				})
+
+				AssertChild()
+			})
+
+			Context("for the configmap in the file", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("configmap-fluentd-config")
 				})
 
 				AssertChild()
@@ -158,6 +194,14 @@ var _ = Describe("Handler Suite", func() {
 			Context("with valid children", func() {
 				AssertValidChildren()
 			})
+
+			Context("with a multi-document YAML", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "9bf412f0e893c8c1624bb1c523cfeca8243534bc"), timeout).Should(Succeed())
+				})
+
+				AssertMultiDocument()
+			})
 		})
 
 		Context("with a ClusterGitTrack", func() {
@@ -181,6 +225,14 @@ var _ = Describe("Handler Suite", func() {
 
 			Context("with valid children", func() {
 				AssertValidChildren()
+			})
+
+			Context("with a multi-document YAML", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "9bf412f0e893c8c1624bb1c523cfeca8243534bc"), timeout).Should(Succeed())
+				})
+
+				AssertMultiDocument()
 			})
 		})
 	})
