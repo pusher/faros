@@ -59,6 +59,23 @@ var _ = Describe("Handler Suite", func() {
 		}
 	}
 
+	var setGitTrackSubPath = func(gt farosv1alpha1.GitTrackInterface, subPath string) {
+		spec := gt.GetSpec()
+		spec.SubPath = subPath
+		gt.SetSpec(spec)
+	}
+
+	var setGitTrackSubPathFunc = func(subPath string) func(testutils.Object) testutils.Object {
+		return func (obj testutils.Object) testutils.Object {
+			gt, ok := obj.(farosv1alpha1.GitTrackInterface)
+			if !ok {
+				panic("expected GitTrackInterface")
+			}
+			setGitTrackSubPath(gt, subPath)
+			return gt
+		}
+	}
+
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
@@ -206,7 +223,30 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertInvalidSubPath = func(kind string) {
+			It("set a gitError", func() {
+				Expect(result.gitError).To(HaveOccurred())
+				Expect(result.gitError.Error()).To(Equal("no files for subpath 'does-not-exist'"))
+			})
+
+			It("sets a gitReason", func() {
+				Expect(result.gitReason).To(Equal(gittrackutils.ErrorFetchingFiles))
+			})
+
+			It("sends a CheckoutFailed event", func() {
+				events := &corev1.EventList{}
+				m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(SatisfyAll(
+					 testutils.WithField("Reason", Equal("CheckoutFailed")),
+					 testutils.WithField("Type", Equal(corev1.EventTypeWarning)),
+					 testutils.WithField("InvolvedObject.Kind", Equal(kind)),
+					 testutils.WithField("InvolvedObject.Name", Equal("example")),
+					))))
+			})
+		}
+
 		Context("with a GitTrack", func() {
+			kind := "GitTrack"
+
 			BeforeEach(func() {
 				gt = testutils.ExampleGitTrack.DeepCopy()
 				setGitTrackReference(gt, repositoryURL, "a14443638218c782b84cae56a14f1090ee9e5c9c")
@@ -250,11 +290,21 @@ var _ = Describe("Handler Suite", func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "does-not-exist"), timeout).Should(Succeed())
 				})
 
-				AssertInvalidReference("GitTrack")
+				AssertInvalidReference(kind)
+			})
+
+			Context("with an invalid SubPath", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackSubPathFunc("does-not-exist"), timeout).Should(Succeed())
+				})
+
+				AssertInvalidSubPath(kind)
 			})
 		})
 
 		Context("with a ClusterGitTrack", func() {
+			kind := "ClusterGitTrack"
+
 			BeforeEach(func() {
 				gt = testutils.ExampleClusterGitTrack.DeepCopy()
 				setGitTrackReference(gt, repositoryURL, "a14443638218c782b84cae56a14f1090ee9e5c9c")
@@ -298,7 +348,15 @@ var _ = Describe("Handler Suite", func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "does-not-exist"), timeout).Should(Succeed())
 				})
 
-				AssertInvalidReference(gt.GroupVersionKind().Kind)
+				AssertInvalidReference(kind)
+			})
+
+			Context("with an invalid SubPath", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackSubPathFunc("does-not-exist"), timeout).Should(Succeed())
+				})
+
+				AssertInvalidSubPath(kind)
 			})
 		})
 	})
