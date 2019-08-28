@@ -18,6 +18,8 @@ package utils
 
 import (
 	"context"
+	"reflect"
+	"strings"
 
 	"github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
@@ -335,5 +337,20 @@ func WithContainers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 func WithImage(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(c corev1.Container) string {
 		return c.Image
+	}, matcher)
+}
+
+// WithField gets the value of the named field from the object
+func WithField(field string, matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	// Addressing Field by <struct>.<field> can be recursed
+	fields := strings.SplitN(field, ".", 2)
+	if len(fields) == 2 {
+		matcher = WithField(fields[1], matcher)
+	}
+
+	return gomega.WithTransform(func(obj interface{}) interface{} {
+		r := reflect.ValueOf(obj)
+		f := reflect.Indirect(r).FieldByName(fields[0])
+		return f.Interface()
 	}, matcher)
 }

@@ -24,6 +24,7 @@ import (
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
+	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	testutils "github.com/pusher/faros/test/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/flowcontrol"
@@ -184,6 +185,27 @@ var _ = Describe("Handler Suite", func() {
 			AssertNoErrors()
 		}
 
+		var AssertInvalidReference = func(kind string) {
+			It("set a gitError", func() {
+				Expect(result.gitError).To(HaveOccurred())
+				Expect(result.gitError.Error()).To(Equal("failed to checkout 'does-not-exist': unable to parse ref does-not-exist: reference not found"))
+			})
+
+			It("sets a gitReason", func() {
+				Expect(result.gitReason).To(Equal(gittrackutils.ErrorFetchingFiles))
+			})
+
+			It("sends a CheckoutFailed event", func() {
+				events := &corev1.EventList{}
+				m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(SatisfyAll(
+						testutils.WithField("Reason", Equal("CheckoutFailed")),
+						testutils.WithField("Type", Equal(corev1.EventTypeWarning)),
+						testutils.WithField("InvolvedObject.Kind", Equal(kind)),
+						testutils.WithField("InvolvedObject.Name", Equal("example")),
+					))))
+			})
+		}
+
 		Context("with a GitTrack", func() {
 			BeforeEach(func() {
 				gt = testutils.ExampleGitTrack.DeepCopy()
@@ -221,6 +243,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertClusterScopedResource()
+			})
+
+			Context("with an invalid reference", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "does-not-exist"), timeout).Should(Succeed())
+				})
+
+				AssertInvalidReference("GitTrack")
 			})
 		})
 
@@ -261,6 +291,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertClusterScopedResource()
+			})
+
+			Context("with an invalid reference", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "does-not-exist"), timeout).Should(Succeed())
+				})
+
+				AssertInvalidReference(gt.GroupVersionKind().Kind)
 			})
 		})
 	})
