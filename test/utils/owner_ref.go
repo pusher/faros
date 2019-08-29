@@ -21,6 +21,29 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// GetGitTrackInterfaceOwnerRef constructs an owner reference for the given GT
+func GetGitTrackInterfaceOwnerRef(gt farosv1alpha1.GitTrackInterface) metav1.OwnerReference {
+	var kind string
+	switch gt.(type) {
+	case *farosv1alpha1.GitTrack:
+		kind = "GitTrack"
+	case *farosv1alpha1.ClusterGitTrack:
+		kind = "ClusterGitTrack"
+	default:
+		panic("This code should not be reachable")
+	}
+
+	t := true
+	return metav1.OwnerReference{
+		APIVersion:         "faros.pusher.com/v1alpha1",
+		Kind:               kind,
+		Name:               gt.GetName(),
+		UID:                gt.GetUID(),
+		Controller:         &t,
+		BlockOwnerDeletion: &t,
+	}
+}
+
 // GetGitTrackObjectOwnerRef constructs an owner reference for the given GTO
 func GetGitTrackObjectOwnerRef(gto *farosv1alpha1.GitTrackObject) metav1.OwnerReference {
 	t := true

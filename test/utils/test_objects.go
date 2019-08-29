@@ -55,10 +55,35 @@ func SetGitTrackObjectInterfaceSpec(gto farosv1alpha1.GitTrackObjectInterface, o
 	return nil
 }
 
+// ExampleGitTrack is an example GitTrack object for use within test suites
+var ExampleGitTrack = &farosv1alpha1.GitTrack{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: "faros.pusher.com/v1alpha1",
+		Kind:       "GitTrack",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "example",
+		Namespace: "default",
+	},
+	Spec: farosv1alpha1.GitTrackSpec{},
+}
+
+// ExampleClusterGitTrack is an example ClusterGitTrack object for use within test suites
+var ExampleClusterGitTrack = &farosv1alpha1.ClusterGitTrack{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: "faros.pusher.com/v1alpha1",
+		Kind:       "ClusterGitTrack",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "example",
+	},
+	Spec: farosv1alpha1.GitTrackSpec{},
+}
+
 // ExampleGitTrackObject is an example GitTrackObject object for use within test suites
 var ExampleGitTrackObject = &farosv1alpha1.GitTrackObject{
 	TypeMeta: metav1.TypeMeta{
-		APIVersion: "faros.pusher.com/v1",
+		APIVersion: "faros.pusher.com/v1alpha1",
 		Kind:       "GitTrackObject",
 	},
 	ObjectMeta: metav1.ObjectMeta{
@@ -94,7 +119,7 @@ var ExampleGitTrackObject = &farosv1alpha1.GitTrackObject{
 // ExampleClusterGitTrackObject is an example ClusterGitTrackObject object for use within test suites
 var ExampleClusterGitTrackObject = &farosv1alpha1.ClusterGitTrackObject{
 	TypeMeta: metav1.TypeMeta{
-		APIVersion: "faros.pusher.com/v1",
+		APIVersion: "faros.pusher.com/v1alpha1",
 		Kind:       "ClusterGitTrackObject",
 	},
 	ObjectMeta: metav1.ObjectMeta{

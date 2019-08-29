@@ -18,6 +18,8 @@ package utils
 
 import (
 	"context"
+	"reflect"
+	"strings"
 
 	"github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
@@ -48,6 +50,10 @@ type Object interface {
 	metav1.Object
 }
 
+// UpdateFunc modifies the object fetched from the API server before sending
+// the update
+type UpdateFunc func(Object) Object
+
 // Apply creates or updates the object on the API server
 func (m *Matcher) Apply(obj Object, opts *farosclient.ApplyOptions, extras ...interface{}) gomega.GomegaAssertion {
 	err := m.FarosClient.Apply(context.TODO(), opts, obj)
@@ -70,6 +76,23 @@ func (m *Matcher) Delete(obj Object, extras ...interface{}) gomega.GomegaAsserti
 func (m *Matcher) Update(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
 	update := func() error {
 		return m.Client.Update(context.TODO(), obj)
+	}
+	return gomega.Eventually(update, intervals...)
+}
+
+// UpdateWithFunc udpates the object on the API server by fetching the object
+// and applying a mutating UpdateFunc before sending the update
+func (m *Matcher) UpdateWithFunc(obj Object, fn UpdateFunc, intervals ...interface{}) gomega.GomegaAsyncAssertion {
+	key := types.NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}
+	update := func() error {
+		err := m.Client.Get(context.TODO(), key, obj)
+		if err != nil {
+			return err
+		}
+		return m.Client.Update(context.TODO(), fn(obj))
 	}
 	return gomega.Eventually(update, intervals...)
 }
@@ -314,5 +337,20 @@ func WithContainers(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 func WithImage(matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
 	return gomega.WithTransform(func(c corev1.Container) string {
 		return c.Image
+	}, matcher)
+}
+
+// WithField gets the value of the named field from the object
+func WithField(field string, matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher {
+	// Addressing Field by <struct>.<field> can be recursed
+	fields := strings.SplitN(field, ".", 2)
+	if len(fields) == 2 {
+		matcher = WithField(fields[1], matcher)
+	}
+
+	return gomega.WithTransform(func(obj interface{}) interface{} {
+		r := reflect.ValueOf(obj)
+		f := reflect.Indirect(r).FieldByName(fields[0])
+		return f.Interface()
 	}, matcher)
 }
