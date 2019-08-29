@@ -27,6 +27,7 @@ import (
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -280,6 +281,63 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertChildOwnedByOtherController = func(r *handlerResult) {
+			var AssertIgnored = func(kind string) {
+				var otherGt farosv1alpha1.GitTrackInterface
+				var otherGto farosv1alpha1.GitTrackObjectInterface
+
+				BeforeEach(func() {
+					switch kind {
+					case "GitTrack":
+						otherGt = testutils.ExampleGitTrack.DeepCopy()
+					case "ClusterGitTrack":
+						otherGt = testutils.ExampleClusterGitTrack.DeepCopy()
+					default:
+						panic("this should not be reachable")
+					}
+					otherGt.SetName("othergittrack")
+					m.Create(otherGt).Should(Succeed())
+					m.Get(otherGt).Should(Succeed())
+
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("deployment-nginx")
+					otherGto = testutils.ExampleGitTrackObject.DeepCopy()
+					otherGto.SetName("deployment-nginx")
+					truth := true
+					otherGto.SetOwnerReferences([]metav1.OwnerReference{
+						{
+							APIVersion:         "faros.pusher.com/v1alpha1",
+							Kind:               kind,
+							Name:               otherGt.GetName(),
+							UID:                otherGt.GetUID(),
+							Controller:         &truth,
+							BlockOwnerDeletion: &truth,
+						},
+					})
+					m.Create(otherGto).Should(Succeed())
+					m.Get(otherGto).Should(Succeed())
+				})
+
+				It("should not overwrite the existing child", func() {
+					m.Consistently(gto, consistentlyTimeout).Should(Equal(otherGto))
+				})
+
+				It("should ignore the child", func() {
+					key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
+					value := fmt.Sprintf("child is already owned by a %s: %s", kind, otherGt.GetName())
+					Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
+				})
+			}
+
+			Context("is owned by a GitTrack", func() {
+				AssertIgnored("GitTrack")
+			})
+
+			Context("is owned by a ClusterGitTrack", func() {
+				AssertIgnored("ClusterGitTrack")
+			})
+		}
+
 		Context("with a GitTrack", func() {
 			kind := "GitTrack"
 
@@ -335,6 +393,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertInvalidSubPath(kind)
+			})
+
+			PContext("when a child is owner by another controller", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "4c31dbdd7103dc209c8bb21b75d78b3efafadc31"), timeout).Should(Succeed())
+				})
+
+				AssertChildOwnedByOtherController(&result)
 			})
 
 			Context("with files from another namespace", func() {
@@ -422,6 +488,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertInvalidSubPath(kind)
+			})
+
+			PContext("when a child is owner by another controller", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "4c31dbdd7103dc209c8bb21b75d78b3efafadc31"), timeout).Should(Succeed())
+				})
+
+				AssertChildOwnedByOtherController(&result)
 			})
 		})
 	})
