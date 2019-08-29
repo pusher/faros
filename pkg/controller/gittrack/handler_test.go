@@ -17,14 +17,15 @@ limitations under the License.
 package gittrack
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
+	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
-	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	testutils "github.com/pusher/faros/test/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/flowcontrol"
@@ -49,7 +50,7 @@ var _ = Describe("Handler Suite", func() {
 	}
 
 	var setGitTrackReferenceFunc = func(repo, reference string) func(testutils.Object) testutils.Object {
-		return func (obj testutils.Object) testutils.Object {
+		return func(obj testutils.Object) testutils.Object {
 			gt, ok := obj.(farosv1alpha1.GitTrackInterface)
 			if !ok {
 				panic("expected GitTrackInterface")
@@ -66,7 +67,7 @@ var _ = Describe("Handler Suite", func() {
 	}
 
 	var setGitTrackSubPathFunc = func(subPath string) func(testutils.Object) testutils.Object {
-		return func (obj testutils.Object) testutils.Object {
+		return func(obj testutils.Object) testutils.Object {
 			gt, ok := obj.(farosv1alpha1.GitTrackInterface)
 			if !ok {
 				panic("expected GitTrackInterface")
@@ -129,6 +130,20 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertAppliedDiscoveredIgnored = func(r *handlerResult, applied, discovered, ignored int64) {
+			It(fmt.Sprintf("sets the applied children count to %d", applied), func() {
+				Expect(r.applied).To(Equal(applied))
+			})
+
+			It(fmt.Sprintf("sets the discovered children count to %d", discovered), func() {
+				Expect(r.discovered).To(Equal(discovered))
+			})
+
+			It(fmt.Sprintf("sets the ignored children count to %d", ignored), func() {
+				Expect(r.ignored).To(Equal(ignored))
+			})
+		}
+
 		var AssertChild = func() {
 			It("creates a GitTrackObject the child", func() {
 				m.Get(gto, timeout).Should(Succeed())
@@ -145,7 +160,19 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
-		var AssertValidChildren = func() {
+		var AssertSendsEvent = func(reason, kind, name, eventType string) {
+			It(fmt.Sprintf("sends a %s event", reason), func() {
+				events := &corev1.EventList{}
+				m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(SatisfyAll(
+					testutils.WithField("Reason", Equal(reason)),
+					testutils.WithField("Type", Equal(eventType)),
+					testutils.WithField("InvolvedObject.Kind", Equal(kind)),
+					testutils.WithField("InvolvedObject.Name", Equal(name)),
+				))))
+			})
+		}
+
+		var AssertValidChildren = func(result *handlerResult, kind string) {
 			Context("for the deployment file", func() {
 				BeforeEach(func() {
 					gto = testutils.ExampleGitTrackObject.DeepCopy()
@@ -165,6 +192,17 @@ var _ = Describe("Handler Suite", func() {
 			})
 
 			AssertNoErrors()
+			AssertAppliedDiscoveredIgnored(result, 2, 2, 0)
+
+			Context("sends events when checking out the repository", func() {
+				AssertSendsEvent("CheckoutStarted", kind, "example", corev1.EventTypeNormal)
+				AssertSendsEvent("CheckoutSuccessful", kind, "example", corev1.EventTypeNormal)
+			})
+
+			Context("sends events when creating the child objects", func() {
+				AssertSendsEvent("CreateStarted", kind, "example", corev1.EventTypeNormal)
+				AssertSendsEvent("CreateSuccessful", kind, "example", corev1.EventTypeNormal)
+			})
 		}
 
 		var AssertMultiDocument = func() {
@@ -212,14 +250,8 @@ var _ = Describe("Handler Suite", func() {
 				Expect(result.gitReason).To(Equal(gittrackutils.ErrorFetchingFiles))
 			})
 
-			It("sends a CheckoutFailed event", func() {
-				events := &corev1.EventList{}
-				m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(SatisfyAll(
-						testutils.WithField("Reason", Equal("CheckoutFailed")),
-						testutils.WithField("Type", Equal(corev1.EventTypeWarning)),
-						testutils.WithField("InvolvedObject.Kind", Equal(kind)),
-						testutils.WithField("InvolvedObject.Name", Equal("example")),
-					))))
+			Context("sends events when checking out the repository", func() {
+				AssertSendsEvent("CheckoutFailed", kind, "example", corev1.EventTypeWarning)
 			})
 		}
 
@@ -233,14 +265,8 @@ var _ = Describe("Handler Suite", func() {
 				Expect(result.gitReason).To(Equal(gittrackutils.ErrorFetchingFiles))
 			})
 
-			It("sends a CheckoutFailed event", func() {
-				events := &corev1.EventList{}
-				m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(SatisfyAll(
-					 testutils.WithField("Reason", Equal("CheckoutFailed")),
-					 testutils.WithField("Type", Equal(corev1.EventTypeWarning)),
-					 testutils.WithField("InvolvedObject.Kind", Equal(kind)),
-					 testutils.WithField("InvolvedObject.Name", Equal("example")),
-					))))
+			Context("sends events when checking out the repository", func() {
+				AssertSendsEvent("CheckoutFailed", kind, "example", corev1.EventTypeWarning)
 			})
 		}
 
@@ -266,7 +292,7 @@ var _ = Describe("Handler Suite", func() {
 			})
 
 			Context("with valid children", func() {
-				AssertValidChildren()
+				AssertValidChildren(&result, kind)
 			})
 
 			Context("with a multi-document YAML", func() {
@@ -324,7 +350,7 @@ var _ = Describe("Handler Suite", func() {
 			})
 
 			Context("with valid children", func() {
-				AssertValidChildren()
+				AssertValidChildren(&result, kind)
 			})
 
 			Context("with a multi-document YAML", func() {
