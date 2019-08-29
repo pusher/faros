@@ -338,6 +338,17 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertChildNameWithColon = func() {
+			BeforeEach(func() {
+					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+					gto.SetName("clusterrole-test-read-ns-pods-svcs")
+			})
+
+			It("replaces `:` with `-` in the name", func() {
+				m.Get(gto, timeout).Should(Succeed())
+			})
+		}
+
 		Context("with a GitTrack", func() {
 			kind := "GitTrack"
 
@@ -401,6 +412,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertChildOwnedByOtherController(&result)
+			})
+
+			Context("when a child name contains colons", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "241786090da55894dca4e91e3f5023c024d3d9a8"), timeout).Should(Succeed())
+				})
+
+				AssertChildNameWithColon()
 			})
 
 			Context("with files from another namespace", func() {
@@ -496,6 +515,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertChildOwnedByOtherController(&result)
+			})
+
+			Context("when a child name contains colons", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "241786090da55894dca4e91e3f5023c024d3d9a8"), timeout).Should(Succeed())
+				})
+
+				AssertChildNameWithColon()
 			})
 		})
 	})
