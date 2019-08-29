@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
-	farosflags "github.com/pusher/faros/pkg/flags"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -83,7 +82,6 @@ var _ = Describe("Handler Suite", func() {
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
-			Namespace:          farosflags.Namespace,
 			MetricsBindAddress: "0", // Disable serving metrics while testing
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -157,6 +155,18 @@ var _ = Describe("Handler Suite", func() {
 			It("should add a last applied annotation to the child", func() {
 				m.Eventually(gto, timeout).
 					Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
+			})
+		}
+
+		var AssertIgnoresWrongNamespaceChild = func(r *handlerResult) {
+			It("does not create a GitTrackObject for the child", func() {
+				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
+			})
+
+			PIt("ignores the child resource", func() {
+				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
+				value := fmt.Sprintf("namespace `%s` is not managed by this GitTrack", gto.GetNamespace())
+				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
 			})
 		}
 
@@ -325,6 +335,35 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertInvalidSubPath(kind)
+			})
+
+			Context("with files from another namespace", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackSubPathFunc("foo"), timeout).Should(Succeed())
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "4c31dbdd7103dc209c8bb21b75d78b3efafadc31"), timeout).Should(Succeed())
+				})
+
+				Context("for the deployment file", func() {
+					BeforeEach(func() {
+						gto = testutils.ExampleGitTrackObject.DeepCopy()
+						gto.SetName("deployment-nginx")
+						gto.SetNamespace("foo")
+					})
+
+					AssertIgnoresWrongNamespaceChild(&result)
+				})
+
+				Context("for the service file", func() {
+					BeforeEach(func() {
+						gto = testutils.ExampleGitTrackObject.DeepCopy()
+						gto.SetName("service-nginx")
+						gto.SetNamespace("foo")
+					})
+
+					AssertIgnoresWrongNamespaceChild(&result)
+				})
+
+				AssertAppliedDiscoveredIgnored(&result, 1, 3, 2)
 			})
 		})
 
