@@ -47,6 +47,34 @@ type handlerResult struct {
 	timeToDeploy   []time.Duration
 }
 
+// asStatusOpts converts the handlerResult into a statusOpts to be passed to updateStatus
+func (h handlerResult) asStatusOpts() *statusOpts {
+	return &statusOpts{
+		applied:        h.applied,
+		discovered:     h.discovered,
+		ignored:        h.ignored,
+		inSync:         h.inSync,
+		parseError:     h.parseError,
+		parseReason:    h.parseReason,
+		gitError:       h.gitError,
+		gitReason:      h.gitReason,
+		gcError:        h.gcError,
+		gcReason:       h.gcReason,
+		upToDateError:  h.upToDateError,
+		upToDateReason: h.upToDateReason,
+		ignoredFiles:   h.ignoredFiles,
+	}
+}
+
+// asMetricOpts converts handlerResult to a metricsOpts to be passed to updateMetrics
+func (h handlerResult) asMetricOpts(repository string) *metricsOpts {
+	return &metricsOpts{
+		status:       h.asStatusOpts(),
+		timeToDeploy: h.timeToDeploy,
+		repository:   repository,
+	}
+}
+
 func (r *ReconcileGitTrack) handleGitTrack(gt farosv1alpha1.GitTrackInterface) handlerResult {
 	var result handlerResult
 

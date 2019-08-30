@@ -25,7 +25,6 @@ import (
 
 	"github.com/go-logr/logr"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
-	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	utils "github.com/pusher/faros/pkg/utils"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
@@ -579,114 +578,33 @@ func (r *ReconcileGitTrack) Reconcile(request reconcile.Request) (reconcile.Resu
 		"namespace", instance.GetNamespace(),
 		"name", instance.GetName(),
 	)
+
 	reconciler.log.V(1).Info("Reconcile started")
+	defer reconciler.log.V(1).Info("Reconcile finished")
 
-	sOpts := newStatusOpts()
-	mOpts := newMetricOpts(sOpts)
-
-	// Update the GitTrack status when we leave this function
-	defer func() {
-		err := reconciler.updateStatus(instance, sOpts)
-		mErr := reconciler.updateMetrics(instance, mOpts)
-
-		reconciler.log.V(1).Info("Reconcile finished")
-		// Print out any errors that may have occurred
-		for _, e := range []error{
-			err,
-			mErr,
-			sOpts.gitError,
-			sOpts.parseError,
-			sOpts.gcError,
-			sOpts.upToDateError,
-		} {
-			if e != nil {
-				r.log.Error(e, "error in reconcile")
-			}
+	result := reconciler.handleGitTrack(instance)
+	var errs []error
+	for _, err := range []error{result.parseError, result.gitError, result.gcError, result.upToDateError} {
+		if err != nil {
+			errs = append(errs, err)
 		}
-	}()
+	}
 
-	// Set the repository for metrics
-	mOpts.repository = instance.GetSpec().Repository
-
-	// Get a map of the files that are in the Spec
-	files, err := reconciler.getFiles(instance)
+	err = reconciler.updateStatus(instance, result.asStatusOpts())
 	if err != nil {
-		sOpts.gitError = err
-		sOpts.gitReason = gittrackutils.ErrorFetchingFiles
-		return reconcile.Result{}, err
+		errs = append(errs, fmt.Errorf("error updating status: %v", err))
 	}
-	// Git successful, set condition
-	sOpts.gitReason = gittrackutils.GitFetchSuccess
-	reconciler.recorder.Eventf(instance, apiv1.EventTypeNormal, "CheckoutSuccessful", "Successfully checked out '%s' at '%s'", instance.GetSpec().Repository, instance.GetSpec().Reference)
-
-	// Attempt to parse k8s objects from files
-	objects, fileErrors := objectsFrom(files)
-	sOpts.ignoredFiles = fileErrors
-	sOpts.ignored += int64(len(fileErrors))
-	if len(fileErrors) > 0 {
-		var errs []string
-		for file, reason := range fileErrors {
-			errs = append(errs, fmt.Sprintf("%s: %s", file, reason))
-		}
-		sOpts.parseError = fmt.Errorf(strings.Join(errs, ",\n"))
-		sOpts.parseReason = gittrackutils.ErrorParsingFiles
-	} else {
-		sOpts.parseReason = gittrackutils.FileParseSuccess
-	}
-
-	// Update status with the number of objects discovered
-	sOpts.discovered = int64(len(objects))
-
-	// Get a list of the GitTrackObjects that currently exist, by name
-	objectsByName, err := reconciler.listObjectsByName(instance)
+	err = reconciler.updateMetrics(instance, result.asMetricOpts(instance.GetSpec().Repository))
 	if err != nil {
-		return reconcile.Result{}, err
-	}
-	// Process the objects and feed back the results
-	resultsChan := make(chan objectResult, len(objects))
-	for _, obj := range objects {
-		go func(obj *unstructured.Unstructured) {
-			resultsChan <- reconciler.handleObject(obj, instance)
-		}(obj)
+		errs = append(errs, fmt.Errorf("error updating metrics: %v", err))
 	}
 
-	handlerErrors := []string{}
-	// Iterate through results and update status accordingly
-	for range objects {
-		res := <-resultsChan
-		if res.Ignored {
-			sOpts.ignoredFiles[res.NamespacedName] = res.Reason
-			sOpts.ignored++
-		} else {
-			sOpts.applied++
+	if len(errs) > 0 {
+		for _, err := range errs {
+			reconciler.log.Error(err, "error during reconcile")
 		}
-		mOpts.timeToDeploy = append(mOpts.timeToDeploy, res.TimeToDeploy)
-		if res.InSync {
-			sOpts.inSync++
-		}
-		delete(objectsByName, res.NamespacedName)
-		if res.Error != nil {
-			handlerErrors = append(handlerErrors, res.Error.Error())
-		}
+		return reconcile.Result{}, fmt.Errorf("errors encountered during reconcile")
 	}
-
-	// If there were errors updating the child objects, set the ChildrenUpToDate
-	// condition appropriately
-	if len(handlerErrors) > 0 {
-		sOpts.upToDateError = fmt.Errorf(strings.Join(handlerErrors, ",\n"))
-		sOpts.upToDateReason = gittrackutils.ErrorUpdatingChildren
-	} else {
-		sOpts.upToDateReason = gittrackutils.ChildrenUpdateSuccess
-	}
-
-	// Cleanup potentially leftover resources
-	if err = reconciler.deleteResources(objectsByName); err != nil {
-		sOpts.gcError = err
-		sOpts.gcReason = gittrackutils.ErrorDeletingChildren
-		reconciler.recorder.Eventf(instance, apiv1.EventTypeWarning, "CleanupFailed", "Failed to clean-up leftover resources")
-		return reconcile.Result{}, fmt.Errorf("failed to clean-up tracked objects: %v", err)
-	}
-	sOpts.gcReason = gittrackutils.GCSuccess
 
 	return reconcile.Result{}, nil
 }
