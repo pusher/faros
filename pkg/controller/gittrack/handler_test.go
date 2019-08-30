@@ -349,6 +349,178 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertGitTrackUpdated = func(kind string) {
+			BeforeEach(func() {
+				By("Executing the handler on and older commit")
+				result = r.handleGitTrack(gt)
+				Expect(result.gcError).ToNot(HaveOccurred())
+				Expect(result.gitError).ToNot(HaveOccurred())
+				Expect(result.parseError).ToNot(HaveOccurred())
+				Expect(result.upToDateError).ToNot(HaveOccurred())
+
+				By("Creating existing GitTrackObjects and ClusterGitTrackObjects")
+				gtoList := &farosv1alpha1.GitTrackObjectList{}
+				m.Eventually(gtoList, timeout).Should(testutils.WithItems(HaveLen(2)))
+				cgtoList := &farosv1alpha1.GitTrackObjectList{}
+				m.Eventually(cgtoList, timeout).Should(testutils.WithItems(HaveLen(2)))
+			})
+
+			Context("and resources are added to the repository", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("ingress-example")
+					m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "09d24c51c191b4caacd35cda23bd44c86f16edc6"), timeout).Should(Succeed())
+				})
+
+				It("creates the new resources", func() {
+					m.Get(gto, timeout).Should(Succeed())
+				})
+			})
+
+			Context("and resources are removed from the repository", func() {
+				BeforeEach(func() {
+					By("Executing the handler on and older commit")
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "4532b487a5aaf651839f5401371556aa16732a6e"), timeout).Should(Succeed())
+					result = r.handleGitTrack(gt)
+					Expect(result.gcError).ToNot(HaveOccurred())
+					Expect(result.gitError).ToNot(HaveOccurred())
+					Expect(result.parseError).ToNot(HaveOccurred())
+					Expect(result.upToDateError).ToNot(HaveOccurred())
+
+					By("Ensuring the desired GTO was created")
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("configmap-deleted-config")
+					m.Get(gto, consistentlyTimeout).Should(Succeed())
+
+					gtoList := &farosv1alpha1.GitTrackObjectList{}
+					m.Eventually(gtoList, timeout).Should(testutils.WithItems(HaveLen(3)))
+
+					By("Setting the reference to a commit after the resource was removed")
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "28928ccaeb314b96293e18cc8889997f0f46b79b"), timeout).Should(Succeed())
+				})
+
+				It("deletes the newly removed", func() {
+					m.Get(gto, timeout).ShouldNot(Succeed())
+				})
+
+				It("does not remove any other resources", func() {
+					gtoList := &farosv1alpha1.GitTrackObjectList{}
+					m.Eventually(gtoList, timeout).Should(testutils.WithItems(HaveLen(2)))
+				})
+			})
+
+			Context("and a resource is updated", func() {
+				var originalSpec farosv1alpha1.GitTrackObjectSpec
+				var serviceVersion string
+				var serviceGto farosv1alpha1.GitTrackObjectInterface
+
+				BeforeEach(func() {
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("deployment-nginx")
+					m.Get(gto).Should(Succeed())
+					originalSpec = gto.GetSpec()
+					m.Eventually(gto, timeout).Should(testutils.WithField("Spec", Equal(originalSpec)))
+
+					serviceGto = testutils.ExampleGitTrackObject.DeepCopy()
+					serviceGto.SetName("service-nginx")
+					m.Get(serviceGto).Should(Succeed())
+					serviceVersion = serviceGto.GetResourceVersion()
+
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"), timeout).Should(Succeed())
+				})
+
+				It("updates the resource spec as expected", func() {
+					m.Eventually(gto, timeout).Should(testutils.WithField("Spec", Not(Equal(originalSpec))))
+				})
+
+				It("does not update other resources", func() {
+					m.Consistently(serviceGto, consistentlyTimeout).Should(testutils.WithField("ObjectMeta.ResourceVersion", Equal(serviceVersion)))
+				})
+
+				Context("should send successful update events", func() {
+					AssertSendsEvent("UpdateSuccessful", kind, "example", corev1.EventTypeNormal)
+				})
+
+				It("should not send udpate failure events", func() {
+					eventList := &corev1.EventList{}
+					m.Consistently(eventList, consistentlyTimeout).ShouldNot(testutils.WithItems(ContainElement(testutils.WithField("Reason", Equal("UpdateFailed")))))
+				})
+			})
+
+			Context("and the new reference is invalid", func() {
+				var existingGtos *farosv1alpha1.GitTrackObjectList
+				var existingCGtos *farosv1alpha1.ClusterGitTrackObjectList
+
+				BeforeEach(func(){
+					existingGtos = &farosv1alpha1.GitTrackObjectList{}
+					m.Eventually(existingGtos, timeout).Should(testutils.WithItems(HaveLen(2)))
+					existingCGtos = &farosv1alpha1.ClusterGitTrackObjectList{}
+					m.Eventually(existingCGtos, timeout).Should(testutils.WithItems(HaveLen(0)))
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "invalid-ref"), timeout).Should(Succeed())
+				})
+
+				It("should not modify any of the existing GitTrackObjects", func() {
+					gtoList := &farosv1alpha1.GitTrackObjectList{}
+					m.Consistently(gtoList, consistentlyTimeout).Should(testutils.WithField("Items", Equal(existingGtos.Items)))
+				})
+
+				It("should not modify any of the existing ClusterGitTrackObjects", func() {
+					gtoList := &farosv1alpha1.ClusterGitTrackObjectList{}
+					m.Consistently(gtoList, consistentlyTimeout).Should(testutils.WithField("Items", Equal(existingCGtos.Items)))
+				})
+
+				It("should set a gitError in the result", func() {
+					Expect(result.gitError).To(HaveOccurred())
+					Expect(result.gitError.Error()).To(Equal("failed to checkout 'invalid-ref': unable to parse ref invalid-ref: reference not found"))
+				})
+
+				It("should set a gitReason in the result", func() {
+					Expect(result.gitReason).To(Equal(gittrackutils.ErrorFetchingFiles))
+				})
+
+				Context("should send an event for failing to checkout the repository", func() {
+					AssertSendsEvent("CheckoutFailed", kind, "example", corev1.EventTypeWarning)
+				})
+			})
+
+			Context("and the subPath does not exist", func() {
+				var existingGtos *farosv1alpha1.GitTrackObjectList
+				var existingCGtos *farosv1alpha1.ClusterGitTrackObjectList
+
+				BeforeEach(func(){
+					existingGtos = &farosv1alpha1.GitTrackObjectList{}
+					m.Eventually(existingGtos, timeout).Should(testutils.WithItems(HaveLen(2)))
+					existingCGtos = &farosv1alpha1.ClusterGitTrackObjectList{}
+					m.Eventually(existingCGtos, timeout).Should(testutils.WithItems(HaveLen(0)))
+					m.UpdateWithFunc(gt, setGitTrackSubPathFunc("invalid-subpath"), timeout).Should(Succeed())
+				})
+
+				It("should not modify any of the existing GitTrackObjects", func() {
+					gtoList := &farosv1alpha1.GitTrackObjectList{}
+					m.Consistently(gtoList, consistentlyTimeout).Should(testutils.WithField("Items", Equal(existingGtos.Items)))
+				})
+
+				It("should not modify any of the existing ClusterGitTrackObjects", func() {
+					gtoList := &farosv1alpha1.ClusterGitTrackObjectList{}
+					m.Consistently(gtoList, consistentlyTimeout).Should(testutils.WithField("Items", Equal(existingCGtos.Items)))
+				})
+
+				It("should set a gitError in the result", func() {
+					Expect(result.gitError).To(HaveOccurred())
+					Expect(result.gitError.Error()).To(Equal("no files for subpath 'invalid-subpath'"))
+				})
+
+				It("should set a gitReason in the result", func() {
+					Expect(result.gitReason).To(Equal(gittrackutils.ErrorFetchingFiles))
+				})
+
+				Context("should send an event for failing to checkout the repository", func() {
+					AssertSendsEvent("CheckoutFailed", kind, "example", corev1.EventTypeWarning)
+				})
+			})
+		}
+
 		Context("with a GitTrack", func() {
 			kind := "GitTrack"
 
@@ -420,6 +592,10 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertChildNameWithColon()
+			})
+
+			Context("when the GitTrack is updated", func() {
+				AssertGitTrackUpdated(kind)
 			})
 
 			Context("with files from another namespace", func() {
@@ -523,6 +699,10 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertChildNameWithColon()
+			})
+
+			Context("when the ClusterGitTrack is updated", func() {
+				AssertGitTrackUpdated(kind)
 			})
 		})
 	})

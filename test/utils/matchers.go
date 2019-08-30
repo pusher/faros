@@ -110,8 +110,16 @@ func (m *Matcher) Get(obj Object, intervals ...interface{}) gomega.GomegaAsyncAs
 }
 
 // Consistently continually gets the object from the API for comparison
-func (m *Matcher) Consistently(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	return m.consistentlyObject(obj, intervals...)
+func (m *Matcher) Consistently(obj runtime.Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
+	// If the object is a list, return a list
+	if meta.IsListType(obj) {
+		return m.consistentlyList(obj, intervals...)
+	}
+	if o, ok := obj.(Object); ok {
+		return m.consistentlyObject(o, intervals...)
+	}
+	//Should not get here
+	panic("Unknown object.")
 }
 
 // consistentlyObject gets an individual object from the API server
@@ -128,6 +136,18 @@ func (m *Matcher) consistentlyObject(obj Object, intervals ...interface{}) gomeg
 		return obj
 	}
 	return gomega.Consistently(get, intervals...)
+}
+
+// consistentlyObject gets an individual object from the API server
+func (m *Matcher) consistentlyList(obj runtime.Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
+	list := func() runtime.Object {
+		err := m.Client.List(context.TODO(), obj)
+		if err != nil {
+			panic(err)
+		}
+		return obj
+	}
+	return gomega.Consistently(list, intervals...)
 }
 
 // Eventually continually gets the object from the API for comparison
