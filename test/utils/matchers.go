@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -371,6 +372,9 @@ func WithField(field string, matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher 
 	return gomega.WithTransform(func(obj interface{}) interface{} {
 		r := reflect.ValueOf(obj)
 		f := reflect.Indirect(r).FieldByName(fields[0])
+		if !f.IsValid() {
+			panic(fmt.Sprintf("Object '%s' does not have a field '%s'", reflect.TypeOf(obj), fields[0]))
+		}
 		return f.Interface()
 	}, matcher)
 }
