@@ -644,12 +644,12 @@
   revision = "418d78d0b9a7b7de3a6bbc8a23def624cc977bb2"
 
 [[projects]]
-  digest = "1:3a529c8a032e190b097ee8030693e5afeb72a9647392cee336ccb8a519de65f7"
+  digest = "1:71f4259e6019b5d9ec2a5b9526894142871f8005775de85bca2b808cd9c036e6"
   name = "github.com/pusher/git-store"
   packages = ["."]
   pruneopts = "T"
-  revision = "095f4308acf8795a53aa38195f2877b7b13b1518"
-  version = "v0.7.1"
+  revision = "b4d46297f79fee0223fd5a0374d1ad524f934b9b"
+  version = "v0.7.2"
 
 [[projects]]
   digest = "1:40e527269f1feb16b3069bfe80ff05a462d190eacfe07eb0a59fa25c381db7af"
