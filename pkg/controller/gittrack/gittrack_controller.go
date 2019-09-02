@@ -365,7 +365,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner far
 		return errorResult(namespacedName, err)
 	}
 
-	ignored, reason, err := r.ignoreObject(u)
+	ignored, reason, err := r.ignoreObject(u, owner)
 	if err != nil {
 		return errorResult(gto.GetNamespacedName(), err)
 	}
@@ -493,7 +493,7 @@ func checkOwner(owner farosv1alpha1.GitTrackInterface, child farosv1alpha1.GitTr
 }
 
 // ignoreObject checks whether the unstructured object should be ignored
-func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, string, error) {
+func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner farosv1alpha1.GitTrackInterface) (bool, string, error) {
 	gvr, namespaced, err := utils.GetAPIResource(r.restMapper, u.GetObjectKind().GroupVersionKind())
 	if err != nil {
 		return false, "", err
@@ -509,6 +509,14 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, st
 		r.log.V(1).Info("Object group version ignored globally", "group version resource", gvr.String())
 		return true, fmt.Sprintf("resource `%s.%s/%s` ignored globally by flag", gvr.Resource, gvr.Group, gvr.Version), nil
 	}
+
+	// prevent a gittrack in a namespace from handling objects which are in a different namespace
+	ownerNamespace := owner.GetNamespace()
+	_, ownerIsGittrack := owner.(*farosv1alpha1.GitTrack)
+	if namespaced && ownerIsGittrack && ownerNamespace != u.GetNamespace() {
+		return true, fmt.Sprintf("namespace `%s` is not managed by this GitTrack", u.GetNamespace()), nil
+	}
+
 	return false, "", nil
 }
 

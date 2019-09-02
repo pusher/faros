@@ -29,7 +29,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pusher/faros/pkg/apis"
-	farosflags "github.com/pusher/faros/pkg/flags"
 	"github.com/pusher/faros/test/reporters"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -86,7 +85,6 @@ var _ = BeforeSuite(func() {
 
 	repositoryPath = setupRepository()
 	repositoryURL = fmt.Sprintf("file://%s", repositoryPath)
-	farosflags.Namespace = "default"
 
 	var err error
 	if cfg, err = t.Start(); err != nil {
