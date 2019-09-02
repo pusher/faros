@@ -166,7 +166,7 @@ var _ = Describe("Handler Suite", func() {
 
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
-				value := fmt.Sprintf("namespace `%s` is not managed by this Faros", gto.GetNamespace())
+				value := fmt.Sprintf("namespace `%s` is not managed by this GitTrack", gto.GetNamespace())
 				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
 			})
 		}
