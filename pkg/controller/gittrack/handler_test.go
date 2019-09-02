@@ -380,7 +380,7 @@ var _ = Describe("Handler Suite", func() {
 
 			Context("and resources are removed from the repository", func() {
 				BeforeEach(func() {
-					By("Executing the handler on and older commit")
+					By("Executing the handler on an older commit")
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "4532b487a5aaf651839f5401371556aa16732a6e"), timeout).Should(Succeed())
 					result = r.handleGitTrack(gt)
 					Expect(result.gcError).ToNot(HaveOccurred())
@@ -400,7 +400,7 @@ var _ = Describe("Handler Suite", func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "28928ccaeb314b96293e18cc8889997f0f46b79b"), timeout).Should(Succeed())
 				})
 
-				It("deletes the newly removed", func() {
+				It("deletes the newly removed resource", func() {
 					m.Get(gto, timeout).ShouldNot(Succeed())
 				})
 
