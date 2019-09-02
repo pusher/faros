@@ -56,7 +56,7 @@ func (r *ReconcileGitTrack) fetchGitCredentials(gt farosv1alpha1.GitTrackInterfa
 		deployKey.SecretNamespace = gt.GetNamespace()
 	case *farosv1alpha1.ClusterGitTrack:
 		if deployKey.SecretNamespace == "" {
-			return nil, fmt.Errorf("No Secret Namespace set for DeployKey")
+			return nil, fmt.Errorf("No SecretNamespace set for DeployKey")
 		}
 	default:
 		panic(fmt.Errorf("This code should not be reachable"))
