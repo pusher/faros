@@ -20,9 +20,78 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gitstore "github.com/pusher/git-store"
+	testutils "github.com/pusher/faros/test/utils"
+	"k8s.io/client-go/util/flowcontrol"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 var _ = Describe("GitTrack Suite", func() {
+	Describe("fetchGitCredentials", func() {
+		var r *ReconcileGitTrack
+		var mgr manager.Manager
+		var stop chan struct{}
+
+		var gt farosv1alpha1.GitTrackInterface
+		var creds *gitCredentials
+		var credsErr error
+
+		BeforeEach(func() {
+			// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
+			// channel when it is finished.
+			var err error
+			cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+			mgr, err = manager.New(cfg, manager.Options{
+				MetricsBindAddress: "0", // Disable serving metrics while testing
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			recFn := newReconciler(mgr)
+			r = recFn.(*ReconcileGitTrack)
+
+			stop = StartTestManager(mgr)
+
+			creds = nil
+			credsErr = nil
+		})
+
+		AfterEach(func() {
+			// Stop Controller and informers before cleaning up
+			close(stop)
+		})
+
+		var AssertNoDeployKey = func() {
+			Context("which has no DeployKey", func() {
+				It("should return no error", func() {
+					Expect(credsErr).To(BeNil())
+				})
+
+				It("should return nil credentials", func() {
+					Expect(creds).To(BeNil())
+				})
+			})
+		}
+
+		JustBeforeEach(func() {
+			creds, credsErr = r.fetchGitCredentials(gt)
+		})
+
+		Context("With a GitTrack", func() {
+			BeforeEach(func() {
+				gt = testutils.ExampleGitTrack.DeepCopy()
+			})
+
+			AssertNoDeployKey()
+		})
+
+		Context("With a ClusterGitTrack", func() {
+			BeforeEach(func() {
+				gt = testutils.ExampleClusterGitTrack.DeepCopy()
+			})
+
+			AssertNoDeployKey()
+		})
+	})
+
 	Describe("createRepoRefFromCreds", func() {
 		Context("When the credentialType is SSH", func() {
 			repo, _ := createRepoRefFromCreds("ssh@tempuri.org", &gitCredentials{
