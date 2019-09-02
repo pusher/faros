@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -110,8 +111,16 @@ func (m *Matcher) Get(obj Object, intervals ...interface{}) gomega.GomegaAsyncAs
 }
 
 // Consistently continually gets the object from the API for comparison
-func (m *Matcher) Consistently(obj Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
-	return m.consistentlyObject(obj, intervals...)
+func (m *Matcher) Consistently(obj runtime.Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
+	// If the object is a list, return a list
+	if meta.IsListType(obj) {
+		return m.consistentlyList(obj, intervals...)
+	}
+	if o, ok := obj.(Object); ok {
+		return m.consistentlyObject(o, intervals...)
+	}
+	//Should not get here
+	panic("Unknown object.")
 }
 
 // consistentlyObject gets an individual object from the API server
@@ -128,6 +137,18 @@ func (m *Matcher) consistentlyObject(obj Object, intervals ...interface{}) gomeg
 		return obj
 	}
 	return gomega.Consistently(get, intervals...)
+}
+
+// consistentlyObject gets an individual object from the API server
+func (m *Matcher) consistentlyList(obj runtime.Object, intervals ...interface{}) gomega.GomegaAsyncAssertion {
+	list := func() runtime.Object {
+		err := m.Client.List(context.TODO(), obj)
+		if err != nil {
+			panic(err)
+		}
+		return obj
+	}
+	return gomega.Consistently(list, intervals...)
 }
 
 // Eventually continually gets the object from the API for comparison
@@ -351,6 +372,9 @@ func WithField(field string, matcher gtypes.GomegaMatcher) gtypes.GomegaMatcher 
 	return gomega.WithTransform(func(obj interface{}) interface{} {
 		r := reflect.ValueOf(obj)
 		f := reflect.Indirect(r).FieldByName(fields[0])
+		if !f.IsValid() {
+			panic(fmt.Sprintf("Object '%s' does not have a field '%s'", reflect.TypeOf(obj), fields[0]))
+		}
 		return f.Interface()
 	}, matcher)
 }
