@@ -340,8 +340,8 @@ var _ = Describe("Handler Suite", func() {
 
 		var AssertChildNameWithColon = func() {
 			BeforeEach(func() {
-					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
-					gto.SetName("clusterrole-test-read-ns-pods-svcs")
+				gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+				gto.SetName("clusterrole-test-read-ns-pods-svcs")
 			})
 
 			It("replaces `:` with `-` in the name", func() {
@@ -452,7 +452,7 @@ var _ = Describe("Handler Suite", func() {
 				var existingGtos *farosv1alpha1.GitTrackObjectList
 				var existingCGtos *farosv1alpha1.ClusterGitTrackObjectList
 
-				BeforeEach(func(){
+				BeforeEach(func() {
 					existingGtos = &farosv1alpha1.GitTrackObjectList{}
 					m.Eventually(existingGtos, timeout).Should(testutils.WithItems(HaveLen(2)))
 					existingCGtos = &farosv1alpha1.ClusterGitTrackObjectList{}
@@ -488,7 +488,7 @@ var _ = Describe("Handler Suite", func() {
 				var existingGtos *farosv1alpha1.GitTrackObjectList
 				var existingCGtos *farosv1alpha1.ClusterGitTrackObjectList
 
-				BeforeEach(func(){
+				BeforeEach(func() {
 					existingGtos = &farosv1alpha1.GitTrackObjectList{}
 					m.Eventually(existingGtos, timeout).Should(testutils.WithItems(HaveLen(2)))
 					existingCGtos = &farosv1alpha1.ClusterGitTrackObjectList{}
