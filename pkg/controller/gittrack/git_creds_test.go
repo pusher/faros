@@ -97,7 +97,7 @@ var _ = Describe("GitTrack Suite", func() {
 			Context("which has a DeployKey" , func() {
 				var dk farosv1alpha1.GitTrackDeployKey
 
-				var keysMustBeSetErr = errors.New("if using a deploy key, both SecretName and Key must be set")
+				var keysMustBeSetErr = errors.New("both SecretName and Key must be set when using DeployKey")
 				var secretNotFoundErr = errors.New("failed to look up secret nonExistentSecret: Secret \"nonExistentSecret\" not found")
 
 				BeforeEach(func() {
@@ -215,7 +215,7 @@ var _ = Describe("GitTrack Suite", func() {
 								Skip("test behaviour is for ClusterGitTracks only")
 							}
 
-							Expect(credsErr).To(Equal(errors.New("No SecretNamespace set for DeployKey")))
+							Expect(credsErr).To(Equal(errors.New("no SecretNamespace set for DeployKey")))
 						})
 
 						It("returns nil credentials", func() {
@@ -295,7 +295,7 @@ var _ = Describe("GitTrack Suite", func() {
 				It("returns an error", func() {
 					Expect(repo).To(BeNil())
 					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(Equal("You must specify the secret as <username>:<password> for credential type HTTPBasicAuth"))
+					Expect(err.Error()).To(Equal("you must specify the secret as <username>:<password> for credential type HTTPBasicAuth"))
 				})
 			})
 		})

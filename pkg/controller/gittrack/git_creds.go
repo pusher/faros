@@ -43,7 +43,7 @@ func (r *ReconcileGitTrack) fetchGitCredentials(gt farosv1alpha1.GitTrackInterfa
 	}
 	// Check the deployKey fields are both non-empty
 	if deployKey.SecretName == "" || deployKey.Key == "" {
-		return nil, fmt.Errorf("if using a deploy key, both SecretName and Key must be set")
+		return nil, fmt.Errorf("both SecretName and Key must be set when using DeployKey")
 	}
 
 	// Set the SecretNamespace to match the GitTrack Namespace
@@ -51,15 +51,15 @@ func (r *ReconcileGitTrack) fetchGitCredentials(gt farosv1alpha1.GitTrackInterfa
 	switch gt.(type) {
 	case *farosv1alpha1.GitTrack:
 		if deployKey.SecretNamespace != "" && deployKey.SecretNamespace != gt.GetNamespace() {
-			return nil, fmt.Errorf("DeployKey namespace must match GitTrack namespace or be empty")
+			return nil, fmt.Errorf("the DeployKey namespace must match GitTrack namespace or be empty")
 		}
 		deployKey.SecretNamespace = gt.GetNamespace()
 	case *farosv1alpha1.ClusterGitTrack:
 		if deployKey.SecretNamespace == "" {
-			return nil, fmt.Errorf("No SecretNamespace set for DeployKey")
+			return nil, fmt.Errorf("no SecretNamespace set for DeployKey")
 		}
 	default:
-		panic(fmt.Errorf("This code should not be reachable"))
+		panic(fmt.Errorf("this code should not be reachable"))
 	}
 
 	// Fetch the secret from the API
@@ -98,8 +98,8 @@ func createRepoRefFromCreds(url string, creds *gitCredentials) (*gitstore.RepoRe
 		if len(credStringSplit) == 2 {
 			return &gitstore.RepoRef{URL: url, User: credStringSplit[0], Pass: credStringSplit[1]}, nil
 		}
-		return nil, fmt.Errorf("You must specify the secret as <username>:<password> for credential type %s", creds.credentialType)
+		return nil, fmt.Errorf("you must specify the secret as <username>:<password> for credential type %s", creds.credentialType)
 	default:
-		return nil, fmt.Errorf("Unable to create repo ref: invalid type \"%s\"", creds.credentialType)
+		return nil, fmt.Errorf("unable to create repo ref: invalid type \"%s\"", creds.credentialType)
 	}
 }
