@@ -41,6 +41,7 @@ var (
 	// FetchTimeout in seconds for fetching changes from repositories
 	FetchTimeout time.Duration
 
+	// ClusterGitTrack specifies which mode we're handling ClusterGitTracks in
 	ClusterGitTrack ClusterGitTrackMode
 
 	// RepositoryDir is the folder on the local filesystem in which Faros should
@@ -82,14 +83,17 @@ func ParseIgnoredResources() (map[schema.GroupVersionResource]interface{}, error
 	return gvrs, nil
 }
 
+// ClusterGitTrackMode specifies which mode we're running ClusterGitTracks in
 type ClusterGitTrackMode int
 
+// Enums for ClusterGitTrackMode
 const (
 	CGTMIncludeNamespaced ClusterGitTrackMode = iota
 	CGTMDisabled
 	CGTMExcludeNamespaced
 )
 
+// String implements the flag.Value interface
 func (cgtm ClusterGitTrackMode) String() string {
 	switch cgtm {
 	case CGTMDisabled:
@@ -102,6 +106,7 @@ func (cgtm ClusterGitTrackMode) String() string {
 	panic("unreachable")
 }
 
+// Set implements the flag.Value interface
 func (cgtm *ClusterGitTrackMode) Set(s string) error {
 	lowered := strings.ToLower(s)
 	switch lowered {
@@ -119,6 +124,7 @@ func (cgtm *ClusterGitTrackMode) Set(s string) error {
 	}
 }
 
+// Type implements the flag.Value interface
 func (cgtm ClusterGitTrackMode) Type() string {
 	return "ClusterGitTrackMode"
 }
