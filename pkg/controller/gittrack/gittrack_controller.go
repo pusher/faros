@@ -506,7 +506,7 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 
 	// Ignore namespaced objects not in the namespace managed by the controller
 	if namespaced && r.namespace != "" && r.namespace != u.GetNamespace() {
-		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", farosflags.Namespace)
+		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", r.namespace)
 		return true, fmt.Sprintf("namespace `%s` is not managed by this Faros", u.GetNamespace()), nil
 	}
 	// Ignore GVKs in the ignoredGVKs set

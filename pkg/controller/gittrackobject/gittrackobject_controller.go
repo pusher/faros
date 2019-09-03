@@ -28,6 +28,7 @@ import (
 	gittrackobjectutils "github.com/pusher/faros/pkg/controller/gittrackobject/utils"
 
 	"github.com/go-logr/logr"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	"github.com/pusher/faros/pkg/utils"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,6 +86,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		applier:        applier,
 		dryRunVerifier: dryRunVerifier,
 		log:            rlogr.Log.WithName("gittrackobject-controller"),
+		namespace:      farosflags.Namespace,
 	}
 }
 
@@ -163,6 +165,7 @@ type ReconcileGitTrackObject struct {
 	stop        chan struct{}
 	recorder    record.EventRecorder
 	log         logr.Logger
+	namespace   string
 
 	applier        farosclient.Client
 	dryRunVerifier *utils.DryRunVerifier

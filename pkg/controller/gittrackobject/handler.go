@@ -278,7 +278,7 @@ func (r *ReconcileGitTrackObject) applyChild(found, child *unstructured.Unstruct
 func (r *ReconcileGitTrackObject) sendEvent(gto farosv1alpha1.GitTrackObjectInterface, eventType, reason, messageFmt string, args ...interface{}) {
 	instance := gto.DeepCopyInterface()
 	if instance.GetNamespace() == "" {
-		instance.SetNamespace(farosflags.Namespace)
+		instance.SetNamespace(r.namespace)
 	}
 
 	r.recorder.Eventf(instance, eventType, reason, messageFmt, args...)
