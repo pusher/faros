@@ -75,16 +75,18 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 
 	return &ReconcileGitTrack{
-		Client:          mgr.GetClient(),
-		scheme:          mgr.GetScheme(),
-		store:           gitstore.NewRepoStore(farosflags.RepositoryDir),
-		restMapper:      restMapper,
-		recorder:        mgr.GetEventRecorderFor("gittrack-controller"),
-		ignoredGVRs:     gvrs,
-		lastUpdateTimes: make(map[string]time.Time),
-		mutex:           &sync.RWMutex{},
-		applier:         applier,
-		log:             rlogr.Log.WithName("gittrack-controller"),
+		Client:              mgr.GetClient(),
+		scheme:              mgr.GetScheme(),
+		store:               gitstore.NewRepoStore(farosflags.RepositoryDir),
+		restMapper:          restMapper,
+		recorder:            mgr.GetEventRecorderFor("gittrack-controller"),
+		ignoredGVRs:         gvrs,
+		lastUpdateTimes:     make(map[string]time.Time),
+		mutex:               &sync.RWMutex{},
+		applier:             applier,
+		log:                 rlogr.Log.WithName("gittrack-controller"),
+		namespace:           farosflags.Namespace,
+		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
 }
 
@@ -157,6 +159,9 @@ type ReconcileGitTrack struct {
 	mutex           *sync.RWMutex
 	applier         farosclient.Client
 	log             logr.Logger
+
+	namespace           string
+	clusterGitTrackMode farosflags.ClusterGitTrackMode
 }
 
 func (r *ReconcileGitTrack) withValues(keysAndValues ...interface{}) *ReconcileGitTrack {
@@ -500,7 +505,7 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 	}
 
 	// Ignore namespaced objects not in the namespace managed by the controller
-	if namespaced && farosflags.Namespace != "" && farosflags.Namespace != u.GetNamespace() {
+	if namespaced && r.namespace != "" && r.namespace != u.GetNamespace() {
 		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", farosflags.Namespace)
 		return true, fmt.Sprintf("namespace `%s` is not managed by this Faros", u.GetNamespace()), nil
 	}
@@ -510,11 +515,19 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 		return true, fmt.Sprintf("resource `%s.%s/%s` ignored globally by flag", gvr.Resource, gvr.Group, gvr.Version), nil
 	}
 
-	// prevent a gittrack in a namespace from handling objects which are in a different namespace
 	ownerNamespace := owner.GetNamespace()
 	_, ownerIsGittrack := owner.(*farosv1alpha1.GitTrack)
-	if namespaced && ownerIsGittrack && ownerNamespace != u.GetNamespace() {
-		return true, fmt.Sprintf("namespace `%s` is not managed by this GitTrack", u.GetNamespace()), nil
+	if namespaced {
+		// prevent a gittrack in a namespace from handling objects which are in a different namespace
+		if ownerIsGittrack && ownerNamespace != u.GetNamespace() {
+			return true, fmt.Sprintf("namespace `%s` is not managed by this GitTrack", u.GetNamespace()), nil
+		} else if !ownerIsGittrack && r.clusterGitTrackMode == farosflags.CGTMExcludeNamespaced {
+			return true, "namespaced resources cannot be managed by ClusterGitTrack", nil
+		}
+	}
+
+	if !ownerIsGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {
+		return true, "ClusterGitTrack handling disabled; ignoring", nil
 	}
 
 	return false, "", nil
