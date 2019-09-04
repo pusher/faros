@@ -100,9 +100,10 @@ var _ = Describe("GitTrack Suite", func() {
 		c = mgr.GetClient()
 
 		var recFn reconcile.Reconciler
-		r = newReconciler(mgr)
+		var opts *reconcileGitTrackOpts
+		r, opts = newReconciler(mgr)
 		recFn, requests = SetupTestReconcile(r)
-		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
+		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
 		stop = StartTestManager(mgr)
 		instance = &farosv1alpha1.GitTrack{
 			ObjectMeta: metav1.ObjectMeta{
