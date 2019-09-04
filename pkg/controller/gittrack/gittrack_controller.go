@@ -517,16 +517,17 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 
 	ownerNamespace := owner.GetNamespace()
 	_, ownerIsGittrack := owner.(*farosv1alpha1.GitTrack)
+	_, ownerIsClusterGittrack := owner.(*farosv1alpha1.ClusterGitTrack)
 	if namespaced {
 		// prevent a gittrack in a namespace from handling objects which are in a different namespace
 		if ownerIsGittrack && ownerNamespace != u.GetNamespace() {
 			return true, fmt.Sprintf("namespace `%s` is not managed by this GitTrack", u.GetNamespace()), nil
-		} else if !ownerIsGittrack && r.clusterGitTrackMode == farosflags.CGTMExcludeNamespaced {
+		} else if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMExcludeNamespaced {
 			return true, "namespaced resources cannot be managed by ClusterGitTrack", nil
 		}
 	}
 
-	if !ownerIsGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {
+	if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {
 		return true, "ClusterGitTrack handling disabled; ignoring", nil
 	}
 
