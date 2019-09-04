@@ -120,7 +120,7 @@ func (cgtm *ClusterGitTrackMode) Set(s string) error {
 		*cgtm = CGTMExcludeNamespaced
 		return nil
 	default:
-		return fmt.Errorf("invalid value %q for ClusterGitTrackMode", s)
+		return fmt.Errorf("invalid value %q for clustergittrack-mode; valid values are Disabled, IncludeNamespaced and ExcludeNamespaced", s)
 	}
 }
 
