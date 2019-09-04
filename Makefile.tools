@@ -33,12 +33,13 @@ golangci-lint:
 .PHONY: kustomize
 kustomize:
 	@ if [ ! $$(which kustomize) ]; then \
-	 	go get -u sigs.k8s.io/kustomize; \
+		go get -u sigs.k8s.io/kustomize/cmd/kustomize; \
 	fi
 
 .PHONY: snyk
+snyk:
 	@ if [ ! $$(which snyk) ]; then \
-		npm install -g snyk
+		npm install -g snyk; \
 	fi
 
 .PHONY: kubebuilder-tools-1.14
