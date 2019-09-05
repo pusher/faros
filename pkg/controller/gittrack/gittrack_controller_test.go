@@ -42,22 +42,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var c client.Client
-var mgr manager.Manager
-var instance farosv1alpha1.GitTrackInterface
-var requests chan reconcile.Request
-var stop chan struct{}
-var r reconcile.Reconciler
-
-var key = types.NamespacedName{Name: "example", Namespace: "default"}
-var expectedRequest = reconcile.Request{NamespacedName: key}
-
-const timeout = time.Second * 5
-const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
-const doesNotExistPath = "does-not-exist"
-const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
-
 var _ = Describe("GitTrack Suite", func() {
+	var c client.Client
+	var mgr manager.Manager
+	var instance farosv1alpha1.GitTrackInterface
+	var requests chan reconcile.Request
+	var stop chan struct{}
+	var r reconcile.Reconciler
+
+	var key = types.NamespacedName{Name: "example", Namespace: "default"}
+	var expectedRequest = reconcile.Request{NamespacedName: key}
+
+	const timeout = time.Second * 5
+	const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
+	const doesNotExistPath = "does-not-exist"
+	const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+
 	var createInstance = func(gt farosv1alpha1.GitTrackInterface, ref string) {
 		spec := gt.GetSpec()
 		spec.Reference = ref
