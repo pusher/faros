@@ -57,7 +57,7 @@ func init() {
 	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
 	FlagSet.DurationVar(&FetchTimeout, "fetch-timeout", 30*time.Second, "Timeout in seconds for fetching changes from repositories")
 	FlagSet.StringVar(&RepositoryDir, "repository-dir", "", "Directory in which to clone repositories. Defaults to cloning in memory if unset.")
-	FlagSet.Var(&ClusterGitTrack, "clustergittrack-mode", "How to manage ClusterGitTracks")
+	FlagSet.Var(&ClusterGitTrack, "clustergittrack-mode", "How to manage ClusterGitTracks. Valid values are Disabled, IncludeNamespaced and ExcludeNamespaced")
 }
 
 // ParseIgnoredResources attempts to parse the ignore-resource flag value and
