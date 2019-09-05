@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -164,9 +165,33 @@ var _ = Describe("Handler Suite", func() {
 				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
 			})
 
-			PIt("ignores the child resource", func() {
+			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
 				value := fmt.Sprintf("namespace `%s` is not managed by this GitTrack", gto.GetNamespace())
+				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
+			})
+		}
+
+		var AssertClusterGitTrackIgnoresNamespaced = func(r *handlerResult) {
+			It("does not create a GitTrackObject for the child", func() {
+				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
+			})
+
+			It("ignores the child resource", func() {
+				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
+				value := fmt.Sprintf("namespaced resources cannot be managed by ClusterGitTrack")
+				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
+			})
+		}
+
+		var AssertClusterGitTrackHandlingDisabled = func(r *handlerResult) {
+			It("does not create a GitTrackObject for the child", func() {
+				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
+			})
+
+			It("ignores the child resource", func() {
+				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
+				value := fmt.Sprintf("ClusterGitTrack handling disabled; ignoring")
 				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
 			})
 		}
@@ -340,8 +365,8 @@ var _ = Describe("Handler Suite", func() {
 
 		var AssertChildNameWithColon = func() {
 			BeforeEach(func() {
-					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
-					gto.SetName("clusterrole-test-read-ns-pods-svcs")
+				gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+				gto.SetName("clusterrole-test-read-ns-pods-svcs")
 			})
 
 			It("replaces `:` with `-` in the name", func() {
@@ -452,7 +477,7 @@ var _ = Describe("Handler Suite", func() {
 				var existingGtos *farosv1alpha1.GitTrackObjectList
 				var existingCGtos *farosv1alpha1.ClusterGitTrackObjectList
 
-				BeforeEach(func(){
+				BeforeEach(func() {
 					existingGtos = &farosv1alpha1.GitTrackObjectList{}
 					m.Eventually(existingGtos, timeout).Should(testutils.WithItems(HaveLen(2)))
 					existingCGtos = &farosv1alpha1.ClusterGitTrackObjectList{}
@@ -488,7 +513,7 @@ var _ = Describe("Handler Suite", func() {
 				var existingGtos *farosv1alpha1.GitTrackObjectList
 				var existingCGtos *farosv1alpha1.ClusterGitTrackObjectList
 
-				BeforeEach(func(){
+				BeforeEach(func() {
 					existingGtos = &farosv1alpha1.GitTrackObjectList{}
 					m.Eventually(existingGtos, timeout).Should(testutils.WithItems(HaveLen(2)))
 					existingCGtos = &farosv1alpha1.ClusterGitTrackObjectList{}
@@ -703,6 +728,24 @@ var _ = Describe("Handler Suite", func() {
 
 			Context("when the ClusterGitTrack is updated", func() {
 				AssertGitTrackUpdated(kind)
+			})
+
+			Context("when the ClusterGitTrack is excluded from managing namespaced object", func() {
+				BeforeEach(func() {
+					r.clusterGitTrackMode = farosflags.CGTMExcludeNamespaced
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("deployment-nginx")
+				})
+				AssertClusterGitTrackIgnoresNamespaced(&result)
+			})
+
+			Context("when ClusterGitTrack handling is disabled", func() {
+				BeforeEach(func() {
+					r.clusterGitTrackMode = farosflags.CGTMDisabled
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("deployment-nginx")
+				})
+				AssertClusterGitTrackHandlingDisabled(&result)
 			})
 		})
 	})

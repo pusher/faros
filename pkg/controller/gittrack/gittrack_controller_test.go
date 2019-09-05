@@ -95,6 +95,8 @@ var _ = Describe("GitTrack Suite", func() {
 	BeforeEach(func() {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
+		farosflags.Namespace = "default"
+
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
@@ -129,6 +131,7 @@ var _ = Describe("GitTrack Suite", func() {
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&v1.EventList{},
 		)
+		farosflags.Namespace = ""
 	})
 
 	Context("When a GitTrack resource is created", func() {

@@ -75,16 +75,18 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 
 	return &ReconcileGitTrack{
-		Client:          mgr.GetClient(),
-		scheme:          mgr.GetScheme(),
-		store:           gitstore.NewRepoStore(farosflags.RepositoryDir),
-		restMapper:      restMapper,
-		recorder:        mgr.GetEventRecorderFor("gittrack-controller"),
-		ignoredGVRs:     gvrs,
-		lastUpdateTimes: make(map[string]time.Time),
-		mutex:           &sync.RWMutex{},
-		applier:         applier,
-		log:             rlogr.Log.WithName("gittrack-controller"),
+		Client:              mgr.GetClient(),
+		scheme:              mgr.GetScheme(),
+		store:               gitstore.NewRepoStore(farosflags.RepositoryDir),
+		restMapper:          restMapper,
+		recorder:            mgr.GetEventRecorderFor("gittrack-controller"),
+		ignoredGVRs:         gvrs,
+		lastUpdateTimes:     make(map[string]time.Time),
+		mutex:               &sync.RWMutex{},
+		applier:             applier,
+		log:                 rlogr.Log.WithName("gittrack-controller"),
+		namespace:           farosflags.Namespace,
+		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
 }
 
@@ -157,6 +159,9 @@ type ReconcileGitTrack struct {
 	mutex           *sync.RWMutex
 	applier         farosclient.Client
 	log             logr.Logger
+
+	namespace           string
+	clusterGitTrackMode farosflags.ClusterGitTrackMode
 }
 
 func (r *ReconcileGitTrack) withValues(keysAndValues ...interface{}) *ReconcileGitTrack {
@@ -365,7 +370,7 @@ func (r *ReconcileGitTrack) handleObject(u *unstructured.Unstructured, owner far
 		return errorResult(namespacedName, err)
 	}
 
-	ignored, reason, err := r.ignoreObject(u)
+	ignored, reason, err := r.ignoreObject(u, owner)
 	if err != nil {
 		return errorResult(gto.GetNamespacedName(), err)
 	}
@@ -493,15 +498,15 @@ func checkOwner(owner farosv1alpha1.GitTrackInterface, child farosv1alpha1.GitTr
 }
 
 // ignoreObject checks whether the unstructured object should be ignored
-func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, string, error) {
+func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner farosv1alpha1.GitTrackInterface) (bool, string, error) {
 	gvr, namespaced, err := utils.GetAPIResource(r.restMapper, u.GetObjectKind().GroupVersionKind())
 	if err != nil {
 		return false, "", err
 	}
 
 	// Ignore namespaced objects not in the namespace managed by the controller
-	if namespaced && farosflags.Namespace != "" && farosflags.Namespace != u.GetNamespace() {
-		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", farosflags.Namespace)
+	if namespaced && r.namespace != "" && r.namespace != u.GetNamespace() {
+		r.log.V(1).Info("Object not in namespace", "object namespace", u.GetNamespace(), "managed namespace", r.namespace)
 		return true, fmt.Sprintf("namespace `%s` is not managed by this Faros", u.GetNamespace()), nil
 	}
 	// Ignore GVKs in the ignoredGVKs set
@@ -509,6 +514,23 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured) (bool, st
 		r.log.V(1).Info("Object group version ignored globally", "group version resource", gvr.String())
 		return true, fmt.Sprintf("resource `%s.%s/%s` ignored globally by flag", gvr.Resource, gvr.Group, gvr.Version), nil
 	}
+
+	ownerNamespace := owner.GetNamespace()
+	_, ownerIsGittrack := owner.(*farosv1alpha1.GitTrack)
+	_, ownerIsClusterGittrack := owner.(*farosv1alpha1.ClusterGitTrack)
+	if namespaced {
+		// prevent a gittrack in a namespace from handling objects which are in a different namespace
+		if ownerIsGittrack && ownerNamespace != u.GetNamespace() {
+			return true, fmt.Sprintf("namespace `%s` is not managed by this GitTrack", u.GetNamespace()), nil
+		} else if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMExcludeNamespaced {
+			return true, "namespaced resources cannot be managed by ClusterGitTrack", nil
+		}
+	}
+
+	if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {
+		return true, "ClusterGitTrack handling disabled; ignoring", nil
+	}
+
 	return false, "", nil
 }
 

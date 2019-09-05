@@ -41,6 +41,9 @@ var (
 	// FetchTimeout in seconds for fetching changes from repositories
 	FetchTimeout time.Duration
 
+	// ClusterGitTrack specifies which mode we're handling ClusterGitTracks in
+	ClusterGitTrack ClusterGitTrackMode
+
 	// RepositoryDir is the folder on the local filesystem in which Faros should
 	// check out repositories. If left empty, Faros will check out repositories
 	// in memory
@@ -54,6 +57,7 @@ func init() {
 	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
 	FlagSet.DurationVar(&FetchTimeout, "fetch-timeout", 30*time.Second, "Timeout in seconds for fetching changes from repositories")
 	FlagSet.StringVar(&RepositoryDir, "repository-dir", "", "Directory in which to clone repositories. Defaults to cloning in memory if unset.")
+	FlagSet.Var(&ClusterGitTrack, "clustergittrack-mode", "How to manage ClusterGitTracks. Valid values are Disabled, IncludeNamespaced and ExcludeNamespaced")
 }
 
 // ParseIgnoredResources attempts to parse the ignore-resource flag value and
@@ -77,4 +81,50 @@ func ParseIgnoredResources() (map[schema.GroupVersionResource]interface{}, error
 		gvrs[gvr] = nil
 	}
 	return gvrs, nil
+}
+
+// ClusterGitTrackMode specifies which mode we're running ClusterGitTracks in
+type ClusterGitTrackMode int
+
+// Enums for ClusterGitTrackMode
+const (
+	CGTMIncludeNamespaced ClusterGitTrackMode = iota
+	CGTMDisabled
+	CGTMExcludeNamespaced
+)
+
+// String implements the flag.Value interface
+func (cgtm ClusterGitTrackMode) String() string {
+	switch cgtm {
+	case CGTMDisabled:
+		return "Disabled"
+	case CGTMIncludeNamespaced:
+		return "IncludeNamespaced"
+	case CGTMExcludeNamespaced:
+		return "ExcludeNamespaced"
+	}
+	panic("unreachable")
+}
+
+// Set implements the flag.Value interface
+func (cgtm *ClusterGitTrackMode) Set(s string) error {
+	lowered := strings.ToLower(s)
+	switch lowered {
+	case "disabled":
+		*cgtm = CGTMDisabled
+		return nil
+	case "includenamespaced":
+		*cgtm = CGTMIncludeNamespaced
+		return nil
+	case "excludenamespaced":
+		*cgtm = CGTMExcludeNamespaced
+		return nil
+	default:
+		return fmt.Errorf("invalid value %q for clustergittrack-mode; valid values are Disabled, IncludeNamespaced and ExcludeNamespaced", s)
+	}
+}
+
+// Type implements the flag.Value interface
+func (cgtm ClusterGitTrackMode) Type() string {
+	return "ClusterGitTrackMode"
 }
