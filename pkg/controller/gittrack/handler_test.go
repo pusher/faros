@@ -394,6 +394,16 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertNamespacedChildNameWithColon = func() {
+			BeforeEach(func() {
+				gto = testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetName("deployment-nginx-name-what-got-a-colon-in-it")
+			})
+
+			It("replaces `:` with `-` in the name", func() {
+				m.Get(gto, timeout).Should(Succeed())
+			})
+		}
 		var AssertGitTrackUpdated = func(kind string) {
 			BeforeEach(func() {
 				By("Executing the handler on and older commit")
@@ -633,10 +643,10 @@ var _ = Describe("Handler Suite", func() {
 
 			Context("when a child name contains colons", func() {
 				BeforeEach(func() {
-					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "241786090da55894dca4e91e3f5023c024d3d9a8"), timeout).Should(Succeed())
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "ba1882582489cb57abf4ec297f3e01abf70a0b8d"), timeout).Should(Succeed())
 				})
 
-				AssertChildNameWithColon()
+				AssertNamespacedChildNameWithColon()
 			})
 
 			Context("when the GitTrack is updated", func() {
