@@ -435,15 +435,6 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		}
 	})
 
-	Context("When a ClusterGitTrack resource is created", func() {
-		BeforeEach(func() {
-			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
-		})
-		It("should not reconcile it", func() {
-			Eventually(requests, timeout).ShouldNot(Receive())
-		})
-	})
-
 	AfterEach(func() {
 		close(stop)
 		testutils.DeleteAll(cfg, timeout,
@@ -454,5 +445,14 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 			&v1.EventList{},
 		)
 		farosflags.Namespace = ""
+	})
+
+	Context("When a ClusterGitTrack resource is created", func() {
+		BeforeEach(func() {
+			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+		})
+		It("should not reconcile it", func() {
+			Eventually(requests, timeout).ShouldNot(Receive())
+		})
 	})
 })
