@@ -452,7 +452,9 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 		})
 		It("should not reconcile it", func() {
-			Eventually(requests, timeout).ShouldNot(Receive())
+			// use a custom timeout here, so that the tests doesn't run too slow on
+			// success
+			Consistently(requests, 1*time.Second).ShouldNot(Receive())
 		})
 	})
 })
