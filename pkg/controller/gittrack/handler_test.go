@@ -160,10 +160,15 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
-		var AssertIgnoresWrongNamespaceChild = func(r *handlerResult) {
+		var AssertNoChild = func() {
 			It("does not create a GitTrackObject for the child", func() {
 				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
 			})
+		}
+
+		var AssertIgnoresWrongNamespaceChild = func(r *handlerResult) {
+
+			AssertNoChild()
 
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
@@ -173,9 +178,7 @@ var _ = Describe("Handler Suite", func() {
 		}
 
 		var AssertClusterGitTrackIgnoresNamespaced = func(r *handlerResult) {
-			It("does not create a GitTrackObject for the child", func() {
-				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
-			})
+			AssertNoChild()
 
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
@@ -185,9 +188,7 @@ var _ = Describe("Handler Suite", func() {
 		}
 
 		var AssertClusterGitTrackHandlingDisabled = func(r *handlerResult) {
-			It("does not create a GitTrackObject for the child", func() {
-				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
-			})
+			AssertNoChild()
 
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
@@ -271,6 +272,25 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertChild()
+			})
+
+			AssertNoErrors()
+		}
+
+		var AssertClusterScopedResourceDisallowed = func() {
+			Context("for the namespace file", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+					gto.SetName("namespace-test")
+				})
+				AssertNoChild()
+
+				It("ignores the child resource", func() {
+					key := gto.GetName()
+					value := "cluster scoped object managed from gittrack are not allowed"
+					Expect(result.ignoredFiles).To(HaveKeyWithValue(key, value))
+				})
+
 			})
 
 			AssertNoErrors()
@@ -584,7 +604,7 @@ var _ = Describe("Handler Suite", func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42"), timeout).Should(Succeed())
 				})
 
-				AssertClusterScopedResource()
+				AssertClusterScopedResourceDisallowed()
 			})
 
 			Context("with an invalid reference", func() {
