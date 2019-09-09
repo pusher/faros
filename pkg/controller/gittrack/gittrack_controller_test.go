@@ -406,8 +406,6 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 	}
 
 	BeforeEach(func() {
-		farosflags.Namespace = "default"
-
 		var err error
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		mgr, err = manager.New(cfg, manager.Options{
@@ -444,7 +442,6 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&v1.EventList{},
 		)
-		farosflags.Namespace = ""
 	})
 
 	Context("When a ClusterGitTrack resource is created", func() {
