@@ -697,7 +697,7 @@ var _ = Describe("Handler Suite", func() {
 					AssertIgnoresWrongNamespaceChild(&result)
 				})
 
-				AssertAppliedDiscoveredIgnored(&result, 1, 3, 2)
+				AssertAppliedDiscoveredIgnored(&result, 0, 3, 3)
 			})
 		})
 
