@@ -393,6 +393,7 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 	var r reconcile.Reconciler
 
 	const timeout = time.Second * 5
+	const consistentTimeout = 1 * time.Second
 	const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
 	const doesNotExistPath = "does-not-exist"
 	const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
@@ -448,10 +449,11 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		BeforeEach(func() {
 			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 		})
+
 		It("should not reconcile it", func() {
 			// use a custom timeout here, so that the tests doesn't run too slow on
 			// success
-			Consistently(requests, 1*time.Second).ShouldNot(Receive())
+			Consistently(requests, consistentTimeout).ShouldNot(Receive())
 		})
 	})
 })
