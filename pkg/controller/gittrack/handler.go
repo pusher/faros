@@ -78,6 +78,13 @@ func (h handlerResult) asMetricOpts(repository string) *metricsOpts {
 func (r *ReconcileGitTrack) handleGitTrack(gt farosv1alpha1.GitTrackInterface) handlerResult {
 	var result handlerResult
 
+	// don't reconcile if it's a gittrack and they're disabled
+	// we shouldn't ever get here because reconcile should be turned off at the controller level,
+	// but for testing and safeguarding, check anyway
+	if _, ok := gt.(*farosv1alpha1.ClusterGitTrack); ok && !r.handleGitTracks {
+		return result
+	}
+
 	// Get a map of the files that are in the Spec
 	files, err := r.getFiles(gt)
 	if err != nil {
