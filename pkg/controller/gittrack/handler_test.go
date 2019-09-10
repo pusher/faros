@@ -98,6 +98,7 @@ var _ = Describe("Handler Suite", func() {
 
 		recFn, _ := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrack)
+		r.gitTrackMode = farosflags.GTMEnabled
 
 		stop = StartTestManager(mgr)
 	})
