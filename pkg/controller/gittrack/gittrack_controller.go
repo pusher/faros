@@ -144,15 +144,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 		return err
 	}
 
-	// TODO(dmo): disable this watch once we've made it so that gittracks cannot create clustergittrackobjects
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.GitTrack{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
