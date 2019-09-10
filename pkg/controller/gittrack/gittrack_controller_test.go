@@ -352,8 +352,8 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should return 6 child objects", func() {
-			Expect(children).Should(HaveLen(6))
+		It("should return 5 child objects", func() {
+			Expect(children).Should(HaveLen(5))
 		})
 
 		It("should return 5 namespaced objects", func() {
@@ -366,14 +366,14 @@ var _ = Describe("GitTrack Suite", func() {
 			Expect(count).To(Equal(5))
 		})
 
-		It("should return 1 non-namespaced resource", func() {
+		It("should return 0 non-namespaced resources", func() {
 			var count int
 			for _, obj := range children {
 				if _, ok := obj.(*farosv1alpha1.ClusterGitTrackObject); ok {
 					count++
 				}
 			}
-			Expect(count).To(Equal(1))
+			Expect(count).To(Equal(0))
 		})
 
 		It("should key all items by their NamespacedName", func() {
