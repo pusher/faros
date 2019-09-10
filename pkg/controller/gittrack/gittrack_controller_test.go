@@ -102,6 +102,8 @@ var _ = Describe("GitTrack Suite", func() {
 		var recFn reconcile.Reconciler
 		var opts *reconcileGitTrackOpts
 		r, opts = newReconciler(mgr)
+		r.(*ReconcileGitTrack).handleGitTracks = true
+		opts.handleGitTracks = true
 		recFn, requests = SetupTestReconcile(r)
 		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
 		stop = StartTestManager(mgr)

@@ -86,6 +86,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 		mutex:               &sync.RWMutex{},
 		applier:             applier,
 		log:                 rlogr.Log.WithName("gittrack-controller"),
+		handleGitTracks:     farosflags.HandleGitTracks,
 		namespace:           farosflags.Namespace,
 		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
@@ -97,6 +98,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 
 type reconcileGitTrackOpts struct {
 	clusterGitTrackMode farosflags.ClusterGitTrackMode
+	handleGitTracks     bool
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -107,10 +109,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 		return err
 	}
 
-	// Watch for changes to GitTrack
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
+	if opts.handleGitTracks {
+		// Watch for changes to GitTrack
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{})
+		if err != nil {
+			return err
+		}
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &farosv1alpha1.GitTrack{},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	switch opts.clusterGitTrackMode {
@@ -140,15 +151,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 			return err
 		}
 	}
-
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.GitTrack{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -167,6 +169,7 @@ type ReconcileGitTrack struct {
 	applier         farosclient.Client
 	log             logr.Logger
 
+	handleGitTracks     bool
 	namespace           string
 	clusterGitTrackMode farosflags.ClusterGitTrackMode
 }
