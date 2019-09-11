@@ -41,6 +41,7 @@ var (
 	// FetchTimeout in seconds for fetching changes from repositories
 	FetchTimeout time.Duration
 
+	// HandleGitTracks specifies if we're handling GitTracks
 	HandleGitTracks HandleGitTrackMode
 
 	// ClusterGitTrack specifies which mode we're handling ClusterGitTracks in
