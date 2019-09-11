@@ -113,7 +113,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 		return err
 	}
 
-	if opts.clusterGitTrackMode != farosflags.CGTMDisabled {
+	switch opts.clusterGitTrackMode {
+	case farosflags.CGTMDisabled:
+		// do nothing
+	case farosflags.CGTMIncludeNamespaced:
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &farosv1alpha1.ClusterGitTrack{},
+		})
+		if err != nil {
+			return err
+		}
+		fallthrough
+	case farosflags.CGTMExcludeNamespaced:
 		// Watch for changes to ClusterGitTrack
 		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrack{}}, &handler.EnqueueRequestForObject{})
 		if err != nil {
@@ -121,13 +133,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 		}
 
 		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &farosv1alpha1.ClusterGitTrack{},
-		})
-		if err != nil {
-			return err
-		}
-		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
 			IsController: true,
 			OwnerType:    &farosv1alpha1.ClusterGitTrack{},
 		})
