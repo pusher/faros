@@ -529,7 +529,7 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 		}
 	} else if ownerIsGittrack {
 		// cluster scoped object managed from namespaced gittrack. Disallow
-		return true, "cluster scoped object managed from gittrack are not allowed", nil
+		return true, "a GitTrack cannot manage a cluster-scoped resource", nil
 	}
 
 	if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {

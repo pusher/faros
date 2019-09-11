@@ -287,7 +287,7 @@ var _ = Describe("Handler Suite", func() {
 
 				It("ignores the child resource", func() {
 					key := gto.GetName()
-					value := "cluster scoped object managed from gittrack are not allowed"
+					value := "a GitTrack cannot manage a cluster-scoped resource"
 					Expect(result.ignoredFiles).To(HaveKeyWithValue(key, value))
 				})
 
