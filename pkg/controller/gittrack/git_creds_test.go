@@ -21,14 +21,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
-	gitstore "github.com/pusher/git-store"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
-	"k8s.io/client-go/util/flowcontrol"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	gitstore "github.com/pusher/git-store"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	farosclient "github.com/pusher/faros/pkg/utils/client"
+	"k8s.io/client-go/util/flowcontrol"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 var _ = Describe("GitTrack Suite", func() {
@@ -61,7 +61,7 @@ var _ = Describe("GitTrack Suite", func() {
 
 			m = testutils.Matcher{Client: c, FarosClient: applier}
 
-			recFn := newReconciler(mgr)
+			recFn, _ := newReconciler(mgr)
 			r = recFn.(*ReconcileGitTrack)
 
 			stop = StartTestManager(mgr)
@@ -94,7 +94,7 @@ var _ = Describe("GitTrack Suite", func() {
 		}
 
 		var AssertWithDeployKey = func() {
-			Context("which has a DeployKey" , func() {
+			Context("which has a DeployKey", func() {
 				var dk farosv1alpha1.GitTrackDeployKey
 
 				var keysMustBeSetErr = errors.New("both SecretName and Key must be set when using DeployKey")
@@ -114,9 +114,9 @@ var _ = Describe("GitTrack Suite", func() {
 					m.Create(secret).Should(Succeed())
 
 					dk = farosv1alpha1.GitTrackDeployKey{
-						SecretName: "foosecret",
+						SecretName:      "foosecret",
 						SecretNamespace: "default",
-						Key:        "privatekey",
+						Key:             "privatekey",
 					}
 					setDeployKey(gt, dk)
 				})
@@ -148,7 +148,7 @@ var _ = Describe("GitTrack Suite", func() {
 					})
 				})
 
-				Context("if a key is not set within the DeployKey", func () {
+				Context("if a key is not set within the DeployKey", func() {
 					BeforeEach(func() {
 						dk.Key = ""
 						setDeployKey(gt, dk)
@@ -166,7 +166,7 @@ var _ = Describe("GitTrack Suite", func() {
 					})
 				})
 
-				Context("if the secret name is not set within the DeployKey", func () {
+				Context("if the secret name is not set within the DeployKey", func() {
 					BeforeEach(func() {
 						dk.SecretName = ""
 						setDeployKey(gt, dk)

@@ -42,22 +42,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var c client.Client
-var mgr manager.Manager
-var instance farosv1alpha1.GitTrackInterface
-var requests chan reconcile.Request
-var stop chan struct{}
-var r reconcile.Reconciler
-
-var key = types.NamespacedName{Name: "example", Namespace: "default"}
-var expectedRequest = reconcile.Request{NamespacedName: key}
-
-const timeout = time.Second * 5
-const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
-const doesNotExistPath = "does-not-exist"
-const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
-
 var _ = Describe("GitTrack Suite", func() {
+	var c client.Client
+	var mgr manager.Manager
+	var instance farosv1alpha1.GitTrackInterface
+	var requests chan reconcile.Request
+	var stop chan struct{}
+	var r reconcile.Reconciler
+
+	var key = types.NamespacedName{Name: "example", Namespace: "default"}
+	var expectedRequest = reconcile.Request{NamespacedName: key}
+
+	const timeout = time.Second * 5
+	const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
+	const doesNotExistPath = "does-not-exist"
+	const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
+
 	var createInstance = func(gt farosv1alpha1.GitTrackInterface, ref string) {
 		spec := gt.GetSpec()
 		spec.Reference = ref
@@ -100,9 +100,10 @@ var _ = Describe("GitTrack Suite", func() {
 		c = mgr.GetClient()
 
 		var recFn reconcile.Reconciler
-		r = newReconciler(mgr)
+		var opts *reconcileGitTrackOpts
+		r, opts = newReconciler(mgr)
 		recFn, requests = SetupTestReconcile(r)
-		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
+		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
 		stop = StartTestManager(mgr)
 		instance = &farosv1alpha1.GitTrack{
 			ObjectMeta: metav1.ObjectMeta{
@@ -205,6 +206,65 @@ var _ = Describe("GitTrack Suite", func() {
 			├── deployment.yaml
 			└── namespace.yaml
 		*/
+		var getsFilesFromRepo = func(path string, count int) {
+			Context(fmt.Sprintf("With subPath %s", path), func() {
+				var files map[string]*gitstore.File
+				var gt *farosv1alpha1.GitTrack
+
+				BeforeEach(func() {
+					var err error
+					var reconciler *ReconcileGitTrack
+					var ok bool
+					reconciler, ok = r.(*ReconcileGitTrack)
+					Expect(ok).To(BeTrue())
+					gt = &farosv1alpha1.GitTrack{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test",
+							Namespace: "default",
+						},
+						Spec: farosv1alpha1.GitTrackSpec{
+							SubPath:    path,
+							Repository: repositoryURL,
+							DeployKey:  farosv1alpha1.GitTrackDeployKey{},
+							Reference:  "51798af1c1374d1d375a0eb7a3e53dd67ac5d135",
+						},
+					}
+
+					Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
+					req := reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      "test",
+							Namespace: "default",
+						},
+					}
+					Eventually(requests, timeout).Should(Receive(Equal(req)))
+
+					files, err = reconciler.getFiles(gt)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				AfterEach(func() {
+					Expect(c.Delete(context.TODO(), gt)).NotTo(HaveOccurred())
+				})
+
+				It("Filters files by SubPath", func() {
+					for filePath := range files {
+						Expect(filePath).To(HavePrefix(strings.TrimPrefix(path, "/")))
+					}
+				})
+
+				It("Filters files by file extension", func() {
+					for filePath := range files {
+						Expect(filePath).To(MatchRegexp(filePathRegexp))
+					}
+				})
+
+				It("Fetches all files recursively from the SubPath", func() {
+					Expect(files).To(HaveLen(count))
+				})
+
+			})
+		}
 
 		getsFilesFromRepo("foo", 3)
 		getsFilesFromRepo("foo/", 3)
@@ -324,62 +384,76 @@ var _ = Describe("GitTrack Suite", func() {
 	})
 })
 
-var getsFilesFromRepo = func(path string, count int) {
-	Context(fmt.Sprintf("With subPath %s", path), func() {
-		var files map[string]*gitstore.File
-		var gt *farosv1alpha1.GitTrack
+var _ = Describe("ClusterGitTrack Suite", func() {
+	var c client.Client
+	var mgr manager.Manager
+	var instance farosv1alpha1.GitTrackInterface
+	var requests chan reconcile.Request
+	var stop chan struct{}
+	var r reconcile.Reconciler
 
-		BeforeEach(func() {
-			var err error
-			var reconciler *ReconcileGitTrack
-			var ok bool
-			reconciler, ok = r.(*ReconcileGitTrack)
-			Expect(ok).To(BeTrue())
-			gt = &farosv1alpha1.GitTrack{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "default",
-				},
-				Spec: farosv1alpha1.GitTrackSpec{
-					SubPath:    path,
-					Repository: repositoryURL,
-					DeployKey:  farosv1alpha1.GitTrackDeployKey{},
-					Reference:  "51798af1c1374d1d375a0eb7a3e53dd67ac5d135",
-				},
-			}
+	const timeout = time.Second * 5
+	const consistentTimeout = 1 * time.Second
+	const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
+	const doesNotExistPath = "does-not-exist"
+	const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
 
-			Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      "test",
-					Namespace: "default",
-				},
-			}
-			Eventually(requests, timeout).Should(Receive(Equal(req)))
+	var createInstance = func(gt farosv1alpha1.GitTrackInterface, ref string) {
+		spec := gt.GetSpec()
+		spec.Reference = ref
+		gt.SetSpec(spec)
+		err := c.Create(context.TODO(), gt)
+		Expect(err).NotTo(HaveOccurred())
+	}
 
-			files, err = reconciler.getFiles(gt)
-			Expect(err).ToNot(HaveOccurred())
+	BeforeEach(func() {
+		var err error
+		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+		mgr, err = manager.New(cfg, manager.Options{
+			Namespace:          farosflags.Namespace,
+			MetricsBindAddress: "0", // Disable serving metrics while testing
 		})
+		Expect(err).NotTo(HaveOccurred())
+		c = mgr.GetClient()
 
-		AfterEach(func() {
-			Expect(c.Delete(context.TODO(), gt)).NotTo(HaveOccurred())
-		})
-
-		It("Filters files by SubPath", func() {
-			for filePath := range files {
-				Expect(filePath).To(HavePrefix(strings.TrimPrefix(path, "/")))
-			}
-		})
-
-		It("Filters files by file extension", func() {
-			for filePath := range files {
-				Expect(filePath).To(MatchRegexp(filePathRegexp))
-			}
-		})
-
-		It("Fetches all files recursively from the SubPath", func() {
-			Expect(files).To(HaveLen(count))
-		})
-
+		var recFn reconcile.Reconciler
+		var opts *reconcileGitTrackOpts
+		r, opts = newReconciler(mgr)
+		recFn, requests = SetupTestReconcile(r)
+		opts.clusterGitTrackMode = farosflags.CGTMDisabled
+		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
+		stop = StartTestManager(mgr)
+		instance = &farosv1alpha1.ClusterGitTrack{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "example",
+				Namespace: "",
+			},
+			Spec: farosv1alpha1.GitTrackSpec{
+				Repository: repositoryURL,
+			},
+		}
 	})
-}
+
+	AfterEach(func() {
+		close(stop)
+		testutils.DeleteAll(cfg, timeout,
+			&farosv1alpha1.GitTrackList{},
+			&farosv1alpha1.ClusterGitTrackList{},
+			&farosv1alpha1.GitTrackObjectList{},
+			&farosv1alpha1.ClusterGitTrackObjectList{},
+			&v1.EventList{},
+		)
+	})
+
+	Context("When a ClusterGitTrack resource is created", func() {
+		BeforeEach(func() {
+			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+		})
+
+		It("should not reconcile it", func() {
+			// use a custom timeout here, so that the tests doesn't run too slow on
+			// success
+			Consistently(requests, consistentTimeout).ShouldNot(Receive())
+		})
+	})
+})

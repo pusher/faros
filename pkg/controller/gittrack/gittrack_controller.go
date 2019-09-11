@@ -53,11 +53,12 @@ import (
 // and Start it when the Manager is Started.
 // USER ACTION REQUIRED: update cmd/manager/main.go to call this faros.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	recFn, opts := newReconciler(mgr)
+	return add(mgr, recFn, opts)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrackOpts) {
 	// Create a restMapper (used by informer to look up resource kinds)
 	restMapper, err := utils.NewRestMapper(mgr.GetConfig())
 	if err != nil {
@@ -74,7 +75,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create applier: %v", err))
 	}
 
-	return &ReconcileGitTrack{
+	rec := &ReconcileGitTrack{
 		Client:              mgr.GetClient(),
 		scheme:              mgr.GetScheme(),
 		store:               gitstore.NewRepoStore(farosflags.RepositoryDir),
@@ -88,10 +89,18 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		namespace:           farosflags.Namespace,
 		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
+	opts := &reconcileGitTrackOpts{
+		clusterGitTrackMode: farosflags.ClusterGitTrack,
+	}
+	return rec, opts
+}
+
+type reconcileGitTrackOpts struct {
+	clusterGitTrackMode farosflags.ClusterGitTrackMode
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpts) error {
 	// Create a new controller
 	c, err := controller.New("gittrack-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -104,10 +113,27 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to ClusterGitTrack
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrack{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
+	if opts.clusterGitTrackMode != farosflags.CGTMDisabled {
+		// Watch for changes to ClusterGitTrack
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrack{}}, &handler.EnqueueRequestForObject{})
+		if err != nil {
+			return err
+		}
+
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &farosv1alpha1.ClusterGitTrack{},
+		})
+		if err != nil {
+			return err
+		}
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &farosv1alpha1.ClusterGitTrack{},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
@@ -118,25 +144,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// TODO(dmo): disable this watch once we've made it so that gittracks cannot create clustergittrackobjects
 	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &farosv1alpha1.GitTrack{},
-	})
-	if err != nil {
-		return err
-	}
-
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.ClusterGitTrack{},
-	})
-	if err != nil {
-		return err
-	}
-
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.ClusterGitTrack{},
 	})
 	if err != nil {
 		return err
