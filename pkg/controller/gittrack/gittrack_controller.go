@@ -86,7 +86,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 		mutex:               &sync.RWMutex{},
 		applier:             applier,
 		log:                 rlogr.Log.WithName("gittrack-controller"),
-		handleGitTracks:     farosflags.HandleGitTracks,
+		gitTrackMode:        farosflags.GitTrack,
 		namespace:           farosflags.Namespace,
 		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
@@ -98,7 +98,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 
 type reconcileGitTrackOpts struct {
 	clusterGitTrackMode farosflags.ClusterGitTrackMode
-	handleGitTracks     bool
+	gitTrackMode        farosflags.GitTrackMode
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -109,7 +109,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 		return err
 	}
 
-	if opts.handleGitTracks {
+	if opts.gitTrackMode == farosflags.GTMEnabled {
 		// Watch for changes to GitTrack
 		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{})
 		if err != nil {
@@ -169,7 +169,7 @@ type ReconcileGitTrack struct {
 	applier         farosclient.Client
 	log             logr.Logger
 
-	handleGitTracks     bool
+	gitTrackMode        farosflags.GitTrackMode
 	namespace           string
 	clusterGitTrackMode farosflags.ClusterGitTrackMode
 }
