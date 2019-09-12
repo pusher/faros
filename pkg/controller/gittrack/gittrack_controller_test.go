@@ -28,9 +28,9 @@ import (
 	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
-	farosclient "github.com/pusher/faros/pkg/utils/client"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -365,7 +365,7 @@ var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
 		Expect(err).NotTo(HaveOccurred())
 		m = testutils.Matcher{
-			Client: c,
+			Client:      c,
 			FarosClient: applier,
 		}
 	})
@@ -416,11 +416,18 @@ var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 
 		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
 			BeforeEach(func() {
-				Fail("Not implemented")
+				// Create the parent
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+
+				// Create a GitTrackObject owned by the ClusterGitTrack
+				gto := testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(gto).Should(Succeed())
+				m.Get(gto, timeout).Should(Succeed())
 			})
 
-			PIt("should not reconcile the ClusterGitTrack", func() {
-				Fail("Not implemented")
+			It("should not reconcile the ClusterGitTrack", func() {
+				Consistently(requests, consistentTimeout).ShouldNot(Receive())
 			})
 		})
 	})
@@ -443,11 +450,17 @@ var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 
 		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
 			BeforeEach(func() {
-				Fail("Not implemented")
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				cgto := testutils.ExampleClusterGitTrackObject.DeepCopy()
+				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(cgto).Should(Succeed())
+				m.Get(cgto, timeout).Should(Succeed())
 			})
 
-			PIt("should reconcile the ClusterGitTrack", func() {
-				Fail("Not implemented")
+			It("should reconcile the ClusterGitTrack", func() {
+				Eventually(requests, timeout).Should(Receive())
 			})
 		})
 
@@ -458,10 +471,10 @@ var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 				Eventually(requests, timeout).Should(Receive())
 
 				// Create a ClusterGitTrackObject owned by the ClusterGitTrack
-				cgto := testutils.ExampleGitTrackObject.DeepCopy()
-				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
-				m.Create(cgto).Should(Succeed())
-				m.Get(cgto, timeout).Should(Succeed())
+				gto := testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(gto).Should(Succeed())
+				m.Get(gto, timeout).Should(Succeed())
 			})
 
 			It("should not reconcile the ClusterGitTrack", func() {
@@ -488,21 +501,35 @@ var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 
 		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
 			BeforeEach(func() {
-				Fail("Not implemented")
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				cgto := testutils.ExampleClusterGitTrackObject.DeepCopy()
+				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(cgto).Should(Succeed())
+				m.Get(cgto, timeout).Should(Succeed())
 			})
 
-			PIt("should reconcile the ClusterGitTrack", func() {
-				Fail("Not implemented")
+			It("should reconcile the ClusterGitTrack", func() {
+				Eventually(requests, timeout).Should(Receive())
 			})
 		})
 
 		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
 			BeforeEach(func() {
-				Fail("Not implemented")
+				// Create the parent and receive it's creation event
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				// Create a ClusterGitTrackObject owned by the ClusterGitTrack
+				gto := testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(gto).Should(Succeed())
+				m.Get(gto, timeout).Should(Succeed())
 			})
 
-			PIt("should reconcile the ClusterGitTrack", func() {
-				Fail("Not implemented")
+			It("should reconcile the ClusterGitTrack", func() {
+				Eventually(requests, timeout).Should(Receive())
 			})
 		})
 	})
