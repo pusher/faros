@@ -18,7 +18,6 @@ package gittrack
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -30,7 +29,6 @@ import (
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
 	testutils "github.com/pusher/faros/test/utils"
-	gitstore "github.com/pusher/git-store"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,83 +193,6 @@ var _ = Describe("GitTrack Suite", func() {
 				}, timeout).Should(Succeed())
 			})
 		})
-	})
-
-	Context("When getting files from a repository", func() {
-		/*
-			foo
-			├── bar
-			│   ├── non-yaml-file.txt
-			│   └── service.yaml
-			├── deployment.yaml
-			└── namespace.yaml
-		*/
-		var getsFilesFromRepo = func(path string, count int) {
-			Context(fmt.Sprintf("With subPath %s", path), func() {
-				var files map[string]*gitstore.File
-				var gt *farosv1alpha1.GitTrack
-
-				BeforeEach(func() {
-					var err error
-					var reconciler *ReconcileGitTrack
-					var ok bool
-					reconciler, ok = r.(*ReconcileGitTrack)
-					Expect(ok).To(BeTrue())
-					gt = &farosv1alpha1.GitTrack{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test",
-							Namespace: "default",
-						},
-						Spec: farosv1alpha1.GitTrackSpec{
-							SubPath:    path,
-							Repository: repositoryURL,
-							DeployKey:  farosv1alpha1.GitTrackDeployKey{},
-							Reference:  "51798af1c1374d1d375a0eb7a3e53dd67ac5d135",
-						},
-					}
-
-					Expect(c.Create(context.TODO(), gt)).NotTo(HaveOccurred())
-					req := reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      "test",
-							Namespace: "default",
-						},
-					}
-					Eventually(requests, timeout).Should(Receive(Equal(req)))
-
-					files, err = reconciler.getFiles(gt)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				AfterEach(func() {
-					Expect(c.Delete(context.TODO(), gt)).NotTo(HaveOccurred())
-				})
-
-				It("Filters files by SubPath", func() {
-					for filePath := range files {
-						Expect(filePath).To(HavePrefix(strings.TrimPrefix(path, "/")))
-					}
-				})
-
-				It("Filters files by file extension", func() {
-					for filePath := range files {
-						Expect(filePath).To(MatchRegexp(filePathRegexp))
-					}
-				})
-
-				It("Fetches all files recursively from the SubPath", func() {
-					Expect(files).To(HaveLen(count))
-				})
-
-			})
-		}
-
-		getsFilesFromRepo("foo", 3)
-		getsFilesFromRepo("foo/", 3)
-		getsFilesFromRepo("/foo/", 3)
-		getsFilesFromRepo("foo/bar", 1)
-		getsFilesFromRepo("foobar", 2)
-		getsFilesFromRepo("foobar/", 2)
 	})
 
 	Context(fmt.Sprintf("with invalid files"), func() {
