@@ -79,11 +79,14 @@ func (h handlerResult) asMetricOpts(repository string) *metricsOpts {
 func (r *ReconcileGitTrack) handleGitTrack(gt farosv1alpha1.GitTrackInterface) handlerResult {
 	var result handlerResult
 
-	// don't reconcile if it's a gittrack and they're disabled
+	// panic if we have a logic error with our watches
 	// we shouldn't ever get here because reconcile should be turned off at the controller level,
 	// but for testing and safeguarding, check anyway
-	if _, ok := gt.(*farosv1alpha1.ClusterGitTrack); ok && r.gitTrackMode == farosflags.GTMDisabled {
-		return result
+	if _, ok := gt.(*farosv1alpha1.GitTrack); ok && r.gitTrackMode == farosflags.GTMDisabled {
+		panic("reconciling GitTrack when GitTrack-mode is disabled")
+	}
+	if _, ok := gt.(*farosv1alpha1.ClusterGitTrack); ok && r.clusterGitTrackMode == farosflags.CGTMDisabled {
+		panic("reconciling ClusterGitTrack when clustergittrack-mode is disabled")
 	}
 
 	// Get a map of the files that are in the Spec
