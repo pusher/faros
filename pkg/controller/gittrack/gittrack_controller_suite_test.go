@@ -128,3 +128,12 @@ func StartTestManager(mgr manager.Manager) chan struct{} {
 	}()
 	return stop
 }
+
+var _ reconcile.Reconciler = &fakeReconciler{}
+
+// fakeReconciler is a no-op reconciler to be used for tests of the watch setup
+type fakeReconciler struct{}
+
+func (f *fakeReconciler) Reconcile(_ reconcile.Request) (reconcile.Result, error) {
+	return reconcile.Result{}, nil
+}
