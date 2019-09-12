@@ -442,10 +442,6 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 		return true, "a GitTrack cannot manage a cluster-scoped resource", nil
 	}
 
-	if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {
-		return true, "ClusterGitTrack handling disabled; ignoring", nil
-	}
-
 	return false, "", nil
 }
 

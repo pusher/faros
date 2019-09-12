@@ -187,16 +187,6 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
-		var AssertClusterGitTrackHandlingDisabled = func(r *handlerResult) {
-			AssertNoChild()
-
-			It("ignores the child resource", func() {
-				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
-				value := fmt.Sprintf("ClusterGitTrack handling disabled; ignoring")
-				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
-			})
-		}
-
 		var AssertSendsEvent = func(reason, kind, name, eventType string) {
 			It(fmt.Sprintf("sends a %s event", reason), func() {
 				events := &corev1.EventList{}
@@ -793,15 +783,6 @@ var _ = Describe("Handler Suite", func() {
 					gto.SetName("deployment-nginx")
 				})
 				AssertClusterGitTrackIgnoresNamespaced(&result)
-			})
-
-			Context("when ClusterGitTrack handling is disabled", func() {
-				BeforeEach(func() {
-					r.clusterGitTrackMode = farosflags.CGTMDisabled
-					gto = testutils.ExampleGitTrackObject.DeepCopy()
-					gto.SetName("deployment-nginx")
-				})
-				AssertClusterGitTrackHandlingDisabled(&result)
 			})
 		})
 	})
