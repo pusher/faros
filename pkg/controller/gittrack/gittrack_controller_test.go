@@ -308,13 +308,12 @@ var _ = Describe("GitTrack Suite", func() {
 	})
 })
 
-var _ = Describe("ClusterGitTrack Suite", func() {
+var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 	var c client.Client
 	var mgr manager.Manager
 	var instance farosv1alpha1.GitTrackInterface
 	var requests chan reconcile.Request
 	var stop chan struct{}
-	var r reconcile.Reconciler
 	var m testutils.Matcher
 
 	var recFn reconcile.Reconciler
@@ -330,8 +329,8 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		spec := gt.GetSpec()
 		spec.Reference = ref
 		gt.SetSpec(spec)
-		err := c.Create(context.TODO(), gt)
-		Expect(err).NotTo(HaveOccurred())
+		m.Create(gt).Should(Succeed())
+		m.Get(gt, timeout).Should(Succeed())
 	}
 
 	var setupManager = func() {
@@ -349,8 +348,10 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
 
-		r, opts = newReconciler(mgr)
-		recFn, requests = SetupTestReconcile(r)
+		// Use a fakeReconciler so we don't create any extra events by updating
+		// resources created during tests
+		opts = &reconcileGitTrackOpts{}
+		recFn, requests = SetupTestReconcile(&fakeReconciler{})
 
 		instance = &farosv1alpha1.ClusterGitTrack{
 			ObjectMeta: metav1.ObjectMeta{
@@ -380,48 +381,129 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		)
 	})
 
-	Context("When a ClusterGitTrack resource is disabled", func() {
+	Context("When management of ClusterGitTrack resources is disabled", func() {
 		BeforeEach(func() {
 			opts.clusterGitTrackMode = farosflags.CGTMDisabled
 			setupManager()
-			createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 		})
 
-		It("should not reconcile it", func() {
-			// use a custom timeout here, so that the tests doesn't run too slow on
-			// success
-			Consistently(requests, consistentTimeout).ShouldNot(Receive())
+		Context("and a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			It("should not reconcile it", func() {
+				Consistently(requests, consistentTimeout).ShouldNot(Receive())
+			})
+		})
+
+		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				// Create the parent
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+
+				// Create a ClusterGitTrackObject owned by the ClusterGitTrack
+				cgto := testutils.ExampleClusterGitTrackObject.DeepCopy()
+				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(cgto).Should(Succeed())
+				m.Get(cgto, timeout).Should(Succeed())
+			})
+
+			It("should not reconcile the ClusterGitTrack", func() {
+				Consistently(requests, consistentTimeout).ShouldNot(Receive())
+			})
+		})
+
+		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				Fail("Not implemented")
+			})
+
+			PIt("should not reconcile the ClusterGitTrack", func() {
+				Fail("Not implemented")
+			})
 		})
 	})
 
-	Context("When a ClusterGitTrack resource is set to exclude namespaced", func() {
+	Context("When management of ClusterGitTrack resources excludes namespaced children", func() {
 		BeforeEach(func() {
-			createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
-
-			// get the instance back, so that we can use it as a parent referent
-			var cgt *farosv1alpha1.ClusterGitTrack
-			cgt = instance.(*farosv1alpha1.ClusterGitTrack).DeepCopy()
-			m.Get(cgt, timeout).Should(Succeed())
-
-			// create a gittrackobject, owned by the instance we just added
-			cgtobject := &farosv1alpha1.GitTrackObject{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "example",
-					Namespace: "default",
-					OwnerReferences: []metav1.OwnerReference{
-						testutils.GetGitTrackInterfaceOwnerRef(instance),
-					},
-				},
-			}
-			m.Create(cgtobject).Should(Succeed())
 			opts.clusterGitTrackMode = farosflags.CGTMExcludeNamespaced
 			setupManager()
 		})
 
-		It("should not reconcile it", func() {
-			// use a custom timeout here, so that the tests doesn't run too slow on
-			// success
-			Consistently(requests, consistentTimeout).ShouldNot(Receive())
+		Context("and a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			It("should reconcile it", func() {
+				Eventually(requests, timeout).Should(Receive())
+			})
+		})
+
+		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				Fail("Not implemented")
+			})
+
+			PIt("should reconcile the ClusterGitTrack", func() {
+				Fail("Not implemented")
+			})
+		})
+
+		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				// Create the parent and receive it's creation event
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				// Create a ClusterGitTrackObject owned by the ClusterGitTrack
+				cgto := testutils.ExampleGitTrackObject.DeepCopy()
+				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(cgto).Should(Succeed())
+				m.Get(cgto, timeout).Should(Succeed())
+			})
+
+			It("should not reconcile the ClusterGitTrack", func() {
+				Consistently(requests, consistentTimeout).ShouldNot(Receive())
+			})
+		})
+	})
+
+	Context("When management of ClusterGitTrack resources includes namespaced children", func() {
+		BeforeEach(func() {
+			opts.clusterGitTrackMode = farosflags.CGTMIncludeNamespaced
+			setupManager()
+		})
+
+		Context("and a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			It("should reconcile it", func() {
+				Eventually(requests, timeout).Should(Receive())
+			})
+		})
+
+		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				Fail("Not implemented")
+			})
+
+			PIt("should reconcile the ClusterGitTrack", func() {
+				Fail("Not implemented")
+			})
+		})
+
+		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				Fail("Not implemented")
+			})
+
+			PIt("should reconcile the ClusterGitTrack", func() {
+				Fail("Not implemented")
+			})
 		})
 	})
 })
