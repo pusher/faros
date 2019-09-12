@@ -30,6 +30,7 @@ import (
 	farosflags "github.com/pusher/faros/pkg/flags"
 	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -314,6 +315,10 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 	var requests chan reconcile.Request
 	var stop chan struct{}
 	var r reconcile.Reconciler
+	var m testutils.Matcher
+
+	var recFn reconcile.Reconciler
+	var opts *reconcileGitTrackOpts
 
 	const timeout = time.Second * 5
 	const consistentTimeout = 1 * time.Second
@@ -321,12 +326,17 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 	const doesNotExistPath = "does-not-exist"
 	const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
 
-	var createInstance = func(gt farosv1alpha1.GitTrackInterface, ref string) {
+	var createClusterGitTrack = func(gt farosv1alpha1.GitTrackInterface, ref string) {
 		spec := gt.GetSpec()
 		spec.Reference = ref
 		gt.SetSpec(spec)
 		err := c.Create(context.TODO(), gt)
 		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var setupManager = func() {
+		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
+		stop = StartTestManager(mgr)
 	}
 
 	BeforeEach(func() {
@@ -339,13 +349,9 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
 
-		var recFn reconcile.Reconciler
-		var opts *reconcileGitTrackOpts
 		r, opts = newReconciler(mgr)
 		recFn, requests = SetupTestReconcile(r)
-		opts.clusterGitTrackMode = farosflags.CGTMDisabled
-		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
-		stop = StartTestManager(mgr)
+
 		instance = &farosv1alpha1.ClusterGitTrack{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "example",
@@ -354,6 +360,12 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 			Spec: farosv1alpha1.GitTrackSpec{
 				Repository: repositoryURL,
 			},
+		}
+		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
+		Expect(err).NotTo(HaveOccurred())
+		m = testutils.Matcher{
+			Client: c,
+			FarosClient: applier,
 		}
 	})
 
@@ -368,9 +380,42 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		)
 	})
 
-	Context("When a ClusterGitTrack resource is created", func() {
+	Context("When a ClusterGitTrack resource is disabled", func() {
 		BeforeEach(func() {
-			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			opts.clusterGitTrackMode = farosflags.CGTMDisabled
+			setupManager()
+			createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+		})
+
+		It("should not reconcile it", func() {
+			// use a custom timeout here, so that the tests doesn't run too slow on
+			// success
+			Consistently(requests, consistentTimeout).ShouldNot(Receive())
+		})
+	})
+
+	Context("When a ClusterGitTrack resource is set to exclude namespaced", func() {
+		BeforeEach(func() {
+			createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+
+			// get the instance back, so that we can use it as a parent referent
+			var cgt *farosv1alpha1.ClusterGitTrack
+			cgt = instance.(*farosv1alpha1.ClusterGitTrack).DeepCopy()
+			m.Get(cgt, timeout).Should(Succeed())
+
+			// create a gittrackobject, owned by the instance we just added
+			cgtobject := &farosv1alpha1.GitTrackObject{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example",
+					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						testutils.GetGitTrackInterfaceOwnerRef(instance),
+					},
+				},
+			}
+			m.Create(cgtobject).Should(Succeed())
+			opts.clusterGitTrackMode = farosflags.CGTMExcludeNamespaced
+			setupManager()
 		})
 
 		It("should not reconcile it", func() {
