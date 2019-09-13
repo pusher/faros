@@ -42,15 +42,6 @@ type statusOpts struct {
 	ignoredFiles   map[string]string
 }
 
-func newStatusOpts() *statusOpts {
-	return &statusOpts{
-		parseReason:    gittrackutils.StatusUnknown,
-		gitReason:      gittrackutils.StatusUnknown,
-		gcReason:       gittrackutils.StatusUnknown,
-		upToDateReason: gittrackutils.StatusUnknown,
-	}
-}
-
 func updateGitTrackStatus(gt farosv1alpha1.GitTrackInterface, opts *statusOpts) (updated bool) {
 	if gt == nil {
 		return
