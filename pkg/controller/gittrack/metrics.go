@@ -30,13 +30,6 @@ type metricsOpts struct {
 	repository   string
 }
 
-func newMetricOpts(status *statusOpts) *metricsOpts {
-	return &metricsOpts{
-		status:       status,
-		timeToDeploy: []time.Duration{},
-	}
-}
-
 func (r *ReconcileGitTrack) updateMetrics(gt farosv1alpha1.GitTrackInterface, opts *metricsOpts) error {
 	if gt == nil {
 		return nil
