@@ -241,6 +241,16 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertIgnoreInvalidFiles = func(numIgnored int) {
+			It("adds the file to `ignoredFiles`", func() {
+				Expect(result.ignoredFiles).To(HaveKeyWithValue("invalid_file.yaml", MatchRegexp("unable to parse 'invalid_file.yaml':")))
+			})
+
+			It("includes the invalid file in `ignored` count", func() {
+				Expect(result.ignored).To(BeNumerically("==", numIgnored))
+			})
+		}
+
 		var AssertMultiDocument = func() {
 			Context("for the daemonset in the file", func() {
 				BeforeEach(func() {
@@ -579,6 +589,14 @@ var _ = Describe("Handler Suite", func() {
 				AssertMultiDocument()
 			})
 
+			Context("with invalid files", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced"), timeout).Should(Succeed())
+				})
+
+				AssertIgnoreInvalidFiles(4)
+			})
+
 			Context("with a cluster scoped resource", func() {
 				BeforeEach(func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42"), timeout).Should(Succeed())
@@ -684,6 +702,14 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertMultiDocument()
+			})
+
+			Context("with invalid files", func() {
+				BeforeEach(func() {
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced"), timeout).Should(Succeed())
+				})
+
+				AssertIgnoreInvalidFiles(1)
 			})
 
 			Context("with a cluster scoped resource", func() {
