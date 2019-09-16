@@ -623,7 +623,7 @@ var _ = Describe("Handler Suite", func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced"), timeout).Should(Succeed())
 				})
 
-				AssertIgnoreInvalidFiles(4)
+				AssertIgnoreInvalidFiles(8)
 			})
 
 			Context("with a cluster scoped resource", func() {
