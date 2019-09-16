@@ -167,7 +167,6 @@ var _ = Describe("Handler Suite", func() {
 		}
 
 		var AssertIgnoresWrongNamespaceChild = func(r *handlerResult) {
-
 			AssertNoChild()
 
 			It("ignores the child resource", func() {
