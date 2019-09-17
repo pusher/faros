@@ -44,7 +44,7 @@ var _ = Describe("Metrics Suite", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		recFn := newReconciler(mgr)
+		recFn, _ := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
 
 		// Reset all metrics before each test
