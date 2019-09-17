@@ -91,6 +91,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
 	opts := &reconcileGitTrackOpts{
+		gitTrackMode:        farosflags.GitTrack,
 		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
 	return rec, opts
