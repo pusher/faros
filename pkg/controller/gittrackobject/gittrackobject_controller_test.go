@@ -60,7 +60,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 	const timeout = time.Second * 5
 	const consistentlyTimeout = time.Second
 
-	BeforeEach(func() {
+	var SetupTest = func(cgtm farosflags.ClusterGitTrackMode) {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
 		var err error
@@ -78,11 +78,13 @@ var _ = Describe("GitTrackObject Suite", func() {
 		Expect(err).NotTo(HaveOccurred())
 		m = testutils.Matcher{Client: mgr.GetClient(), FarosClient: applier}
 
-		recFn := newReconciler(mgr)
+		recFn, opts := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
+		r.clusterGitTrackMode = cgtm
+		opts.clusterGitTrackMode = cgtm
 		recFn, testEvents = SetupTestEventRecorder(recFn)
 		recFn, requests, reconcileStopped = SetupTestReconcile(recFn)
-		Expect(add(mgr, recFn)).NotTo(HaveOccurred())
+		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
 
 		stopInformers = r.StopChan()
 		stop = StartTestManager(mgr)
@@ -104,6 +106,11 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 		// Reset all metrics before each test
 		metrics.InSync.Reset()
+
+	}
+
+	BeforeEach(func() {
+		SetupTest(farosflags.CGTMIncludeNamespaced)
 	})
 
 	AfterEach(func() {
