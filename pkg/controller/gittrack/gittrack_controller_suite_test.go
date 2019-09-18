@@ -28,6 +28,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/pusher/faros/pkg/apis"
 	"github.com/pusher/faros/test/reporters"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
@@ -90,6 +92,11 @@ var _ = BeforeSuite(func() {
 	if cfg, err = t.Start(); err != nil {
 		log.Fatal(err)
 	}
+})
+
+var _ = BeforeEach(func() {
+	// Reset metrics registry before each test
+	metrics.Registry = prometheus.NewRegistry()
 })
 
 var _ = AfterSuite(func() {
