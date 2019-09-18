@@ -160,10 +160,14 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
-		var AssertIgnoresWrongNamespaceChild = func(r *handlerResult) {
+		var AssertNoChild = func() {
 			It("does not create a GitTrackObject for the child", func() {
 				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
 			})
+		}
+
+		var AssertIgnoresWrongNamespaceChild = func(r *handlerResult) {
+			AssertNoChild()
 
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
@@ -173,9 +177,7 @@ var _ = Describe("Handler Suite", func() {
 		}
 
 		var AssertClusterGitTrackIgnoresNamespaced = func(r *handlerResult) {
-			It("does not create a GitTrackObject for the child", func() {
-				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
-			})
+			AssertNoChild()
 
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
@@ -185,9 +187,7 @@ var _ = Describe("Handler Suite", func() {
 		}
 
 		var AssertClusterGitTrackHandlingDisabled = func(r *handlerResult) {
-			It("does not create a GitTrackObject for the child", func() {
-				m.Get(gto, consistentlyTimeout).ShouldNot(Succeed())
-			})
+			AssertNoChild()
 
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
@@ -281,6 +281,25 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertChild()
+			})
+
+			AssertNoErrors()
+		}
+
+		var AssertClusterScopedResourceDisallowed = func() {
+			Context("for the namespace file", func() {
+				BeforeEach(func() {
+					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+					gto.SetName("namespace-test")
+				})
+				AssertNoChild()
+
+				It("ignores the child resource", func() {
+					key := gto.GetName()
+					value := "a GitTrack cannot manage a cluster-scoped resource"
+					Expect(result.ignoredFiles).To(HaveKeyWithValue(key, value))
+				})
+
 			})
 
 			AssertNoErrors()
@@ -384,6 +403,16 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertNamespacedChildNameWithColon = func() {
+			BeforeEach(func() {
+				gto = testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetName("deployment-nginx-name-what-got-a-colon-in-it")
+			})
+
+			It("replaces `:` with `-` in the name", func() {
+				m.Get(gto, timeout).Should(Succeed())
+			})
+		}
 		var AssertGitTrackUpdated = func(kind string) {
 			BeforeEach(func() {
 				By("Executing the handler on and older commit")
@@ -594,7 +623,7 @@ var _ = Describe("Handler Suite", func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced"), timeout).Should(Succeed())
 				})
 
-				AssertIgnoreInvalidFiles(4)
+				AssertIgnoreInvalidFiles(8)
 			})
 
 			Context("with a cluster scoped resource", func() {
@@ -602,7 +631,7 @@ var _ = Describe("Handler Suite", func() {
 					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42"), timeout).Should(Succeed())
 				})
 
-				AssertClusterScopedResource()
+				AssertClusterScopedResourceDisallowed()
 			})
 
 			Context("with an invalid reference", func() {
@@ -631,10 +660,10 @@ var _ = Describe("Handler Suite", func() {
 
 			Context("when a child name contains colons", func() {
 				BeforeEach(func() {
-					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "241786090da55894dca4e91e3f5023c024d3d9a8"), timeout).Should(Succeed())
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "ba1882582489cb57abf4ec297f3e01abf70a0b8d"), timeout).Should(Succeed())
 				})
 
-				AssertChildNameWithColon()
+				AssertNamespacedChildNameWithColon()
 			})
 
 			Context("when the GitTrack is updated", func() {
@@ -667,7 +696,7 @@ var _ = Describe("Handler Suite", func() {
 					AssertIgnoresWrongNamespaceChild(&result)
 				})
 
-				AssertAppliedDiscoveredIgnored(&result, 1, 3, 2)
+				AssertAppliedDiscoveredIgnored(&result, 0, 3, 3)
 			})
 		})
 

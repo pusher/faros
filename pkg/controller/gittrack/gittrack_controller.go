@@ -127,25 +127,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 		if err != nil {
 			return err
 		}
-		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &farosv1alpha1.ClusterGitTrack{},
-		})
-		if err != nil {
-			return err
+
+		if opts.clusterGitTrackMode == farosflags.CGTMIncludeNamespaced {
+			err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
+				IsController: true,
+				OwnerType:    &farosv1alpha1.ClusterGitTrack{},
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.GitTrack{},
-	})
-	if err != nil {
-		return err
-	}
-
-	// TODO(dmo): disable this watch once we've made it so that gittracks cannot create clustergittrackobjects
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &farosv1alpha1.GitTrack{},
 	})
@@ -440,6 +434,9 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 		} else if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMExcludeNamespaced {
 			return true, "namespaced resources cannot be managed by ClusterGitTrack", nil
 		}
+	} else if ownerIsGittrack {
+		// cluster scoped object managed from namespaced gittrack. Disallow
+		return true, "a GitTrack cannot manage a cluster-scoped resource", nil
 	}
 
 	if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {
