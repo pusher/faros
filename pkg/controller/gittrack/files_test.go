@@ -388,11 +388,21 @@ var _ = Describe("GitTrack Suite", func() {
 				reference = "f1d8485c9ef1f93a368d25308deb81107459d542"
 			})
 
-			It("does not return the valid ones (in the same file)", func() {
-				for _, obj := range objects {
-					Expect(obj.GetKind()).ToNot(Equal("DaemonSet"))
-					Expect(obj.GetName()).ToNot(Equal("fluentd"))
-				}
+			It("does return the valid ones", func() {
+				haveName := func(u *unstructured.Unstructured) string { return u.GetName() }
+				haveKind := func(u *unstructured.Unstructured) string { return u.GetKind() }
+				Expect(objects).To(ContainElement(
+					And(
+						WithTransform(haveName, Equal("fluentd")),
+						WithTransform(haveKind, Equal("DaemonSet")),
+					),
+				))
+				Expect(objects).ToNot(ContainElement(
+					And(
+						WithTransform(haveName, Equal("fluentd-config")),
+						WithTransform(haveKind, Equal("ConfigMap")),
+					),
+				))
 			})
 
 			It("returns errors", func() {
