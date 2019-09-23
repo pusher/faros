@@ -67,13 +67,14 @@ func YAMLToUnstructured(in []byte) (u unstructured.Unstructured, err error) {
 }
 
 // YAMLToUnstructuredSlice converts a raw yaml document into a slice of pointers to Unstructured objects
-func YAMLToUnstructuredSlice(in []byte) (us []*unstructured.Unstructured, err error) {
+func YAMLToUnstructuredSlice(in []byte) ([]*unstructured.Unstructured, error) {
+	var us []*unstructured.Unstructured
 	for _, yaml := range splitYAML(in) {
 		var u unstructured.Unstructured
-		u, err = YAMLToUnstructured(yaml)
+		u, err := YAMLToUnstructured(yaml)
 		if err != nil {
 			// unable to parse properly, bail
-			break
+			return us, err
 		}
 		if u.IsList() {
 			err = u.EachListItem(func(obj runtime.Object) error {
@@ -89,7 +90,7 @@ func YAMLToUnstructuredSlice(in []byte) (us []*unstructured.Unstructured, err er
 			us = append(us, &u)
 		}
 	}
-	return us, err
+	return us, nil
 }
 
 // splitYAML will take raw yaml from a file and split yaml documents on the
