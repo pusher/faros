@@ -107,7 +107,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 		}
 		m.Create(gitTrack).Should(Succeed())
 
-		// Create a ClusterGitTrack to own the ClusterGitTrackObjects
+		// Create a ClusterGitTrack to own the ClusterGitTrackObjects and GitTrackObjects
+		// Reconciling should follow the rules of the ClusterGitTrackMode that we're running
+		// in
 		clusterGitTrack = &farosv1alpha1.ClusterGitTrack{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "testclustergittrack",
@@ -124,10 +126,6 @@ var _ = Describe("GitTrackObject Suite", func() {
 		metrics.InSync.Reset()
 
 	}
-
-	BeforeEach(func() {
-		SetupTest(farosflags.GTMEnabled, farosflags.CGTMIncludeNamespaced)
-	})
 
 	AfterEach(func() {
 		// Stop Controller and informers before cleaning up
@@ -161,6 +159,10 @@ var _ = Describe("GitTrackObject Suite", func() {
 		Context("with a GitTrackObject", func() {
 			var gto *farosv1alpha1.GitTrackObject
 			var child *appsv1.Deployment
+
+			BeforeEach(func() {
+				SetupTest(farosflags.GTMEnabled, farosflags.CGTMIncludeNamespaced)
+			})
 
 			BeforeEach(func() {
 				gto = testutils.ExampleGitTrackObject.DeepCopy()
@@ -536,347 +538,377 @@ var _ = Describe("GitTrackObject Suite", func() {
 			var gto *farosv1alpha1.ClusterGitTrackObject
 			var child *rbacv1.ClusterRoleBinding
 
-			BeforeEach(func() {
-				gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
-				gto.SetOwnerReferences([]metav1.OwnerReference{
-					{
-						APIVersion: "faros.pusher.com/v1alpha1",
-						Kind:       "ClusterGitTrack",
-						UID:        clusterGitTrack.UID,
-						Name:       clusterGitTrack.Name,
-					},
-				})
-				child = testutils.ExampleClusterRoleBinding.DeepCopy()
-				Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
-			})
-
-			Context("with valid data", func() {
+			Context("and ClusterGitTrackMode is set to Disabled", func() {
 				BeforeEach(func() {
-					// Create and fetch the instance to make sure caches are synced
-					m.Create(gto).Should(Succeed())
-					// Wait for the initial reconcile
-					Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-					// And for the status one as well, probably
-					Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-					// Fetch up-to-date objects if we're going to modify them
-					m.Get(gto, timeout).Should(Succeed())
-					m.Get(child, timeout).Should(Succeed())
+					SetupTest(farosflags.GTMEnabled, farosflags.CGTMDisabled)
 				})
-
-				It("should create the child resource", func() {
-					m.Get(child, timeout).Should(Succeed())
-				})
-
-				It("should add an owner reference to the child", func() {
-					m.Eventually(child, timeout).
-						Should(testutils.WithOwnerReferences(ContainElement(testutils.GetClusterGitTrackObjectOwnerRef(gto))))
-				})
-
-				It("should add a last applied annotation to the child", func() {
-					m.Eventually(child, timeout).
-						Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
-				})
-
-				Context("when the child has the update strategy", func() {
-					var originalVersion string
-					var originalUID types.UID
-
-					BeforeEach(func() {
-						child.SetAnnotations(map[string]string{"updated": "annotations"})
-						child.SetOwnerReferences([]metav1.OwnerReference{testutils.GetClusterGitTrackObjectOwnerRef(gto)})
-						m.Update(child).Should(Succeed())
-						// Wait for the update reconcile
-						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-						// And for the status update reconcile
-						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-						// Get the latest version of the object
-						m.Get(child, timeout).Should(Succeed())
-
-						originalVersion = child.GetResourceVersion()
-						originalUID = child.GetUID()
-					})
-
-					Context("update", func() {
-						BeforeEach(func() {
-							specData := testutils.ExampleClusterRoleBinding.DeepCopy()
-							annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.DefaultUpdateStrategy)}
-							specData.SetAnnotations(annotations)
-							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
-
-							m.Update(gto, timeout).Should(Succeed())
-							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-						})
-
-						It("should update the child", func() {
-							m.Eventually(child, timeout).Should(testutils.WithResourceVersion(Not(Equal(originalVersion))))
-						})
-
-						It("should not replace the child", func() {
-							m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
-						})
-					})
-
-					Context("never", func() {
-						BeforeEach(func() {
-							specData := testutils.ExampleClusterRoleBinding.DeepCopy()
-							annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.NeverUpdateStrategy)}
-							specData.Subjects = []rbacv1.Subject{}
-							specData.SetAnnotations(annotations)
-							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
-
-							m.Update(gto, timeout).Should(Succeed())
-							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-						})
-
-						It("should not update the child", func() {
-							m.Consistently(child, consistentlyTimeout).ShouldNot(testutils.WithSubjects(BeEmpty()))
-						})
-
-						It("should not replace the child", func() {
-							m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
-						})
-					})
-
-					Context("recreate", func() {
-						Context("with conflicts", func() {
-							var childCopy *rbacv1.ClusterRoleBinding
-
-							BeforeEach(func() {
-								m.Get(gto, timeout).Should(Succeed())
-								specData := testutils.ExampleClusterRoleBinding.DeepCopy()
-								// Create a conflict (this field is immutable)
-								specData.RoleRef.Name = "changed"
-								annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
-								specData.SetAnnotations(annotations)
-								Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
-								m.Update(gto, timeout).Should(Succeed())
-
-								// Keep a copy of the child, otherwise we'll run into data race issues
-								childCopy = child.DeepCopy()
-
-								go func() {
-									defer GinkgoRecover()
-									// We are expecting a delete but we have no GC so have to do it manually
-									m.Eventually(childCopy, timeout).Should(testutils.WithFinalizers(ContainElement("foregroundDeletion")))
-									childCopy.SetFinalizers([]string{})
-									m.Update(childCopy).Should(Succeed())
-									m.Get(childCopy, timeout).ShouldNot(Succeed())
-								}()
-
-								Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-							})
-
-							It("should replace the child", func() {
-								Eventually(func() error {
-									m.Get(child, timeout).Should(Succeed())
-									if child.GetUID() == originalUID {
-										return fmt.Errorf("still the same object")
-									}
-									return nil
-								}, timeout).Should(Succeed())
-							})
-						})
-					})
-				})
-
-				Context("when the ClusterGitTrackObject is updated", func() {
-					BeforeEach(func() {
-						// Make sure the first reconcile has happened
-						m.Get(child, timeout).Should(Succeed())
-						// Need to get the updated GTO as well
-						m.Get(gto, timeout).Should(Succeed())
-					})
-
-					Context("and the child spec is updated", func() {
-						BeforeEach(func() {
-							// Make an update to the spec
-							specData := testutils.ExampleClusterRoleBinding.DeepCopy()
-							annotations := map[string]string{"updated": "annotations"}
-							specData.SetAnnotations(annotations)
-							Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
-
-							m.Update(gto, timeout).Should(Succeed())
-							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-						})
-
-						It("should update the child resource", func() {
-							m.Eventually(child, timeout).Should(testutils.WithAnnotations(HaveKeyWithValue("updated", "annotations")))
-						})
-					})
-
-					Context("and the object metdata is updated", func() {
-						var originalVersion string
-
-						BeforeEach(func() {
-							originalVersion = child.GetResourceVersion()
-
-							// Make an update to the GTO metadata
-							annotations := map[string]string{"updated": "annotations"}
-							gto.SetAnnotations(annotations)
-
-							m.Update(gto).Should(Succeed())
-							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-						})
-
-						It("should not update the child resource", func() {
-							m.Consistently(child, consistentlyTimeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
-						})
-					})
-				})
-
-				Context("if a child resource is deleted", func() {
-					var originalUID types.UID
-
-					BeforeEach(func() {
-						originalUID = child.GetUID()
-						m.Delete(child).Should(Succeed())
-						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-					})
-
-					It("should be recreated", func() {
-						Eventually(func() error {
-							key := types.NamespacedName{Namespace: child.GetNamespace(), Name: child.GetName()}
-							err := c.Get(context.TODO(), key, child)
-							if err != nil {
-								return err
-							}
-							if child.GetUID() == originalUID {
-								return fmt.Errorf("child not yet recreated")
-							}
-							return nil
-						}, timeout).Should(Succeed())
-					})
-				})
-
-				Context("should send events", func() {
-					var events *corev1.EventList
-
-					BeforeEach(func() {
-						events = &corev1.EventList{}
-						m.Eventually(events, timeout).ShouldNot(testutils.WithItems(BeEmpty()))
-					})
-
-					It("for attempting to create the child", func() {
-						m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(
-							SatisfyAll(
-								testutils.WithReason(Equal("CreateStarted")),
-								testutils.WithInvolvedObjectKind(Equal(gto.GetObjectKind().GroupVersionKind().Kind)),
-								testutils.WithInvolvedObjectName(Equal(gto.GetName())),
-								testutils.WithEventType(Equal(string(corev1.EventTypeNormal))),
-							),
-						)))
-					})
-
-					It("for successfully to creating the child", func() {
-						m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(
-							SatisfyAll(
-								testutils.WithReason(Equal("CreateSuccessful")),
-								testutils.WithInvolvedObjectKind(Equal(gto.GetObjectKind().GroupVersionKind().Kind)),
-								testutils.WithInvolvedObjectName(Equal(gto.GetName())),
-								testutils.WithEventType(Equal(string(corev1.EventTypeNormal))),
-							),
-						)))
-					})
-
-					PIt("to the namespace the controller is restricted to", func() {
-						for range events.Items {
-							event := <-testEvents
-							Expect(event.Namespace).To(Equal(farosflags.Namespace))
-						}
-					})
-				})
-			})
-
-			Context("with invalid data", func() {
 				BeforeEach(func() {
-					// Break the JSON data
-					gto.Spec.Data = gto.Spec.Data[10:]
-
-					// Create and fetch the instance to make sure caches are synced
-					m.Create(gto).Should(Succeed())
-					// Wait twice for the extra reconcile for status updates
-					Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-					Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
-					m.Get(gto, timeout).Should(Succeed())
-				})
-
-				Context("should update the status", func() {
-					It("to represent the failure", func() {
-						m.Eventually(gto, timeout).Should(
-							testutils.WithGitTrackObjectStatusConditions(
-								ContainElement(
-									SatisfyAll(
-										testutils.WithGitTrackObjectConditionType(Equal(farosv1alpha1.ObjectInSyncType)),
-										testutils.WithGitTrackObjectConditionStatus(Equal(corev1.ConditionFalse)),
-										testutils.WithGitTrackObjectConditionReason(Equal(string(gittrackobjectutils.ErrorUnmarshallingData))),
-									),
-								),
-							),
-						)
-					})
-				})
-
-				Context("should send an event", func() {
-					var events *corev1.EventList
-					BeforeEach(func() {
-						events = &corev1.EventList{}
-						m.Eventually(events, timeout).ShouldNot(testutils.WithItems(BeEmpty()))
-					})
-
-					It("to represent the failure", func() {
-						m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(
-							SatisfyAll(
-								testutils.WithReason(Equal("UnmarshalFailed")),
-								testutils.WithInvolvedObjectKind(Equal(gto.GetObjectKind().GroupVersionKind().Kind)),
-								testutils.WithInvolvedObjectName(Equal(gto.GetName())),
-								testutils.WithEventType(Equal(string(corev1.EventTypeWarning))),
-							),
-						)))
-					})
-				})
-			})
-
-			Context("with an owner in a different namespace", func() {
-				var ns *corev1.Namespace
-
-				BeforeEach(func() {
-					ns = &corev1.Namespace{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "not-default",
-						},
-					}
-					m.Create(ns)
-
-					gitTrack = &farosv1alpha1.GitTrack{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "testgittrack",
-							Namespace: "not-default",
-						},
-						Spec: farosv1alpha1.GitTrackSpec{
-							Reference:  "foo",
-							Repository: "bar",
-						},
-					}
-					m.Create(gitTrack).Should(Succeed())
-
+					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
 					gto.SetOwnerReferences([]metav1.OwnerReference{
 						{
 							APIVersion: "faros.pusher.com/v1alpha1",
-							Kind:       "GitTrack",
-							UID:        gitTrack.UID,
-							Name:       gitTrack.Name,
+							Kind:       "ClusterGitTrack",
+							UID:        clusterGitTrack.UID,
+							Name:       clusterGitTrack.Name,
 						},
 					})
-					m.Create(gto).Should(Succeed())
+					child = testutils.ExampleClusterRoleBinding.DeepCopy()
+					Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
 				})
 
-				AfterEach(func() {
-					m.Delete(gitTrack).Should(Succeed())
-					m.Get(gitTrack, timeout).ShouldNot(Succeed())
+				PIt("shouldn't get reconcile ClusterGitTrackObjects", func() {
+					Fail("Not Implemented")
 				})
 
-				It("should not be reconciled", func() {
-					Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedClusterRequest)))
+			})
+
+			Context("and ClusterGitTrackMode set to IncludeNamespaced", func() {
+				BeforeEach(func() {
+					SetupTest(farosflags.GTMEnabled, farosflags.CGTMIncludeNamespaced)
+				})
+
+				BeforeEach(func() {
+					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
+					gto.SetOwnerReferences([]metav1.OwnerReference{
+						{
+							APIVersion: "faros.pusher.com/v1alpha1",
+							Kind:       "ClusterGitTrack",
+							UID:        clusterGitTrack.UID,
+							Name:       clusterGitTrack.Name,
+						},
+					})
+					child = testutils.ExampleClusterRoleBinding.DeepCopy()
+					Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
+				})
+
+				Context("with valid data", func() {
+					BeforeEach(func() {
+						// Create and fetch the instance to make sure caches are synced
+						m.Create(gto).Should(Succeed())
+						// Wait for the initial reconcile
+						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+						// And for the status one as well, probably
+						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+						// Fetch up-to-date objects if we're going to modify them
+						m.Get(gto, timeout).Should(Succeed())
+						m.Get(child, timeout).Should(Succeed())
+					})
+
+					It("should create the child resource", func() {
+						m.Get(child, timeout).Should(Succeed())
+					})
+
+					It("should add an owner reference to the child", func() {
+						m.Eventually(child, timeout).
+							Should(testutils.WithOwnerReferences(ContainElement(testutils.GetClusterGitTrackObjectOwnerRef(gto))))
+					})
+
+					It("should add a last applied annotation to the child", func() {
+						m.Eventually(child, timeout).
+							Should(testutils.WithAnnotations(HaveKey(farosclient.LastAppliedAnnotation)))
+					})
+
+					Context("when the child has the update strategy", func() {
+						var originalVersion string
+						var originalUID types.UID
+
+						BeforeEach(func() {
+							child.SetAnnotations(map[string]string{"updated": "annotations"})
+							child.SetOwnerReferences([]metav1.OwnerReference{testutils.GetClusterGitTrackObjectOwnerRef(gto)})
+							m.Update(child).Should(Succeed())
+							// Wait for the update reconcile
+							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+							// And for the status update reconcile
+							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+							// Get the latest version of the object
+							m.Get(child, timeout).Should(Succeed())
+
+							originalVersion = child.GetResourceVersion()
+							originalUID = child.GetUID()
+						})
+
+						Context("update", func() {
+							BeforeEach(func() {
+								specData := testutils.ExampleClusterRoleBinding.DeepCopy()
+								annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.DefaultUpdateStrategy)}
+								specData.SetAnnotations(annotations)
+								Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+
+								m.Update(gto, timeout).Should(Succeed())
+								Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+							})
+
+							It("should update the child", func() {
+								m.Eventually(child, timeout).Should(testutils.WithResourceVersion(Not(Equal(originalVersion))))
+							})
+
+							It("should not replace the child", func() {
+								m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
+							})
+						})
+
+						Context("never", func() {
+							BeforeEach(func() {
+								specData := testutils.ExampleClusterRoleBinding.DeepCopy()
+								annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.NeverUpdateStrategy)}
+								specData.Subjects = []rbacv1.Subject{}
+								specData.SetAnnotations(annotations)
+								Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+
+								m.Update(gto, timeout).Should(Succeed())
+								Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+							})
+
+							It("should not update the child", func() {
+								m.Consistently(child, consistentlyTimeout).ShouldNot(testutils.WithSubjects(BeEmpty()))
+							})
+
+							It("should not replace the child", func() {
+								m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
+							})
+						})
+
+						Context("recreate", func() {
+							Context("with conflicts", func() {
+								var childCopy *rbacv1.ClusterRoleBinding
+
+								BeforeEach(func() {
+									m.Get(gto, timeout).Should(Succeed())
+									specData := testutils.ExampleClusterRoleBinding.DeepCopy()
+									// Create a conflict (this field is immutable)
+									specData.RoleRef.Name = "changed"
+									annotations := map[string]string{"faros.pusher.com/update-strategy": string(gittrackobjectutils.RecreateUpdateStrategy)}
+									specData.SetAnnotations(annotations)
+									Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+									m.Update(gto, timeout).Should(Succeed())
+
+									// Keep a copy of the child, otherwise we'll run into data race issues
+									childCopy = child.DeepCopy()
+
+									go func() {
+										defer GinkgoRecover()
+										// We are expecting a delete but we have no GC so have to do it manually
+										m.Eventually(childCopy, timeout).Should(testutils.WithFinalizers(ContainElement("foregroundDeletion")))
+										childCopy.SetFinalizers([]string{})
+										m.Update(childCopy).Should(Succeed())
+										m.Get(childCopy, timeout).ShouldNot(Succeed())
+									}()
+
+									Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+								})
+
+								It("should replace the child", func() {
+									Eventually(func() error {
+										m.Get(child, timeout).Should(Succeed())
+										if child.GetUID() == originalUID {
+											return fmt.Errorf("still the same object")
+										}
+										return nil
+									}, timeout).Should(Succeed())
+								})
+							})
+						})
+					})
+
+					Context("when the ClusterGitTrackObject is updated", func() {
+						BeforeEach(func() {
+							// Make sure the first reconcile has happened
+							m.Get(child, timeout).Should(Succeed())
+							// Need to get the updated GTO as well
+							m.Get(gto, timeout).Should(Succeed())
+						})
+
+						Context("and the child spec is updated", func() {
+							BeforeEach(func() {
+								// Make an update to the spec
+								specData := testutils.ExampleClusterRoleBinding.DeepCopy()
+								annotations := map[string]string{"updated": "annotations"}
+								specData.SetAnnotations(annotations)
+								Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, specData)).To(Succeed())
+
+								m.Update(gto, timeout).Should(Succeed())
+								Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+							})
+
+							It("should update the child resource", func() {
+								m.Eventually(child, timeout).Should(testutils.WithAnnotations(HaveKeyWithValue("updated", "annotations")))
+							})
+						})
+
+						Context("and the object metdata is updated", func() {
+							var originalVersion string
+
+							BeforeEach(func() {
+								originalVersion = child.GetResourceVersion()
+
+								// Make an update to the GTO metadata
+								annotations := map[string]string{"updated": "annotations"}
+								gto.SetAnnotations(annotations)
+
+								m.Update(gto).Should(Succeed())
+								Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+							})
+
+							It("should not update the child resource", func() {
+								m.Consistently(child, consistentlyTimeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
+							})
+						})
+					})
+
+					Context("if a child resource is deleted", func() {
+						var originalUID types.UID
+
+						BeforeEach(func() {
+							originalUID = child.GetUID()
+							m.Delete(child).Should(Succeed())
+							Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+						})
+
+						It("should be recreated", func() {
+							Eventually(func() error {
+								key := types.NamespacedName{Namespace: child.GetNamespace(), Name: child.GetName()}
+								err := c.Get(context.TODO(), key, child)
+								if err != nil {
+									return err
+								}
+								if child.GetUID() == originalUID {
+									return fmt.Errorf("child not yet recreated")
+								}
+								return nil
+							}, timeout).Should(Succeed())
+						})
+					})
+
+					Context("should send events", func() {
+						var events *corev1.EventList
+
+						BeforeEach(func() {
+							events = &corev1.EventList{}
+							m.Eventually(events, timeout).ShouldNot(testutils.WithItems(BeEmpty()))
+						})
+
+						It("for attempting to create the child", func() {
+							m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(
+								SatisfyAll(
+									testutils.WithReason(Equal("CreateStarted")),
+									testutils.WithInvolvedObjectKind(Equal(gto.GetObjectKind().GroupVersionKind().Kind)),
+									testutils.WithInvolvedObjectName(Equal(gto.GetName())),
+									testutils.WithEventType(Equal(string(corev1.EventTypeNormal))),
+								),
+							)))
+						})
+
+						It("for successfully to creating the child", func() {
+							m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(
+								SatisfyAll(
+									testutils.WithReason(Equal("CreateSuccessful")),
+									testutils.WithInvolvedObjectKind(Equal(gto.GetObjectKind().GroupVersionKind().Kind)),
+									testutils.WithInvolvedObjectName(Equal(gto.GetName())),
+									testutils.WithEventType(Equal(string(corev1.EventTypeNormal))),
+								),
+							)))
+						})
+
+						PIt("to the namespace the controller is restricted to", func() {
+							for range events.Items {
+								event := <-testEvents
+								Expect(event.Namespace).To(Equal(farosflags.Namespace))
+							}
+						})
+					})
+				})
+
+				Context("with invalid data", func() {
+					BeforeEach(func() {
+						// Break the JSON data
+						gto.Spec.Data = gto.Spec.Data[10:]
+
+						// Create and fetch the instance to make sure caches are synced
+						m.Create(gto).Should(Succeed())
+						// Wait twice for the extra reconcile for status updates
+						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+						Eventually(requests, timeout).Should(Receive(Equal(expectedClusterRequest)))
+						m.Get(gto, timeout).Should(Succeed())
+					})
+
+					Context("should update the status", func() {
+						It("to represent the failure", func() {
+							m.Eventually(gto, timeout).Should(
+								testutils.WithGitTrackObjectStatusConditions(
+									ContainElement(
+										SatisfyAll(
+											testutils.WithGitTrackObjectConditionType(Equal(farosv1alpha1.ObjectInSyncType)),
+											testutils.WithGitTrackObjectConditionStatus(Equal(corev1.ConditionFalse)),
+											testutils.WithGitTrackObjectConditionReason(Equal(string(gittrackobjectutils.ErrorUnmarshallingData))),
+										),
+									),
+								),
+							)
+						})
+					})
+
+					Context("should send an event", func() {
+						var events *corev1.EventList
+						BeforeEach(func() {
+							events = &corev1.EventList{}
+							m.Eventually(events, timeout).ShouldNot(testutils.WithItems(BeEmpty()))
+						})
+
+						It("to represent the failure", func() {
+							m.Eventually(events, timeout).Should(testutils.WithItems(ContainElement(
+								SatisfyAll(
+									testutils.WithReason(Equal("UnmarshalFailed")),
+									testutils.WithInvolvedObjectKind(Equal(gto.GetObjectKind().GroupVersionKind().Kind)),
+									testutils.WithInvolvedObjectName(Equal(gto.GetName())),
+									testutils.WithEventType(Equal(string(corev1.EventTypeWarning))),
+								),
+							)))
+						})
+					})
+				})
+
+				Context("with an owner in a different namespace", func() {
+					var ns *corev1.Namespace
+
+					BeforeEach(func() {
+						ns = &corev1.Namespace{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "not-default",
+							},
+						}
+						m.Create(ns)
+
+						gitTrack = &farosv1alpha1.GitTrack{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "testgittrack",
+								Namespace: "not-default",
+							},
+							Spec: farosv1alpha1.GitTrackSpec{
+								Reference:  "foo",
+								Repository: "bar",
+							},
+						}
+						m.Create(gitTrack).Should(Succeed())
+
+						gto.SetOwnerReferences([]metav1.OwnerReference{
+							{
+								APIVersion: "faros.pusher.com/v1alpha1",
+								Kind:       "GitTrack",
+								UID:        gitTrack.UID,
+								Name:       gitTrack.Name,
+							},
+						})
+						m.Create(gto).Should(Succeed())
+					})
+
+					AfterEach(func() {
+						m.Delete(gitTrack).Should(Succeed())
+						m.Get(gitTrack, timeout).ShouldNot(Succeed())
+					})
+
+					It("should not be reconciled", func() {
+						Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedClusterRequest)))
+					})
 				})
 			})
 		})
