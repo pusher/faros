@@ -62,6 +62,12 @@ func main() {
 	flag.CommandLine.AddGoFlagSet(logFlags)
 	flag.Parse()
 
+	err = farosflags.ValidateSettings()
+	if err != nil {
+		log.Error(err, "Invalid flags set")
+		return
+	}
+
 	// Handle version flag
 	if *showVersion {
 		fmt.Printf("faros-gittrack-controller %s (built with %s)\n", VERSION, runtime.Version())
