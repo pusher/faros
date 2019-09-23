@@ -559,6 +559,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 					// get the most recent version so we can get the UID
 					m.Get(child, timeout).Should(Succeed())
 					originalUID = child.GetUID()
+
+					// Create
+					m.Create(gto).Should(Succeed())
 				})
 
 				It("should not get reconcile ClusterGitTrackObjects", func() {
@@ -598,6 +601,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 					m.Get(namespacedChild, timeout).Should(Succeed())
 					originalUID = namespacedChild.GetUID()
 					originalVersion = namespacedChild.GetResourceVersion()
+
+					// Create
+					m.Create(gto).Should(Succeed())
 				})
 
 				It("should not get reconcile namespaced GitTrackObjects owned by ClusterGitTracks", func() {
