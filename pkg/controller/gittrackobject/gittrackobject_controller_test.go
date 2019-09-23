@@ -923,7 +923,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 					})
 				})
 
-				Context("with an owner in a different namespace", func() {
+				// don't run these tests, since the cross-namespace ownership reference is
+				// invalid k8s.
+				PContext("with an owner in a different namespace", func() {
 					var ns *corev1.Namespace
 
 					BeforeEach(func() {
