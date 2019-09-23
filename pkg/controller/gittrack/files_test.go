@@ -392,13 +392,13 @@ var _ = Describe("GitTrack Suite", func() {
 				haveName := func(u *unstructured.Unstructured) string { return u.GetName() }
 				haveKind := func(u *unstructured.Unstructured) string { return u.GetKind() }
 				Expect(objects).To(ContainElement(
-					And(
+					SatisfyAll(
 						WithTransform(haveName, Equal("fluentd")),
 						WithTransform(haveKind, Equal("DaemonSet")),
 					),
 				))
 				Expect(objects).ToNot(ContainElement(
-					And(
+					SatisfyAll(
 						WithTransform(haveName, Equal("fluentd-config")),
 						WithTransform(haveKind, Equal("ConfigMap")),
 					),
