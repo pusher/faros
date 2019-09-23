@@ -122,7 +122,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 		err = c.Watch(
 			&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}},
 			&handler.EnqueueRequestForObject{},
-			utils.NewOwnerInNamespacePredicate(mgr.GetClient()),
+			utils.NewOwnerIsClusterGitTrackPredicate(mgr.GetClient()),
 		)
 		if err != nil {
 			return err
@@ -148,7 +148,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 				},
 				Log: rlogr.Log.WithName("gittrackobject-controller/enqueue-request-for-owner"),
 			},
-			utils.NewOwnersOwnerInNamespacePredicate(mgr.GetClient()),
+			utils.NewOurResponsibilityPredicate(mgr.GetClient(), opts.gitTrackMode, opts.clusterGitTrackMode),
 		)
 		if err != nil {
 			msg := fmt.Sprintf("unable to watch channel: %v", err)
