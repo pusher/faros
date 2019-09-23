@@ -251,13 +251,18 @@ func (p OurResponsibilityPredicate) isOurResponsibility(ownerRefs []metav1.Owner
 			// is invalid. Check if we need to be more proactive about invalid states
 			gto, inSet := gtoSet[ref.UID]
 			if p.gitTrackMode == farosflags.GTMEnabled && inSet {
-				return true
+				// make sure that we're owned by a gittrack and not a clustergittrack
+				for _, gtref := range gto.GetOwnerReferences() {
+					if gtref.APIVersion == farosGroupVersion && gtref.Kind == "GitTrack" {
+						return true
+					}
+				}
 			}
 
 			// a ClusterGitTrack might have created this GitTrackObject
 			if inSet && p.clusterGitTrackMode == farosflags.CGTMIncludeNamespaced {
 				for _, gtref := range gto.GetOwnerReferences() {
-					if gtref.APIVersion == farosGroupVersion && ref.Kind == "ClusterGitTrack" {
+					if gtref.APIVersion == farosGroupVersion && gtref.Kind == "ClusterGitTrack" {
 						return true
 					}
 				}
