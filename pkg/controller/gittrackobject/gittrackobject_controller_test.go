@@ -537,6 +537,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		Context("with a ClusterGitTrackObject", func() {
 			var gto *farosv1alpha1.ClusterGitTrackObject
 			var child *rbacv1.ClusterRoleBinding
+			var originalUID types.UID
 
 			Context("and ClusterGitTrackMode is set to Disabled", func() {
 				BeforeEach(func() {
@@ -554,12 +555,22 @@ var _ = Describe("GitTrackObject Suite", func() {
 					})
 					child = testutils.ExampleClusterRoleBinding.DeepCopy()
 					Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
+					m.Update(child).Should(Succeed())
+					// get the most recent version so we can get the UID
+					m.Get(child, timeout).Should(Succeed())
+					originalUID = child.GetUID()
 				})
 
-				PIt("shouldn't get reconcile ClusterGitTrackObjects", func() {
-					Fail("Not Implemented")
+				It("should not get reconcile ClusterGitTrackObjects", func() {
+					Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedClusterRequest)))
+				})
+				It("should not update the child", func() {
+					m.Consistently(child, consistentlyTimeout).ShouldNot(testutils.WithSubjects(BeEmpty()))
 				})
 
+				It("should not replace the child", func() {
+					m.Consistently(child, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
+				})
 			})
 
 			Context("and ClusterGitTrackMode set to IncludeNamespaced", func() {
