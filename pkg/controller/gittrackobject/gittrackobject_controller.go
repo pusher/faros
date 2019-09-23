@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	rlogr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -112,7 +113,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 	}
 
 	// Watch for changes to GitTrackObject
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{})
+	predicate := []predicate.Predicate(nil)
+	if opts.clusterGitTrackMode == farosflags.CGTMExcludeNamespaced {
+		predicate = append(predicate, utils.NewOwnerIsNotClusterGitTrackPredicate(mgr.GetClient()))
+	}
+	if opts.gitTrackMode == farosflags.GTMDisabled {
+		predicate = append(predicate, utils.NewOwnerIsNotGitTrackPredicate(mgr.GetClient()))
+	}
+
+	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{}, predicate...)
 	if err != nil {
 		return err
 	}
@@ -122,7 +131,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 		err = c.Watch(
 			&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}},
 			&handler.EnqueueRequestForObject{},
-			utils.NewOwnerIsClusterGitTrackPredicate(mgr.GetClient()),
 		)
 		if err != nil {
 			return err

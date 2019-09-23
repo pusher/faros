@@ -597,7 +597,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 					namespacedChild = testutils.ExampleDeployment.DeepCopy()
 					Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, namespacedChild)).To(Succeed())
 					m.Create(namespacedChild).Should(Succeed())
-					// get the most recent version so we can get the UID
+					// get the most recent version so we can get the UID and version
 					m.Get(namespacedChild, timeout).Should(Succeed())
 					originalUID = namespacedChild.GetUID()
 					originalVersion = namespacedChild.GetResourceVersion()
