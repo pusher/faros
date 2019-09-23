@@ -53,6 +53,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 	var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "example", Namespace: "default"}}
 	var expectedClusterRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "example"}}
 	var gitTrack *farosv1alpha1.GitTrack
+	var clusterGitTrack *farosv1alpha1.ClusterGitTrack
 	var requests chan reconcile.Request
 	var reconcileStopped *sync.WaitGroup
 	var testEvents chan TestEvent
@@ -60,7 +61,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 	const timeout = time.Second * 5
 	const consistentlyTimeout = time.Second
 
-	var SetupTest = func(cgtm farosflags.ClusterGitTrackMode) {
+	var SetupTest = func(gtm farosflags.GitTrackMode, cgtm farosflags.ClusterGitTrackMode) {
 		// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 		// channel when it is finished.
 		var err error
@@ -80,8 +81,12 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 		recFn, opts := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
+
+		r.gitTrackMode = gtm
+		opts.gitTrackMode = gtm
 		r.clusterGitTrackMode = cgtm
 		opts.clusterGitTrackMode = cgtm
+
 		recFn, testEvents = SetupTestEventRecorder(recFn)
 		recFn, requests, reconcileStopped = SetupTestReconcile(recFn)
 		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
@@ -89,9 +94,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		stopInformers = r.StopChan()
 		stop = StartTestManager(mgr)
 
-		// Create a GitTrack to own the ClusterGitTrackObjects
-		// The Reconciler wont reconcile CGTOs that aren't owned by the a GT in their
-		// namespace
+		// Create a GitTrack to own the GitTrackObjects
 		gitTrack = &farosv1alpha1.GitTrack{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "testgittrack",
@@ -104,13 +107,26 @@ var _ = Describe("GitTrackObject Suite", func() {
 		}
 		m.Create(gitTrack).Should(Succeed())
 
+		// Create a ClusterGitTrack to own the ClusterGitTrackObjects
+		clusterGitTrack = &farosv1alpha1.ClusterGitTrack{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "testclustergittrack",
+				Namespace: "default",
+			},
+			Spec: farosv1alpha1.GitTrackSpec{
+				Reference:  "foo",
+				Repository: "bar",
+			},
+		}
+		m.Create(clusterGitTrack).Should(Succeed())
+
 		// Reset all metrics before each test
 		metrics.InSync.Reset()
 
 	}
 
 	BeforeEach(func() {
-		SetupTest(farosflags.CGTMIncludeNamespaced)
+		SetupTest(farosflags.GTMEnabled, farosflags.CGTMIncludeNamespaced)
 	})
 
 	AfterEach(func() {
@@ -132,6 +148,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 		// Clean up all resources as GC is disabled in the control plane
 		testutils.DeleteAll(cfg, timeout,
 			&farosv1alpha1.GitTrackList{},
+			&farosv1alpha1.ClusterGitTrackList{},
 			&farosv1alpha1.GitTrackObjectList{},
 			&farosv1alpha1.ClusterGitTrackObjectList{},
 			&appsv1.DeploymentList{},
@@ -524,9 +541,9 @@ var _ = Describe("GitTrackObject Suite", func() {
 				gto.SetOwnerReferences([]metav1.OwnerReference{
 					{
 						APIVersion: "faros.pusher.com/v1alpha1",
-						Kind:       "GitTrack",
-						UID:        gitTrack.UID,
-						Name:       gitTrack.Name,
+						Kind:       "ClusterGitTrack",
+						UID:        clusterGitTrack.UID,
+						Name:       clusterGitTrack.Name,
 					},
 				})
 				child = testutils.ExampleClusterRoleBinding.DeepCopy()
