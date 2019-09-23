@@ -70,7 +70,6 @@ func YAMLToUnstructured(in []byte) (u unstructured.Unstructured, err error) {
 func YAMLToUnstructuredSlice(in []byte) ([]*unstructured.Unstructured, error) {
 	var us []*unstructured.Unstructured
 	for _, yaml := range splitYAML(in) {
-		var u unstructured.Unstructured
 		u, err := YAMLToUnstructured(yaml)
 		if err != nil {
 			// unable to parse properly, bail
@@ -86,6 +85,9 @@ func YAMLToUnstructuredSlice(in []byte) ([]*unstructured.Unstructured, error) {
 				us = append(us, o)
 				return nil
 			})
+			if err != nil {
+				return us, err
+			}
 		} else {
 			us = append(us, &u)
 		}

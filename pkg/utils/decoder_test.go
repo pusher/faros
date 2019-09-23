@@ -65,6 +65,13 @@ metadata:
   namespace: default
 `
 
+var invalidListItem = `---
+apiVersion: v1
+kind: List
+items:
+- 1
+`
+
 var mixedList = roleBinding + pdb
 
 var _ = Describe("YAMLToUnstructured", func() {
@@ -142,6 +149,18 @@ var _ = Describe("YAMLToUnstructuredSlice", func() {
 		It("does not return any error", func() {
 			_, err := YAMLToUnstructuredSlice([]byte(mixedList))
 			Expect(err).ShouldNot(HaveOccurred())
+		})
+	})
+
+	Context("with a list that consists of a single invalid resource", func() {
+		It("returns an empty slice", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(invalidListItem))
+			Expect(s).To(BeEmpty())
+		})
+
+		It("returns an error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(invalidListItem))
+			Expect(err).Should(HaveOccurred())
 		})
 	})
 
