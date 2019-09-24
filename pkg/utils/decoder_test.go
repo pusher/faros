@@ -59,6 +59,19 @@ data:
     world: hello
 `
 
+var broken = `---
+metadata:
+  name: { broken ]
+  namespace: default
+`
+
+var invalidListItem = `---
+apiVersion: v1
+kind: List
+items:
+- 1
+`
+
 var mixedList = roleBinding + pdb
 
 var _ = Describe("YAMLToUnstructured", func() {
@@ -80,7 +93,7 @@ var _ = Describe("YAMLToUnstructured", func() {
 			listItems = append(listItems, obj)
 			return nil
 		})
-		Expect(len(listItems)).To(Equal(2))
+		Expect(listItems).To(HaveLen(2))
 		rb, ok := listItems[0].(*unstructured.Unstructured)
 		Expect(ok).To(BeTrue())
 		Expect(rb.GetKind()).To(Equal("RoleBinding"))
@@ -100,11 +113,93 @@ var _ = Describe("YAMLToUnstructured", func() {
 })
 
 var _ = Describe("YAMLToUnstructuredSlice", func() {
-	It("should return a slice of Unstructured objects", func() {
-		s, err := YAMLToUnstructuredSlice([]byte(mixedList))
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(len(s)).To(Equal(2))
-		Expect(s[0].GetKind()).To(Equal("RoleBinding"))
-		Expect(s[1].GetKind()).To(Equal("PodDisruptionBudget"))
+	Context("with a single valid YAML document with a separator", func() {
+		It("returns a slice of one Unstructured object", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(pdb))
+			Expect(s).To(HaveLen(1))
+			Expect(s[0].GetKind()).To(Equal("PodDisruptionBudget"))
+		})
+
+		It("does not return any error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(pdb))
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("with a single valid YAML document without a separator", func() {
+		It("returns a slice of one Unstructured object", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(pdb[4:]))
+			Expect(s).To(HaveLen(1))
+		})
+
+		It("does not return any error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(pdb[4:]))
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("with a list of only valid YAML documents", func() {
+		It("returns a slice of Unstructured objects", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(mixedList))
+			Expect(s).To(HaveLen(2))
+			Expect(s[0].GetKind()).To(Equal("RoleBinding"))
+			Expect(s[1].GetKind()).To(Equal("PodDisruptionBudget"))
+		})
+
+		It("does not return any error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(mixedList))
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+	})
+
+	Context("with a list that consists of a single invalid resource", func() {
+		It("returns an empty slice", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(invalidListItem))
+			Expect(s).To(BeEmpty())
+		})
+
+		It("returns an error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(invalidListItem))
+			Expect(err).Should(HaveOccurred())
+		})
+	})
+
+	Context("with a list that has invalid YAML in the beginning of it", func() {
+		It("returns an empty slice", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(broken + pdb))
+			Expect(s).To(BeEmpty())
+		})
+
+		It("returns an error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(broken + pdb))
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("with a list that has invalid YAML in the middle of it", func() {
+		It("returns the valid ones (up til the invalid one)", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(roleBinding + broken + pdb))
+			Expect(s).To(HaveLen(1))
+			Expect(s[0].GetKind()).To(Equal("RoleBinding"))
+		})
+
+		It("returns an error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(roleBinding + broken + pdb))
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Context("with a list that has invalid YAML at the end of it", func() {
+		It("returns the valid ones", func() {
+			s, _ := YAMLToUnstructuredSlice([]byte(roleBinding + pdb + broken))
+			Expect(s).To(HaveLen(2))
+			Expect(s[0].GetKind()).To(Equal("RoleBinding"))
+			Expect(s[1].GetKind()).To(Equal("PodDisruptionBudget"))
+		})
+
+		It("returns an error", func() {
+			_, err := YAMLToUnstructuredSlice([]byte(roleBinding + broken + pdb))
+			Expect(err).To(HaveOccurred())
+		})
 	})
 })

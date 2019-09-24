@@ -383,17 +383,30 @@ var _ = Describe("GitTrack Suite", func() {
 			})
 		})
 
-		PContext("with invalid YAMLs interleaved", func() {
+		Context("with invalid YAMLs interleaved in the same file", func() {
 			BeforeEach(func() {
-				reference = "TODO"
+				reference = "f1d8485c9ef1f93a368d25308deb81107459d542"
 			})
 
-			It("returns the valid ones", func() {
-				Expect(objects).ToNot(BeEmpty())
+			It("does return the valid ones", func() {
+				haveName := func(u *unstructured.Unstructured) string { return u.GetName() }
+				haveKind := func(u *unstructured.Unstructured) string { return u.GetKind() }
+				Expect(objects).To(ContainElement(
+					SatisfyAll(
+						WithTransform(haveName, Equal("fluentd")),
+						WithTransform(haveKind, Equal("DaemonSet")),
+					),
+				))
+				Expect(objects).ToNot(ContainElement(
+					SatisfyAll(
+						WithTransform(haveName, Equal("fluentd-config")),
+						WithTransform(haveKind, Equal("ConfigMap")),
+					),
+				))
 			})
 
 			It("returns errors", func() {
-				Expect(parseErrs).ToNot(BeEmpty())
+				Expect(parseErrs).To(HaveKeyWithValue("daemonset.yaml", MatchRegexp("unable to parse 'daemonset.yaml':")))
 			})
 		})
 	})

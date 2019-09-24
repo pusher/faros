@@ -251,6 +251,33 @@ var _ = Describe("Handler Suite", func() {
 			})
 		}
 
+		var AssertNoDeletionsInvalidFiles = func() {
+			Context("that contains broken multi-document YAML", func() {
+				BeforeEach(func() {
+					By("where valid YAML is first deployed")
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetName("daemonset-fluentd")
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "d4f4810f428b1041f632e9a9bf1684347d7e7a62"), timeout).Should(Succeed())
+					_ = r.handleGitTrack(gt)
+					m.Get(gto, timeout).Should(Succeed())
+					By("and then invalid YAML is deployed")
+					m.UpdateWithFunc(gt, setGitTrackReferenceFunc(repositoryURL, "f1d8485c9ef1f93a368d25308deb81107459d542"), timeout).Should(Succeed())
+				})
+
+				It("does not delete any resources", func() {
+					m.Get(gto, consistentlyTimeout).Should(Succeed())
+				})
+
+				It("returns a parseError", func() {
+					Expect(result.parseError).To(HaveOccurred())
+				})
+
+				It("includes the broken file in `ignoredFiles`", func() {
+					Expect(result.ignoredFiles).To(HaveKey("daemonset.yaml"))
+				})
+			})
+		}
+
 		var AssertMultiDocument = func() {
 			Context("for the daemonset in the file", func() {
 				BeforeEach(func() {
@@ -624,6 +651,7 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertIgnoreInvalidFiles(8)
+				AssertNoDeletionsInvalidFiles()
 			})
 
 			Context("with a cluster scoped resource", func() {
@@ -739,6 +767,7 @@ var _ = Describe("Handler Suite", func() {
 				})
 
 				AssertIgnoreInvalidFiles(1)
+				AssertNoDeletionsInvalidFiles()
 			})
 
 			Context("with a cluster scoped resource", func() {

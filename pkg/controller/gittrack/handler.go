@@ -149,6 +149,11 @@ func (r *ReconcileGitTrack) handleGitTrack(gt farosv1alpha1.GitTrackInterface) h
 		result.upToDateReason = gittrackutils.ChildrenUpdateSuccess
 	}
 
+	// Don't attempt to clean up leftovers if there are any parse errors
+	if result.parseError != nil {
+		return result
+	}
+
 	// Cleanup potentially leftover resources
 	if err = r.deleteResources(objectsByName); err != nil {
 		result.gcError = err
