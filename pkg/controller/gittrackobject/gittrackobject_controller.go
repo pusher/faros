@@ -113,7 +113,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 	}
 
 	// Watch for changes to GitTrackObject
-	predicate := []predicate.Predicate(nil)
+	var predicate []predicate.Predicate
 	if opts.clusterGitTrackMode == farosflags.CGTMExcludeNamespaced {
 		predicate = append(predicate, utils.NewOwnerIsNotClusterGitTrackPredicate(mgr.GetClient()))
 	}
@@ -121,9 +121,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 		predicate = append(predicate, utils.NewOwnerIsNotGitTrackPredicate(mgr.GetClient()))
 	}
 
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{}, predicate...)
-	if err != nil {
-		return err
+	// don't bother putting a watch on gittrackobjects if we are entirely disabled
+	if len(predicate) != 2 {
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{}, predicate...)
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.clusterGitTrackMode != farosflags.CGTMDisabled {
