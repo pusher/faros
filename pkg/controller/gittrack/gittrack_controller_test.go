@@ -524,7 +524,7 @@ var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 				Eventually(requests, timeout).Should(Receive())
 
-				// Create a ClusterGitTrackObject owned by the ClusterGitTrack
+				// Create a GitTrackObject owned by the ClusterGitTrack
 				gto := testutils.ExampleGitTrackObject.DeepCopy()
 				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
 				m.Create(gto).Should(Succeed())
@@ -575,7 +575,7 @@ var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 				Eventually(requests, timeout).Should(Receive())
 
-				// Create a ClusterGitTrackObject owned by the ClusterGitTrack
+				// Create a GitTrackObject owned by the ClusterGitTrack
 				gto := testutils.ExampleGitTrackObject.DeepCopy()
 				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
 				m.Create(gto).Should(Succeed())
