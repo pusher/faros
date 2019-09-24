@@ -86,10 +86,12 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 		mutex:               &sync.RWMutex{},
 		applier:             applier,
 		log:                 rlogr.Log.WithName("gittrack-controller"),
+		gitTrackMode:        farosflags.GitTrack,
 		namespace:           farosflags.Namespace,
 		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
 	opts := &reconcileGitTrackOpts{
+		gitTrackMode:        farosflags.GitTrack,
 		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
 	return rec, opts
@@ -97,6 +99,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 
 type reconcileGitTrackOpts struct {
 	clusterGitTrackMode farosflags.ClusterGitTrackMode
+	gitTrackMode        farosflags.GitTrackMode
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -107,10 +110,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 		return err
 	}
 
-	// Watch for changes to GitTrack
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
+	if opts.gitTrackMode == farosflags.GTMEnabled {
+		// Watch for changes to GitTrack
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrack{}}, &handler.EnqueueRequestForObject{})
+		if err != nil {
+			return err
+		}
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &farosv1alpha1.GitTrack{},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.clusterGitTrackMode != farosflags.CGTMDisabled {
@@ -138,15 +150,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackOpt
 			}
 		}
 	}
-
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &farosv1alpha1.GitTrack{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -165,6 +168,7 @@ type ReconcileGitTrack struct {
 	applier         farosclient.Client
 	log             logr.Logger
 
+	gitTrackMode        farosflags.GitTrackMode
 	namespace           string
 	clusterGitTrackMode farosflags.ClusterGitTrackMode
 }
@@ -437,10 +441,6 @@ func (r *ReconcileGitTrack) ignoreObject(u *unstructured.Unstructured, owner far
 	} else if ownerIsGittrack {
 		// cluster scoped object managed from namespaced gittrack. Disallow
 		return true, "a GitTrack cannot manage a cluster-scoped resource", nil
-	}
-
-	if ownerIsClusterGittrack && r.clusterGitTrackMode == farosflags.CGTMDisabled {
-		return true, "ClusterGitTrack handling disabled; ignoring", nil
 	}
 
 	return false, "", nil

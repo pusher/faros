@@ -23,6 +23,7 @@ import (
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
+	farosflags "github.com/pusher/faros/pkg/flags"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -77,6 +78,16 @@ func (h handlerResult) asMetricOpts(repository string) *metricsOpts {
 
 func (r *ReconcileGitTrack) handleGitTrack(gt farosv1alpha1.GitTrackInterface) handlerResult {
 	var result handlerResult
+
+	// panic if we have a logic error with our watches
+	// we shouldn't ever get here because reconcile should be turned off at the controller level,
+	// but for testing and safeguarding, check anyway
+	if _, ok := gt.(*farosv1alpha1.GitTrack); ok && r.gitTrackMode == farosflags.GTMDisabled {
+		panic("reconciling GitTrack when GitTrack-mode is disabled")
+	}
+	if _, ok := gt.(*farosv1alpha1.ClusterGitTrack); ok && r.clusterGitTrackMode == farosflags.CGTMDisabled {
+		panic("reconciling ClusterGitTrack when clustergittrack-mode is disabled")
+	}
 
 	// Get a map of the files that are in the Spec
 	files, err := r.getFiles(gt)

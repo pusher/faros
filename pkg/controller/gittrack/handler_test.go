@@ -98,6 +98,7 @@ var _ = Describe("Handler Suite", func() {
 
 		recFn, _ := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrack)
+		r.gitTrackMode = farosflags.GTMEnabled
 
 		stop = StartTestManager(mgr)
 	})
@@ -182,16 +183,6 @@ var _ = Describe("Handler Suite", func() {
 			It("ignores the child resource", func() {
 				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
 				value := fmt.Sprintf("namespaced resources cannot be managed by ClusterGitTrack")
-				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
-			})
-		}
-
-		var AssertClusterGitTrackHandlingDisabled = func(r *handlerResult) {
-			AssertNoChild()
-
-			It("ignores the child resource", func() {
-				key := fmt.Sprintf("%s/%s", gto.GetNamespace(), gto.GetName())
-				value := fmt.Sprintf("ClusterGitTrack handling disabled; ignoring")
 				Expect(r.ignoredFiles).To(HaveKeyWithValue(key, value))
 			})
 		}
@@ -821,15 +812,6 @@ var _ = Describe("Handler Suite", func() {
 					gto.SetName("deployment-nginx")
 				})
 				AssertClusterGitTrackIgnoresNamespaced(&result)
-			})
-
-			Context("when ClusterGitTrack handling is disabled", func() {
-				BeforeEach(func() {
-					r.clusterGitTrackMode = farosflags.CGTMDisabled
-					gto = testutils.ExampleGitTrackObject.DeepCopy()
-					gto.SetName("deployment-nginx")
-				})
-				AssertClusterGitTrackHandlingDisabled(&result)
 			})
 		})
 	})

@@ -41,6 +41,9 @@ var (
 	// FetchTimeout in seconds for fetching changes from repositories
 	FetchTimeout time.Duration
 
+	// GitTrack specifies if we're handling GitTracks
+	GitTrack GitTrackMode
+
 	// ClusterGitTrack specifies which mode we're handling ClusterGitTracks in
 	ClusterGitTrack ClusterGitTrackMode
 
@@ -57,6 +60,7 @@ func init() {
 	FlagSet.BoolVar(&ServerDryRun, "server-dry-run", true, "Enable/Disable server side dry run before updating resources")
 	FlagSet.DurationVar(&FetchTimeout, "fetch-timeout", 30*time.Second, "Timeout in seconds for fetching changes from repositories")
 	FlagSet.StringVar(&RepositoryDir, "repository-dir", "", "Directory in which to clone repositories. Defaults to cloning in memory if unset.")
+	FlagSet.Var(&GitTrack, "gittrack-mode", "Whether to manage GitTracks. Valid values are Disabled and Enabled")
 	FlagSet.Var(&ClusterGitTrack, "clustergittrack-mode", "How to manage ClusterGitTracks. Valid values are Disabled, IncludeNamespaced and ExcludeNamespaced")
 }
 
@@ -127,4 +131,41 @@ func (cgtm *ClusterGitTrackMode) Set(s string) error {
 // Type implements the flag.Value interface
 func (cgtm ClusterGitTrackMode) Type() string {
 	return "ClusterGitTrackMode"
+}
+
+// GitTrackMode specifies which mode we're running GitTracks in
+type GitTrackMode bool
+
+// Enums for GitTrackMode
+const (
+	GTMDisabled GitTrackMode = false
+	GTMEnabled  GitTrackMode = true
+)
+
+// String implements the flag.Value interface
+func (gtm GitTrackMode) String() string {
+	if gtm {
+		return "Enabled"
+	}
+	return "Disabled"
+}
+
+// Set implements the flag.Value interface
+func (gtm *GitTrackMode) Set(s string) error {
+	lowered := strings.ToLower(s)
+	switch lowered {
+	case "disabled":
+		*gtm = false
+		return nil
+	case "enabled":
+		*gtm = true
+		return nil
+	default:
+		return fmt.Errorf("invalid value %q for gittrack-mode; valid values are Disabled and Enabled", s)
+	}
+}
+
+// Type implements the flag.Value interface
+func (gtm *GitTrackMode) Type() string {
+	return "GitTrackMode"
 }

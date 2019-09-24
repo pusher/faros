@@ -28,6 +28,7 @@ import (
 	"github.com/pusher/faros/pkg/controller/gittrack/metrics"
 	gittrackutils "github.com/pusher/faros/pkg/controller/gittrack/utils"
 	farosflags "github.com/pusher/faros/pkg/flags"
+	farosclient "github.com/pusher/faros/pkg/utils/client"
 	testutils "github.com/pusher/faros/test/utils"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
@@ -47,11 +48,13 @@ var _ = Describe("GitTrack Suite", func() {
 	var requests chan reconcile.Request
 	var stop chan struct{}
 	var r reconcile.Reconciler
+	var m testutils.Matcher
 
 	var key = types.NamespacedName{Name: "example", Namespace: "default"}
 	var expectedRequest = reconcile.Request{NamespacedName: key}
 
 	const timeout = time.Second * 5
+	const consistentlyTimeout = 1 * time.Second
 	const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
 	const doesNotExistPath = "does-not-exist"
 	const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
@@ -97,12 +100,6 @@ var _ = Describe("GitTrack Suite", func() {
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
 
-		var recFn reconcile.Reconciler
-		var opts *reconcileGitTrackOpts
-		r, opts = newReconciler(mgr)
-		recFn, requests = SetupTestReconcile(r)
-		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
-		stop = StartTestManager(mgr)
 		instance = &farosv1alpha1.GitTrack{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "example",
@@ -111,6 +108,12 @@ var _ = Describe("GitTrack Suite", func() {
 			Spec: farosv1alpha1.GitTrackSpec{
 				Repository: repositoryURL,
 			},
+		}
+		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
+		Expect(err).NotTo(HaveOccurred())
+		m = testutils.Matcher{
+			Client:      c,
+			FarosClient: applier,
 		}
 	})
 
@@ -126,205 +129,267 @@ var _ = Describe("GitTrack Suite", func() {
 		farosflags.Namespace = ""
 	})
 
-	Context("When a GitTrack resource is created", func() {
-		Context("in a different namespace", func() {
-			var ns *v1.Namespace
+	Context("When GitTrack handling is disabled", func() {
+		BeforeEach(func() {
+			var recFn reconcile.Reconciler
+			var opts *reconcileGitTrackOpts
+
+			r, opts = newReconciler(mgr)
+			r.(*ReconcileGitTrack).gitTrackMode = farosflags.GTMDisabled
+			opts.gitTrackMode = farosflags.GTMDisabled
+			recFn, requests = SetupTestReconcile(r)
+			Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
+			stop = StartTestManager(mgr)
+		})
+
+		Context("and a GitTrack is created", func() {
 			BeforeEach(func() {
-				ns = &v1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "not-default",
-					},
-				}
-				Expect(c.Create(context.TODO(), ns)).NotTo(HaveOccurred())
-				instance.SetNamespace("not-default")
 				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 			})
 
-			AfterEach(func() {
-				Expect(c.Delete(context.TODO(), ns)).NotTo(HaveOccurred())
-			})
-
-			It("should not reconcile it", func() {
-				Eventually(requests, timeout).ShouldNot(Receive())
+			It("should not reconcile the GitTrack", func() {
+				Consistently(requests, consistentlyTimeout).ShouldNot(Receive())
 			})
 		})
+
+		Context("and a GitTrackObject owned by a GitTrack is created", func() {
+			BeforeEach(func() {
+				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+
+				gto := testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(gto).Should(Succeed())
+				m.Get(gto, timeout).Should(Succeed())
+			})
+
+			It("should not reconcile the GitTrack", func() {
+				Consistently(requests, consistentlyTimeout).ShouldNot(Receive())
+			})
+		})
+
 	})
 
-	Context("When a GitTrack resource is updated", func() {
-		Context("and resources in the repository are updated", func() {
+	Context("When GitTrack handling is enabled", func() {
+		BeforeEach(func() {
+			var recFn reconcile.Reconciler
+			var opts *reconcileGitTrackOpts
+
+			r, opts = newReconciler(mgr)
+			r.(*ReconcileGitTrack).gitTrackMode = farosflags.GTMEnabled
+			opts.gitTrackMode = farosflags.GTMEnabled
+			recFn, requests = SetupTestReconcile(r)
+			Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
+			stop = StartTestManager(mgr)
+		})
+
+		Context("and when a GitTrack resource is created", func() {
+			Context("in a different namespace", func() {
+				var ns *v1.Namespace
+				BeforeEach(func() {
+					ns = &v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "not-default",
+						},
+					}
+					Expect(c.Create(context.TODO(), ns)).NotTo(HaveOccurred())
+					instance.SetNamespace("not-default")
+					createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				})
+
+				AfterEach(func() {
+					Expect(c.Delete(context.TODO(), ns)).NotTo(HaveOccurred())
+				})
+
+				It("should not reconcile it", func() {
+					Eventually(requests, timeout).ShouldNot(Receive())
+				})
+			})
+		})
+
+		Context("and when a GitTrack resource is updated", func() {
+			Context("and resources in the repository are updated", func() {
+				BeforeEach(func() {
+					createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+					// Wait for client cache to expire
+					waitForInstanceCreated(key)
+				})
+
+				It("updates the time to deploy metric", func() {
+					// Reset the metric before testing
+					metrics.TimeToDeploy.Reset()
+
+					Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+					Expect(instance.GetSpec().Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
+
+					// Update the reference
+					spec := instance.GetSpec()
+					spec.Reference = repeatedReference
+					instance.SetSpec(spec)
+					err := c.Update(context.TODO(), instance)
+					Expect(err).ToNot(HaveOccurred())
+					// Wait for reconcile for update
+					Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+					// Wait for reconcile for status update
+					Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+
+					Eventually(func() error {
+						labels := map[string]string{
+							"name":       instance.GetName(),
+							"namespace":  instance.GetNamespace(),
+							"repository": instance.GetSpec().Repository,
+						}
+						histObserver := metrics.TimeToDeploy.With(labels)
+						hist := histObserver.(prometheus.Histogram)
+						var timeToDeploy dto.Metric
+						hist.Write(&timeToDeploy)
+						if timeToDeploy.GetHistogram().GetSampleCount() != uint64(4) {
+							return fmt.Errorf("metrics not updated")
+						}
+						return nil
+					}, timeout).Should(Succeed())
+				})
+			})
+		})
+
+		Context(fmt.Sprintf("with invalid files"), func() {
 			BeforeEach(func() {
+				createInstance(instance, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced")
+				waitForInstanceCreated(key)
+			})
+
+			It("adds a message to the ignoredFiles status", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("invalid_file.yaml", "unable to parse 'invalid_file.yaml': unable to unmarshal JSON: Object 'Kind' is missing in '{\"I\":\"a;m an \\\"invalid Kubernetes manifest.)\"}'\n"))
+			})
+
+			It("includes the invalid file in ignoredObjects count", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.GetStatus().IgnoredFiles).To(HaveLen(int(instance.GetStatus().ObjectsIgnored)))
+			})
+		})
+
+		Context("and when a list of ignored GVRs is supplied", func() {
+			BeforeEach(func() {
+				reconciler, ok := r.(*ReconcileGitTrack)
+				Expect(ok).To(BeTrue())
+				reconciler.ignoredGVRs = make(map[schema.GroupVersionResource]interface{})
+				deploymentGVR := schema.GroupVersionResource{
+					Group:    "apps",
+					Version:  "v1",
+					Resource: "deployments",
+				}
+				reconciler.ignoredGVRs[deploymentGVR] = nil
+
 				createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
 				// Wait for client cache to expire
 				waitForInstanceCreated(key)
 			})
 
-			It("updates the time to deploy metric", func() {
-				// Reset the metric before testing
-				metrics.TimeToDeploy.Reset()
-
+			It("ignores the deployment files", func() {
 				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-				Expect(instance.GetSpec().Reference).To(Equal("a14443638218c782b84cae56a14f1090ee9e5c9c"))
 
-				// Update the reference
-				spec := instance.GetSpec()
-				spec.Reference = repeatedReference
-				instance.SetSpec(spec)
-				err := c.Update(context.TODO(), instance)
-				Expect(err).ToNot(HaveOccurred())
-				// Wait for reconcile for update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
-				// Wait for reconcile for status update
-				Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				// TODO: don't rely on ordering
+				c := instance.GetStatus().Conditions[3]
+				Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
+				Expect(c.Status).To(Equal(v1.ConditionTrue))
+				Expect(c.LastUpdateTime).NotTo(BeNil())
+				Expect(c.LastTransitionTime).NotTo(BeNil())
+				Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
+				Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
 
-				Eventually(func() error {
-					labels := map[string]string{
-						"name":       instance.GetName(),
-						"namespace":  instance.GetNamespace(),
-						"repository": instance.GetSpec().Repository,
-					}
-					histObserver := metrics.TimeToDeploy.With(labels)
-					hist := histObserver.(prometheus.Histogram)
-					var timeToDeploy dto.Metric
-					hist.Write(&timeToDeploy)
-					if timeToDeploy.GetHistogram().GetSampleCount() != uint64(4) {
-						return fmt.Errorf("metrics not updated")
-					}
-					return nil
-				}, timeout).Should(Succeed())
+				Expect(instance.GetStatus().ObjectsIgnored).To(Equal(int64(1)))
+			})
+
+			It("adds a message to the ignoredFiles status", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("default/deployment-nginx", "resource `deployments.apps/v1` ignored globally by flag"))
+			})
+
+			It("includes the ignored files in ignoredObjects count", func() {
+				Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
+				Expect(instance.GetStatus().IgnoredFiles).To(HaveLen(int(instance.GetStatus().ObjectsIgnored)))
 			})
 		})
-	})
 
-	Context(fmt.Sprintf("with invalid files"), func() {
-		BeforeEach(func() {
-			createInstance(instance, "936b7ee3df1dbd61b1fc691b742fa5d5d3c0dced")
-			waitForInstanceCreated(key)
-		})
+		Context("listObjectsByName", func() {
+			var reconciler *ReconcileGitTrack
+			var children map[string]farosv1alpha1.GitTrackObjectInterface
 
-		It("adds a message to the ignoredFiles status", func() {
-			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("invalid_file.yaml", "unable to parse 'invalid_file.yaml': unable to unmarshal JSON: Object 'Kind' is missing in '{\"I\":\"a;m an \\\"invalid Kubernetes manifest.)\"}'\n"))
-		})
+			BeforeEach(func() {
+				var ok bool
+				reconciler, ok = r.(*ReconcileGitTrack)
+				Expect(ok).To(BeTrue())
 
-		It("includes the invalid file in ignoredObjects count", func() {
-			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.GetStatus().IgnoredFiles).To(HaveLen(int(instance.GetStatus().ObjectsIgnored)))
-		})
-	})
+				createInstance(instance, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42")
+				// Wait for client cache to expire
+				waitForInstanceCreated(key)
 
-	Context("When a list of ignored GVRs is supplied", func() {
-		BeforeEach(func() {
-			reconciler, ok := r.(*ReconcileGitTrack)
-			Expect(ok).To(BeTrue())
-			reconciler.ignoredGVRs = make(map[schema.GroupVersionResource]interface{})
-			deploymentGVR := schema.GroupVersionResource{
-				Group:    "apps",
-				Version:  "v1",
-				Resource: "deployments",
-			}
-			reconciler.ignoredGVRs[deploymentGVR] = nil
+				var err error
+				children, err = reconciler.listObjectsByName(instance)
+				Expect(err).NotTo(HaveOccurred())
+			})
 
-			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
-			// Wait for client cache to expire
-			waitForInstanceCreated(key)
-		})
+			It("should return 5 child objects", func() {
+				Expect(children).Should(HaveLen(5))
+			})
 
-		It("ignores the deployment files", func() {
-			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-
-			// TODO: don't rely on ordering
-			c := instance.GetStatus().Conditions[3]
-			Expect(c.Type).To(Equal(farosv1alpha1.ChildrenUpToDateType))
-			Expect(c.Status).To(Equal(v1.ConditionTrue))
-			Expect(c.LastUpdateTime).NotTo(BeNil())
-			Expect(c.LastTransitionTime).NotTo(BeNil())
-			Expect(c.LastUpdateTime).To(Equal(c.LastTransitionTime))
-			Expect(c.Reason).To(Equal(string(gittrackutils.ChildrenUpdateSuccess)))
-
-			Expect(instance.GetStatus().ObjectsIgnored).To(Equal(int64(1)))
-		})
-
-		It("adds a message to the ignoredFiles status", func() {
-			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.GetStatus().IgnoredFiles).To(HaveKeyWithValue("default/deployment-nginx", "resource `deployments.apps/v1` ignored globally by flag"))
-		})
-
-		It("includes the ignored files in ignoredObjects count", func() {
-			Eventually(func() error { return c.Get(context.TODO(), key, instance) }, timeout).Should(Succeed())
-			Expect(instance.GetStatus().IgnoredFiles).To(HaveLen(int(instance.GetStatus().ObjectsIgnored)))
-		})
-	})
-
-	Context("listObjectsByName", func() {
-		var reconciler *ReconcileGitTrack
-		var children map[string]farosv1alpha1.GitTrackObjectInterface
-
-		BeforeEach(func() {
-			var ok bool
-			reconciler, ok = r.(*ReconcileGitTrack)
-			Expect(ok).To(BeTrue())
-
-			createInstance(instance, "b17c0e0f45beca3f1c1e62a7f49fecb738c60d42")
-			// Wait for client cache to expire
-			waitForInstanceCreated(key)
-
-			var err error
-			children, err = reconciler.listObjectsByName(instance)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should return 5 child objects", func() {
-			Expect(children).Should(HaveLen(5))
-		})
-
-		It("should return 5 namespaced objects", func() {
-			var count int
-			for _, obj := range children {
-				if _, ok := obj.(*farosv1alpha1.GitTrackObject); ok {
-					count++
+			It("should return 5 namespaced objects", func() {
+				var count int
+				for _, obj := range children {
+					if _, ok := obj.(*farosv1alpha1.GitTrackObject); ok {
+						count++
+					}
 				}
-			}
-			Expect(count).To(Equal(5))
-		})
+				Expect(count).To(Equal(5))
+			})
 
-		It("should return 0 non-namespaced resources", func() {
-			var count int
-			for _, obj := range children {
-				if _, ok := obj.(*farosv1alpha1.ClusterGitTrackObject); ok {
-					count++
+			It("should return 0 non-namespaced resources", func() {
+				var count int
+				for _, obj := range children {
+					if _, ok := obj.(*farosv1alpha1.ClusterGitTrackObject); ok {
+						count++
+					}
 				}
-			}
-			Expect(count).To(Equal(0))
-		})
+				Expect(count).To(Equal(0))
+			})
 
-		It("should key all items by their NamespacedName", func() {
-			for key, obj := range children {
-				Expect(key).Should(Equal(obj.GetNamespacedName()))
-			}
+			It("should key all items by their NamespacedName", func() {
+				for key, obj := range children {
+					Expect(key).Should(Equal(obj.GetNamespacedName()))
+				}
+			})
 		})
 	})
 })
 
-var _ = Describe("ClusterGitTrack Suite", func() {
+var _ = Describe("ClusterGitTrack Watcher Suite", func() {
 	var c client.Client
 	var mgr manager.Manager
 	var instance farosv1alpha1.GitTrackInterface
 	var requests chan reconcile.Request
 	var stop chan struct{}
-	var r reconcile.Reconciler
+	var m testutils.Matcher
+
+	var recFn reconcile.Reconciler
+	var opts *reconcileGitTrackOpts
 
 	const timeout = time.Second * 5
-	const consistentTimeout = 1 * time.Second
+	const consistentlyTimeout = 1 * time.Second
 	const filePathRegexp = "^[a-zA-Z0-9/\\-\\.]*\\.(?:yaml|yml|json)$"
 	const doesNotExistPath = "does-not-exist"
 	const repeatedReference = "448b39a21d285fcb5aa4b718b27a3e13ffc649b3"
 
-	var createInstance = func(gt farosv1alpha1.GitTrackInterface, ref string) {
+	var createClusterGitTrack = func(gt farosv1alpha1.GitTrackInterface, ref string) {
 		spec := gt.GetSpec()
 		spec.Reference = ref
 		gt.SetSpec(spec)
-		err := c.Create(context.TODO(), gt)
-		Expect(err).NotTo(HaveOccurred())
+		m.Create(gt).Should(Succeed())
+		m.Get(gt, timeout).Should(Succeed())
+	}
+
+	var setupManager = func() {
+		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
+		stop = StartTestManager(mgr)
 	}
 
 	BeforeEach(func() {
@@ -337,13 +402,11 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		Expect(err).NotTo(HaveOccurred())
 		c = mgr.GetClient()
 
-		var recFn reconcile.Reconciler
-		var opts *reconcileGitTrackOpts
-		r, opts = newReconciler(mgr)
-		recFn, requests = SetupTestReconcile(r)
-		opts.clusterGitTrackMode = farosflags.CGTMDisabled
-		Expect(add(mgr, recFn, opts)).NotTo(HaveOccurred())
-		stop = StartTestManager(mgr)
+		// Use a fakeReconciler so we don't create any extra events by updating
+		// resources created during tests
+		opts = &reconcileGitTrackOpts{}
+		recFn, requests = SetupTestReconcile(&fakeReconciler{})
+
 		instance = &farosv1alpha1.ClusterGitTrack{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "example",
@@ -352,6 +415,12 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 			Spec: farosv1alpha1.GitTrackSpec{
 				Repository: repositoryURL,
 			},
+		}
+		applier, err := farosclient.NewApplier(cfg, farosclient.Options{})
+		Expect(err).NotTo(HaveOccurred())
+		m = testutils.Matcher{
+			Client:      c,
+			FarosClient: applier,
 		}
 	})
 
@@ -366,15 +435,156 @@ var _ = Describe("ClusterGitTrack Suite", func() {
 		)
 	})
 
-	Context("When a ClusterGitTrack resource is created", func() {
+	Context("When management of ClusterGitTrack resources is disabled", func() {
 		BeforeEach(func() {
-			createInstance(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			opts.clusterGitTrackMode = farosflags.CGTMDisabled
+			setupManager()
 		})
 
-		It("should not reconcile it", func() {
-			// use a custom timeout here, so that the tests doesn't run too slow on
-			// success
-			Consistently(requests, consistentTimeout).ShouldNot(Receive())
+		Context("and a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			It("should not reconcile it", func() {
+				Consistently(requests, consistentlyTimeout).ShouldNot(Receive())
+			})
+		})
+
+		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				// Create the parent
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+
+				// Create a ClusterGitTrackObject owned by the ClusterGitTrack
+				cgto := testutils.ExampleClusterGitTrackObject.DeepCopy()
+				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(cgto).Should(Succeed())
+				m.Get(cgto, timeout).Should(Succeed())
+			})
+
+			It("should not reconcile the ClusterGitTrack", func() {
+				Consistently(requests, consistentlyTimeout).ShouldNot(Receive())
+			})
+		})
+
+		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				// Create the parent
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+
+				// Create a GitTrackObject owned by the ClusterGitTrack
+				gto := testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(gto).Should(Succeed())
+				m.Get(gto, timeout).Should(Succeed())
+			})
+
+			It("should not reconcile the ClusterGitTrack", func() {
+				Consistently(requests, consistentlyTimeout).ShouldNot(Receive())
+			})
+		})
+	})
+
+	Context("When management of ClusterGitTrack resources excludes namespaced children", func() {
+		BeforeEach(func() {
+			opts.clusterGitTrackMode = farosflags.CGTMExcludeNamespaced
+			setupManager()
+		})
+
+		Context("and a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			It("should reconcile it", func() {
+				Eventually(requests, timeout).Should(Receive())
+			})
+		})
+
+		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				cgto := testutils.ExampleClusterGitTrackObject.DeepCopy()
+				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(cgto).Should(Succeed())
+				m.Get(cgto, timeout).Should(Succeed())
+			})
+
+			It("should reconcile the ClusterGitTrack", func() {
+				Eventually(requests, timeout).Should(Receive())
+			})
+		})
+
+		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				// Create the parent and receive it's creation event
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				// Create a GitTrackObject owned by the ClusterGitTrack
+				gto := testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(gto).Should(Succeed())
+				m.Get(gto, timeout).Should(Succeed())
+			})
+
+			It("should not reconcile the ClusterGitTrack", func() {
+				Consistently(requests, consistentlyTimeout).ShouldNot(Receive())
+			})
+		})
+	})
+
+	Context("When management of ClusterGitTrack resources includes namespaced children", func() {
+		BeforeEach(func() {
+			opts.clusterGitTrackMode = farosflags.CGTMIncludeNamespaced
+			setupManager()
+		})
+
+		Context("and a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+			})
+
+			It("should reconcile it", func() {
+				Eventually(requests, timeout).Should(Receive())
+			})
+		})
+
+		Context("and a ClusterGitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				cgto := testutils.ExampleClusterGitTrackObject.DeepCopy()
+				cgto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(cgto).Should(Succeed())
+				m.Get(cgto, timeout).Should(Succeed())
+			})
+
+			It("should reconcile the ClusterGitTrack", func() {
+				Eventually(requests, timeout).Should(Receive())
+			})
+		})
+
+		Context("and a GitTrackObject owned by a ClusterGitTrack is created", func() {
+			BeforeEach(func() {
+				// Create the parent and receive it's creation event
+				createClusterGitTrack(instance, "a14443638218c782b84cae56a14f1090ee9e5c9c")
+				Eventually(requests, timeout).Should(Receive())
+
+				// Create a GitTrackObject owned by the ClusterGitTrack
+				gto := testutils.ExampleGitTrackObject.DeepCopy()
+				gto.SetOwnerReferences([]metav1.OwnerReference{testutils.GetGitTrackInterfaceOwnerRef(instance)})
+				m.Create(gto).Should(Succeed())
+				m.Get(gto, timeout).Should(Succeed())
+			})
+
+			It("should reconcile the ClusterGitTrack", func() {
+				Eventually(requests, timeout).Should(Receive())
+			})
 		})
 	})
 })
