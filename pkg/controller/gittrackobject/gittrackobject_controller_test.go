@@ -618,6 +618,44 @@ var _ = Describe("GitTrackObject Suite", func() {
 				})
 			})
 
+			Context("and ClusterGitTrackMode set to IncludeNamespaced and GitTrackMode set to disabled", func() {
+				var gto *farosv1alpha1.GitTrackObject
+				var namespacedChild *appsv1.Deployment
+				var originalVersion string
+
+				BeforeEach(func() {
+					SetupTest(farosflags.GTMDisabled, farosflags.CGTMIncludeNamespaced)
+				})
+				BeforeEach(func() {
+					gto = testutils.ExampleGitTrackObject.DeepCopy()
+					gto.SetOwnerReferences([]metav1.OwnerReference{
+						{
+							APIVersion: "faros.pusher.com/v1alpha1",
+							Kind:       "ClusterGitTrack",
+							UID:        clusterGitTrack.UID,
+							Name:       clusterGitTrack.Name,
+						},
+					})
+					namespacedChild = testutils.ExampleDeployment.DeepCopy()
+					Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, namespacedChild)).To(Succeed())
+					m.Create(namespacedChild).Should(Succeed())
+					// get the most recent version so we can get the UID and version
+					m.Get(namespacedChild, timeout).Should(Succeed())
+					originalUID = namespacedChild.GetUID()
+					originalVersion = namespacedChild.GetResourceVersion()
+
+					// Create
+					m.Create(gto).Should(Succeed())
+				})
+
+				It("should reconcile namespaced GitTrackObjects owned by ClusterGitTracks", func() {
+					Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
+				})
+				It("should update the child", func() {
+					m.Eventually(namespacedChild, timeout).ShouldNot(testutils.WithResourceVersion(Equal(originalVersion)))
+				})
+			})
+
 			Context("and ClusterGitTrackMode set to IncludeNamespaced", func() {
 				BeforeEach(func() {
 					SetupTest(farosflags.GTMEnabled, farosflags.CGTMIncludeNamespaced)
