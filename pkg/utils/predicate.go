@@ -37,7 +37,7 @@ type OwnerIsClusterGitTrackPredicate struct {
 	client client.Client
 }
 
-// NewOwnerIsNotClusterGitTrackPredicate constructs a new OwnerIsNotClusterGitTrackPredicate
+// NewOwnerIsClusterGitTrackPredicate constructs a new OwnerIsClusterGitTrackPredicate
 func NewOwnerIsClusterGitTrackPredicate(client client.Client) OwnerIsClusterGitTrackPredicate {
 	return OwnerIsClusterGitTrackPredicate{
 		client: client,
@@ -79,7 +79,7 @@ type OwnerIsGitTrackPredicate struct {
 	client client.Client
 }
 
-// NewOwnerIsNotGitTrackPredicate constructs a new OwnerIsNotGitTrackPredicate
+// NewOwnerIsGitTrackPredicate constructs a new OwnerIsGitTrackPredicate
 func NewOwnerIsGitTrackPredicate(client client.Client) OwnerIsGitTrackPredicate {
 	return OwnerIsGitTrackPredicate{
 		client: client,
