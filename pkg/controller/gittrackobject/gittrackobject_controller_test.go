@@ -162,9 +162,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 			BeforeEach(func() {
 				SetupTest(farosflags.GTMEnabled, farosflags.CGTMIncludeNamespaced)
-			})
 
-			BeforeEach(func() {
 				gto = testutils.ExampleGitTrackObject.DeepCopy()
 				gto.SetOwnerReferences([]metav1.OwnerReference{
 					{
@@ -542,8 +540,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 			Context("and ClusterGitTrackMode is set to Disabled", func() {
 				BeforeEach(func() {
 					SetupTest(farosflags.GTMEnabled, farosflags.CGTMDisabled)
-				})
-				BeforeEach(func() {
+
 					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
 					gto.SetOwnerReferences([]metav1.OwnerReference{
 						{
@@ -583,8 +580,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 				BeforeEach(func() {
 					SetupTest(farosflags.GTMEnabled, farosflags.CGTMExcludeNamespaced)
-				})
-				BeforeEach(func() {
+
 					gto = testutils.ExampleGitTrackObject.DeepCopy()
 					gto.SetOwnerReferences([]metav1.OwnerReference{
 						{
@@ -648,8 +644,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 
 				BeforeEach(func() {
 					SetupTest(farosflags.GTMDisabled, farosflags.CGTMIncludeNamespaced)
-				})
-				BeforeEach(func() {
+
 					gto = testutils.ExampleGitTrackObject.DeepCopy()
 					gto.SetOwnerReferences([]metav1.OwnerReference{
 						{
@@ -682,9 +677,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 			Context("and ClusterGitTrackMode set to IncludeNamespaced", func() {
 				BeforeEach(func() {
 					SetupTest(farosflags.GTMEnabled, farosflags.CGTMIncludeNamespaced)
-				})
 
-				BeforeEach(func() {
 					gto = testutils.ExampleClusterGitTrackObject.DeepCopy()
 					gto.SetOwnerReferences([]metav1.OwnerReference{
 						{
