@@ -983,52 +983,6 @@ var _ = Describe("GitTrackObject Suite", func() {
 						})
 					})
 				})
-
-				// don't run these tests, since the cross-namespace ownership reference is
-				// invalid k8s.
-				PContext("with an owner in a different namespace", func() {
-					var ns *corev1.Namespace
-
-					BeforeEach(func() {
-						ns = &corev1.Namespace{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "not-default",
-							},
-						}
-						m.Create(ns)
-
-						gitTrack = &farosv1alpha1.GitTrack{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "testgittrack",
-								Namespace: "not-default",
-							},
-							Spec: farosv1alpha1.GitTrackSpec{
-								Reference:  "foo",
-								Repository: "bar",
-							},
-						}
-						m.Create(gitTrack).Should(Succeed())
-
-						gto.SetOwnerReferences([]metav1.OwnerReference{
-							{
-								APIVersion: "faros.pusher.com/v1alpha1",
-								Kind:       "GitTrack",
-								UID:        gitTrack.UID,
-								Name:       gitTrack.Name,
-							},
-						})
-						m.Create(gto).Should(Succeed())
-					})
-
-					AfterEach(func() {
-						m.Delete(gitTrack).Should(Succeed())
-						m.Get(gitTrack, timeout).ShouldNot(Succeed())
-					})
-
-					It("should not be reconciled", func() {
-						Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedClusterRequest)))
-					})
-				})
 			})
 		})
 	})
