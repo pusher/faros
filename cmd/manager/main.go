@@ -62,7 +62,7 @@ func main() {
 	flag.CommandLine.AddGoFlagSet(logFlags)
 	flag.Parse()
 
-	err = farosflags.ValidateSettings()
+	err = farosflags.ValidateFlags()
 	if err != nil {
 		log.Error(err, "Invalid flags set")
 		return

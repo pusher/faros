@@ -87,11 +87,11 @@ func ParseIgnoredResources() (map[schema.GroupVersionResource]interface{}, error
 	return gvrs, nil
 }
 
-// ValidateSettings returns an error if an invalid set of options have been set in the flags.
+// ValidateFlags returns an error if an invalid set of options have been set in the flags.
 // It must be called after the flags have been parsed
-func ValidateSettings() error {
+func ValidateFlags() error {
 	if !FlagSet.Parsed() {
-		return fmt.Errorf("ValidateSettings called on unparsed flags")
+		return fmt.Errorf("ValidateFlags called on unparsed flags")
 	}
 
 	if GitTrack == GTMEnabled && Namespace != "" && ClusterGitTrack == CGTMIncludeNamespaced {
