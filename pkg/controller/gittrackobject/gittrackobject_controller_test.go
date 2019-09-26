@@ -564,7 +564,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 					m.Create(gto).Should(Succeed())
 				})
 
-				It("should not get reconcile ClusterGitTrackObjects", func() {
+				It("should not reconcile ClusterGitTrackObjects", func() {
 					Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedClusterRequest)))
 				})
 				It("should not update the child", func() {
@@ -609,7 +609,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 						m.Create(gto).Should(Succeed())
 					})
 
-					It("should not get reconcile namespaced GitTrackObjects", func() {
+					It("should not reconcile namespaced GitTrackObjects", func() {
 						Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedRequest)))
 					})
 					It("should not update the child", func() {
