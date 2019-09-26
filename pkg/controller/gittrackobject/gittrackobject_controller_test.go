@@ -602,19 +602,42 @@ var _ = Describe("GitTrackObject Suite", func() {
 					originalUID = namespacedChild.GetUID()
 					originalVersion = namespacedChild.GetResourceVersion()
 
-					// Create
-					m.Create(gto).Should(Succeed())
 				})
 
-				It("should not get reconcile namespaced GitTrackObjects owned by ClusterGitTracks", func() {
-					Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedRequest)))
-				})
-				It("should not update the child", func() {
-					m.Consistently(namespacedChild, timeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
+				Context("and owned by a ClusterGitTrack", func() {
+					BeforeEach(func() {
+						m.Create(gto).Should(Succeed())
+					})
+
+					It("should not get reconcile namespaced GitTrackObjects", func() {
+						Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedRequest)))
+					})
+					It("should not update the child", func() {
+						m.Consistently(namespacedChild, timeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
+					})
+
+					It("should not replace the child", func() {
+						m.Consistently(namespacedChild, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
+					})
 				})
 
-				It("should not replace the child", func() {
-					m.Consistently(namespacedChild, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
+				Context("and owned by no one", func() {
+					BeforeEach(func() {
+						gto.SetOwnerReferences([]metav1.OwnerReference{})
+						m.Create(gto).Should(Succeed())
+					})
+
+					It("should not reconcile GitTrackObject", func() {
+						Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedRequest)))
+					})
+					It("should not update the child", func() {
+						m.Consistently(namespacedChild, consistentlyTimeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
+					})
+
+					It("should not replace the child", func() {
+						m.Consistently(namespacedChild, consistentlyTimeout).Should(testutils.WithUID(Equal(originalUID)))
+					})
+
 				})
 			})
 
