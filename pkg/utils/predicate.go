@@ -31,88 +31,88 @@ const (
 	farosGroupVersion = "faros.pusher.com/v1alpha1"
 )
 
-// OwnerIsNotClusterGitTrackPredicate filters events to check the owner of the event
+// OwnerIsClusterGitTrackPredicate filters events to check the owner of the event
 // object is a ClusterGitTrack
-type OwnerIsNotClusterGitTrackPredicate struct {
+type OwnerIsClusterGitTrackPredicate struct {
 	client client.Client
 }
 
 // NewOwnerIsNotClusterGitTrackPredicate constructs a new OwnerIsNotClusterGitTrackPredicate
-func NewOwnerIsNotClusterGitTrackPredicate(client client.Client) OwnerIsNotClusterGitTrackPredicate {
-	return OwnerIsNotClusterGitTrackPredicate{
+func NewOwnerIsClusterGitTrackPredicate(client client.Client) OwnerIsClusterGitTrackPredicate {
+	return OwnerIsClusterGitTrackPredicate{
 		client: client,
 	}
 }
 
 // Create returns true if the event object owner is a ClusterGitTrack
-func (p OwnerIsNotClusterGitTrackPredicate) Create(e event.CreateEvent) bool {
-	return p.ownerIsNotClusterGitTrack(e.Meta.GetOwnerReferences())
+func (p OwnerIsClusterGitTrackPredicate) Create(e event.CreateEvent) bool {
+	return p.ownerIsClusterGitTrack(e.Meta.GetOwnerReferences())
 }
 
 // Update returns true if the event object owner is a ClusterGitTrack
-func (p OwnerIsNotClusterGitTrackPredicate) Update(e event.UpdateEvent) bool {
-	return p.ownerIsNotClusterGitTrack(e.MetaNew.GetOwnerReferences())
+func (p OwnerIsClusterGitTrackPredicate) Update(e event.UpdateEvent) bool {
+	return p.ownerIsClusterGitTrack(e.MetaNew.GetOwnerReferences())
 }
 
 // Delete returns true if the event object owner is a ClusterGitTrack
-func (p OwnerIsNotClusterGitTrackPredicate) Delete(e event.DeleteEvent) bool {
-	return p.ownerIsNotClusterGitTrack(e.Meta.GetOwnerReferences())
+func (p OwnerIsClusterGitTrackPredicate) Delete(e event.DeleteEvent) bool {
+	return p.ownerIsClusterGitTrack(e.Meta.GetOwnerReferences())
 }
 
 // Generic returns true if the event object owner is a ClusterGitTrack
-func (p OwnerIsNotClusterGitTrackPredicate) Generic(e event.GenericEvent) bool {
-	return p.ownerIsNotClusterGitTrack(e.Meta.GetOwnerReferences())
+func (p OwnerIsClusterGitTrackPredicate) Generic(e event.GenericEvent) bool {
+	return p.ownerIsClusterGitTrack(e.Meta.GetOwnerReferences())
 }
 
-func (p OwnerIsNotClusterGitTrackPredicate) ownerIsNotClusterGitTrack(ownerRefs []metav1.OwnerReference) bool {
+func (p OwnerIsClusterGitTrackPredicate) ownerIsClusterGitTrack(ownerRefs []metav1.OwnerReference) bool {
 	for _, ref := range ownerRefs {
 		if ref.Kind == "ClusterGitTrack" && ref.APIVersion == farosGroupVersion {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
-// OwnerIsNotGitTrackPredicate filters events to check the owner of the event
+// OwnerIsGitTrackPredicate filters events to check the owner of the event
 // object is a GitTrack
-type OwnerIsNotGitTrackPredicate struct {
+type OwnerIsGitTrackPredicate struct {
 	client client.Client
 }
 
 // NewOwnerIsNotGitTrackPredicate constructs a new OwnerIsNotGitTrackPredicate
-func NewOwnerIsNotGitTrackPredicate(client client.Client) OwnerIsNotGitTrackPredicate {
-	return OwnerIsNotGitTrackPredicate{
+func NewOwnerIsGitTrackPredicate(client client.Client) OwnerIsGitTrackPredicate {
+	return OwnerIsGitTrackPredicate{
 		client: client,
 	}
 }
 
 // Create returns true if the event object owner is a GitTrack
-func (p OwnerIsNotGitTrackPredicate) Create(e event.CreateEvent) bool {
-	return p.ownerIsNotGitTrack(e.Meta.GetOwnerReferences())
+func (p OwnerIsGitTrackPredicate) Create(e event.CreateEvent) bool {
+	return p.ownerIsGitTrack(e.Meta.GetOwnerReferences())
 }
 
 // Update returns true if the event object owner is a GitTrack
-func (p OwnerIsNotGitTrackPredicate) Update(e event.UpdateEvent) bool {
-	return p.ownerIsNotGitTrack(e.MetaNew.GetOwnerReferences())
+func (p OwnerIsGitTrackPredicate) Update(e event.UpdateEvent) bool {
+	return p.ownerIsGitTrack(e.MetaNew.GetOwnerReferences())
 }
 
 // Delete returns true if the event object owner is a GitTrack
-func (p OwnerIsNotGitTrackPredicate) Delete(e event.DeleteEvent) bool {
-	return p.ownerIsNotGitTrack(e.Meta.GetOwnerReferences())
+func (p OwnerIsGitTrackPredicate) Delete(e event.DeleteEvent) bool {
+	return p.ownerIsGitTrack(e.Meta.GetOwnerReferences())
 }
 
 // Generic returns true if the event object owner is a GitTrack
-func (p OwnerIsNotGitTrackPredicate) Generic(e event.GenericEvent) bool {
-	return p.ownerIsNotGitTrack(e.Meta.GetOwnerReferences())
+func (p OwnerIsGitTrackPredicate) Generic(e event.GenericEvent) bool {
+	return p.ownerIsGitTrack(e.Meta.GetOwnerReferences())
 }
 
-func (p OwnerIsNotGitTrackPredicate) ownerIsNotGitTrack(ownerRefs []metav1.OwnerReference) bool {
+func (p OwnerIsGitTrackPredicate) ownerIsGitTrack(ownerRefs []metav1.OwnerReference) bool {
 	for _, ref := range ownerRefs {
 		if ref.Kind == "GitTrack" && ref.APIVersion == farosGroupVersion {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 // OurResponsibilityPredicate returns whether an event is our
