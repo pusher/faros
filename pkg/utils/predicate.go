@@ -136,7 +136,7 @@ func (p OurResponsibilityPredicate) isOurResponsibility(ownerRefs []metav1.Owner
 	gtoList := &farosv1alpha1.GitTrackObjectList{}
 	err := p.client.List(context.TODO(), gtoList)
 	if err != nil {
-		// We can't list GTs so fail closed and ignore the requests
+		// We can't list GTOs so fail closed and ignore the requests
 		return false
 	}
 
