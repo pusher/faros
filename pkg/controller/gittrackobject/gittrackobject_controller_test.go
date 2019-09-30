@@ -552,7 +552,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 					})
 					child = testutils.ExampleClusterRoleBinding.DeepCopy()
 					Expect(testutils.SetGitTrackObjectInterfaceSpec(gto, child)).To(Succeed())
-					m.Update(child).Should(Succeed())
+					m.Create(child).Should(Succeed())
 					// get the most recent version so we can get the UID
 					m.Get(child, timeout).Should(Succeed())
 					originalUID = child.GetUID()
