@@ -564,6 +564,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 				It("should not reconcile ClusterGitTrackObjects", func() {
 					Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedClusterRequest)))
 				})
+
 				It("should not update the child", func() {
 					m.Consistently(child, consistentlyTimeout).ShouldNot(testutils.WithSubjects(BeEmpty()))
 				})
@@ -608,6 +609,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 					It("should not reconcile namespaced GitTrackObjects", func() {
 						Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedRequest)))
 					})
+
 					It("should not update the child", func() {
 						m.Consistently(namespacedChild, timeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
 					})
@@ -626,6 +628,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 					It("should not reconcile GitTrackObject", func() {
 						Consistently(requests, consistentlyTimeout).ShouldNot(Receive(Equal(expectedRequest)))
 					})
+
 					It("should not update the child", func() {
 						m.Consistently(namespacedChild, consistentlyTimeout).Should(testutils.WithResourceVersion(Equal(originalVersion)))
 					})
@@ -669,6 +672,7 @@ var _ = Describe("GitTrackObject Suite", func() {
 				It("should reconcile namespaced GitTrackObjects owned by ClusterGitTracks", func() {
 					Eventually(requests, timeout).Should(Receive(Equal(expectedRequest)))
 				})
+
 				It("should update the child", func() {
 					m.Eventually(namespacedChild, timeout).ShouldNot(testutils.WithResourceVersion(Equal(originalVersion)))
 				})
