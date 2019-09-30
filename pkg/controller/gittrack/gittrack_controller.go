@@ -97,6 +97,8 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrac
 	return rec, opts
 }
 
+// reconcileGitTrackOpts is the mode that we're running the reconciler
+// in. Being able to change these options during runtime is helpful during tests.
 type reconcileGitTrackOpts struct {
 	clusterGitTrackMode farosflags.ClusterGitTrackMode
 	gitTrackMode        farosflags.GitTrackMode
