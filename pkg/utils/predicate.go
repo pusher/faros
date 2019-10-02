@@ -20,16 +20,69 @@ import (
 	"context"
 
 	farosv1alpha1 "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
-	farosflags "github.com/pusher/faros/pkg/flags"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const (
 	farosGroupVersion = "faros.pusher.com/v1alpha1"
 )
+
+// AnyPredicate takes a list of predicates and returns true if any one of them
+// returns true
+type AnyPredicate struct {
+	elems []predicate.Predicate
+}
+
+// NewAnyPredicate constructs a new AnyPredicate
+func NewAnyPredicate(elems ...predicate.Predicate) AnyPredicate {
+	return AnyPredicate{
+		elems: elems,
+	}
+}
+
+// Create returns true if any of the elements return true
+func (p AnyPredicate) Create(e event.CreateEvent) bool {
+	for _, el := range p.elems {
+		if el.Create(e) {
+			return true
+		}
+	}
+	return false
+}
+
+// Update returns true if any of the elements return true
+func (p AnyPredicate) Update(e event.UpdateEvent) bool {
+	for _, el := range p.elems {
+		if el.Update(e) {
+			return true
+		}
+	}
+	return false
+}
+
+// Delete returns true if any of the elements return true
+func (p AnyPredicate) Delete(e event.DeleteEvent) bool {
+	for _, el := range p.elems {
+		if el.Delete(e) {
+			return true
+		}
+	}
+	return false
+}
+
+// Generic returns true if any of the elements return true
+func (p AnyPredicate) Generic(e event.GenericEvent) bool {
+	for _, el := range p.elems {
+		if el.Generic(e) {
+			return true
+		}
+	}
+	return false
+}
 
 // OwnerIsClusterGitTrackPredicate filters events to check the owner of the event
 // object is a ClusterGitTrack
@@ -115,24 +168,40 @@ func (p OwnerIsGitTrackPredicate) ownerIsGitTrack(ownerRefs []metav1.OwnerRefere
 	return false
 }
 
-// OurResponsibilityPredicate returns whether an event is our
-// responsibility, based on the flags we're running with
-type OurResponsibilityPredicate struct {
-	client              client.Client
-	gitTrackMode        farosflags.GitTrackMode
-	clusterGitTrackMode farosflags.ClusterGitTrackMode
+// OwnersOwnerIsGitTrackPredicate filters events to check the owner of the event
+// object is a GitTrack
+type OwnersOwnerIsGitTrackPredicate struct {
+	client client.Client
 }
 
-// NewOurResponsibilityPredicate constructs a new OurResponsibilityPredicate
-func NewOurResponsibilityPredicate(client client.Client, gtmode farosflags.GitTrackMode, cgtmode farosflags.ClusterGitTrackMode) OurResponsibilityPredicate {
-	return OurResponsibilityPredicate{
-		client:              client,
-		gitTrackMode:        gtmode,
-		clusterGitTrackMode: cgtmode,
+// NewOwnersOwnerIsGitTrackPredicate constructs a new OwnerIsGitTrackPredicate
+func NewOwnersOwnerIsGitTrackPredicate(client client.Client) OwnersOwnerIsGitTrackPredicate {
+	return OwnersOwnerIsGitTrackPredicate{
+		client: client,
 	}
 }
 
-func (p OurResponsibilityPredicate) isOurResponsibility(ownerRefs []metav1.OwnerReference) bool {
+// Create returns true if the event object owner is a GitTrack
+func (p OwnersOwnerIsGitTrackPredicate) Create(e event.CreateEvent) bool {
+	return p.ownersOwnerIsGitTrack(e.Meta.GetOwnerReferences())
+}
+
+// Update returns true if the event object owner is a GitTrack
+func (p OwnersOwnerIsGitTrackPredicate) Update(e event.UpdateEvent) bool {
+	return p.ownersOwnerIsGitTrack(e.MetaNew.GetOwnerReferences())
+}
+
+// Delete returns true if the event object owner is a GitTrack
+func (p OwnersOwnerIsGitTrackPredicate) Delete(e event.DeleteEvent) bool {
+	return p.ownersOwnerIsGitTrack(e.Meta.GetOwnerReferences())
+}
+
+// Generic returns true if the event object owner is a GitTrack
+func (p OwnersOwnerIsGitTrackPredicate) Generic(e event.GenericEvent) bool {
+	return p.ownersOwnerIsGitTrack(e.Meta.GetOwnerReferences())
+}
+
+func (p OwnersOwnerIsGitTrackPredicate) ownersOwnerIsGitTrack(ownerRefs []metav1.OwnerReference) bool {
 	gtoList := &farosv1alpha1.GitTrackObjectList{}
 	err := p.client.List(context.TODO(), gtoList)
 	if err != nil {
@@ -147,58 +216,108 @@ func (p OurResponsibilityPredicate) isOurResponsibility(ownerRefs []metav1.Owner
 	}
 
 	for _, ref := range ownerRefs {
-		// not a faros owner? not our problem
 		if ref.APIVersion != farosGroupVersion {
 			continue
 		}
-		// are we owned by a clustergittrackobject and are we handling ClusterGitTracks?
-		if p.clusterGitTrackMode != farosflags.CGTMDisabled && ref.Kind == "ClusterGitTrackObject" {
-			return true
+		if ref.Kind != "GitTrackObject" {
+			continue
 		}
-
-		if ref.Kind == "GitTrackObject" {
-			// gtoSet contains all the gtos in our namespace, so check if we are owned by one of those.
-			// TODO(dmo): we're assuming that we're in the same namespace here because any other construction
-			// is invalid. Check if we need to be more proactive about invalid states
-			gto, inSet := gtoSet[ref.UID]
-			if p.gitTrackMode == farosflags.GTMEnabled && inSet {
-				// make sure that we're owned by a gittrack and not a clustergittrack
-				for _, gtref := range gto.GetOwnerReferences() {
-					if gtref.APIVersion == farosGroupVersion && gtref.Kind == "GitTrack" {
-						return true
-					}
-				}
-			}
-
-			// a ClusterGitTrack might have created this GitTrackObject
-			if inSet && p.clusterGitTrackMode == farosflags.CGTMIncludeNamespaced {
-				for _, gtref := range gto.GetOwnerReferences() {
-					if gtref.APIVersion == farosGroupVersion && gtref.Kind == "ClusterGitTrack" {
-						return true
-					}
-				}
+		// the gittrackobject should owned by a gittrack or a clustergittrack.
+		// fetch the gittrackobject, then run through its owners to see if there's
+		// a gittrack in there. We shouldn't see any gittracks from namespaces
+		// that we're not managing since cross namespace ownership is disallowed
+		gto, inset := gtoSet[ref.UID]
+		if !inset {
+			// we have an owner reference to a gittrackobject that isn't in our namespace
+			// be cautious and don't handle this object
+			return false
+		}
+		for _, gtoOwner := range gto.GetOwnerReferences() {
+			if gtoOwner.APIVersion == farosGroupVersion && gtoOwner.Kind == "GitTrack" {
+				return true
 			}
 		}
 	}
 	return false
 }
 
-// Create returns true if the event object owner is our responsibility
-func (p OurResponsibilityPredicate) Create(e event.CreateEvent) bool {
-	return p.isOurResponsibility(e.Meta.GetOwnerReferences())
+// OwnersOwnerIsClusterGitTrackPredicate filters events to check the owner of the event
+// object is a ClusterGitTrack
+type OwnersOwnerIsClusterGitTrackPredicate struct {
+	client            client.Client
+	includeNamespaced bool
 }
 
-// Update returns true if the event object owner is our responsibility
-func (p OurResponsibilityPredicate) Update(e event.UpdateEvent) bool {
-	return p.isOurResponsibility(e.MetaNew.GetOwnerReferences())
+// NewOwnersOwnerIsClusterGitTrackPredicate constructs a new OwnerIsClusterGitTrackPredicate
+func NewOwnersOwnerIsClusterGitTrackPredicate(client client.Client, includeNamespaced bool) OwnersOwnerIsClusterGitTrackPredicate {
+	return OwnersOwnerIsClusterGitTrackPredicate{
+		client:            client,
+		includeNamespaced: includeNamespaced,
+	}
 }
 
-// Delete returns true if the event object owner is our responsibility
-func (p OurResponsibilityPredicate) Delete(e event.DeleteEvent) bool {
-	return p.isOurResponsibility(e.Meta.GetOwnerReferences())
+// Create returns true if the event object owner is a ClusterGitTrack
+func (p OwnersOwnerIsClusterGitTrackPredicate) Create(e event.CreateEvent) bool {
+	return p.ownersOwnerIsClusterGitTrack(e.Meta.GetOwnerReferences())
 }
 
-// Generic returns true if the event object owner is our responsibility
-func (p OurResponsibilityPredicate) Generic(e event.GenericEvent) bool {
-	return p.isOurResponsibility(e.Meta.GetOwnerReferences())
+// Update returns true if the event object owner is a ClusterGitTrack
+func (p OwnersOwnerIsClusterGitTrackPredicate) Update(e event.UpdateEvent) bool {
+	return p.ownersOwnerIsClusterGitTrack(e.MetaNew.GetOwnerReferences())
+}
+
+// Delete returns true if the event object owner is a ClusterGitTrack
+func (p OwnersOwnerIsClusterGitTrackPredicate) Delete(e event.DeleteEvent) bool {
+	return p.ownersOwnerIsClusterGitTrack(e.Meta.GetOwnerReferences())
+}
+
+// Generic returns true if the event object owner is a ClusterGitTrack
+func (p OwnersOwnerIsClusterGitTrackPredicate) Generic(e event.GenericEvent) bool {
+	return p.ownersOwnerIsClusterGitTrack(e.Meta.GetOwnerReferences())
+}
+
+func (p OwnersOwnerIsClusterGitTrackPredicate) ownersOwnerIsClusterGitTrack(ownerRefs []metav1.OwnerReference) bool {
+	gtoList := &farosv1alpha1.GitTrackObjectList{}
+	err := p.client.List(context.TODO(), gtoList)
+	if err != nil {
+		// We can't list GTOs so fail closed and ignore the requests
+		return false
+	}
+
+	// build a set of uids
+	gtoSet := make(map[types.UID]farosv1alpha1.GitTrackObject)
+	for _, item := range gtoList.Items {
+		gtoSet[item.UID] = item
+	}
+
+	for _, ref := range ownerRefs {
+		if ref.APIVersion != farosGroupVersion {
+			continue
+		}
+		if ref.Kind == "ClusterGitTrackObject" {
+			return true
+		}
+		if ref.Kind != "GitTrackObject" || !p.includeNamespaced {
+			continue
+		}
+		// the gittrackobject should owned by a gittrack or a clustergittrack.
+		// fetch the gittrackobject, then run through its owners to see if there's
+		// a clustergittrack in there
+		gto, inset := gtoSet[ref.UID]
+		if !inset {
+			// we have an owner reference to a gittrackobject that isn't handled
+			// by us. This should never happen, since we should only be watching on
+			// these objects if we're in IncludeNamespaced mode and when that happens,
+			// we should be watching everything in the cluster
+			//
+			// Fail closed for now
+			return false
+		}
+		for _, gtoOwner := range gto.GetOwnerReferences() {
+			if gtoOwner.APIVersion == farosGroupVersion && gtoOwner.Kind == "ClusterGitTrack" {
+				return true
+			}
+		}
+	}
+	return false
 }

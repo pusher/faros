@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	rlogr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -148,6 +149,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 			Source: gtoReconciler.EventStream(),
 		}
 
+		// usually, this would be created by multiple independent watches, but because our source is a channel
+		// we can't do that, since once one watch reads off the channel, the value isn't there for any other watches.
+		// Instead construct a predicate that will fire if any of the underlying predicates fire
+		var preds []predicate.Predicate
+		if opts.gitTrackMode == farosflags.GTMEnabled {
+			preds = append(preds, utils.NewOwnersOwnerIsGitTrackPredicate(mgr.GetClient()))
+		}
+		if opts.clusterGitTrackMode != farosflags.CGTMDisabled {
+			includeNamespaced := opts.clusterGitTrackMode == farosflags.CGTMIncludeNamespaced
+			preds = append(preds, utils.NewOwnersOwnerIsClusterGitTrackPredicate(mgr.GetClient(), includeNamespaced))
+		}
+
 		// When an event is received, queue the event's owner for reconciliation
 		err = c.Watch(src,
 			&gittrackobjectutils.EnqueueRequestForOwner{
@@ -161,7 +174,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObj
 				},
 				Log: rlogr.Log.WithName("gittrackobject-controller/enqueue-request-for-owner"),
 			},
-			utils.NewOurResponsibilityPredicate(mgr.GetClient(), opts.gitTrackMode, opts.clusterGitTrackMode),
+			utils.NewAnyPredicate(preds...),
 		)
 		if err != nil {
 			msg := fmt.Sprintf("unable to watch channel: %v", err)
