@@ -294,6 +294,8 @@ func (p OwnersOwnerIsClusterGitTrackPredicate) ownersOwnerIsClusterGitTrack(owne
 		if ref.APIVersion != farosGroupVersion {
 			continue
 		}
+		// ClusterGitTrackObjects can only be owned by ClusterGitTracks, so we
+		// if we're owned by a CGTO, then we know that our owners owner is a ClusterGitTrack
 		if ref.Kind == "ClusterGitTrackObject" {
 			return true
 		}
