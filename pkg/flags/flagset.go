@@ -90,7 +90,7 @@ func ParseIgnoredResources() (map[schema.GroupVersionResource]interface{}, error
 // ValidateFlags returns an error if an invalid set of options have been set in the flags.
 // It must be called after the flags have been parsed
 func ValidateFlags() error {
-	if !FlagSet.Parsed() {
+	if !flag.Parsed() {
 		return fmt.Errorf("ValidateFlags called on unparsed flags")
 	}
 
