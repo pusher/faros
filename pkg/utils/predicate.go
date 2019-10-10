@@ -168,35 +168,35 @@ func (p OwnerIsGitTrackPredicate) ownerIsGitTrack(ownerRefs []metav1.OwnerRefere
 	return false
 }
 
-// OwnersOwnerIsGitTrackPredicate filters events to check the owner's owner of the event
-// object is a GitTrack
+// OwnersOwnerIsGitTrackPredicate filters events to check that the
+// owner of the event object's owner is a GitTrack
 type OwnersOwnerIsGitTrackPredicate struct {
 	client client.Client
 }
 
-// NewOwnersOwnerIsGitTrackPredicate constructs a new OwnerIsGitTrackPredicate
+// NewOwnersOwnerIsGitTrackPredicate constructs a new OwnersOwnerIsGitTrackPredicate
 func NewOwnersOwnerIsGitTrackPredicate(client client.Client) OwnersOwnerIsGitTrackPredicate {
 	return OwnersOwnerIsGitTrackPredicate{
 		client: client,
 	}
 }
 
-// Create returns true if the event object owner's owner is a GitTrack
+// Create returns true if the owner of the event object's owner is a GitTrack
 func (p OwnersOwnerIsGitTrackPredicate) Create(e event.CreateEvent) bool {
 	return p.ownersOwnerIsGitTrack(e.Meta.GetOwnerReferences())
 }
 
-// Update returns true if the event object owner's owner is a GitTrack
+// Update returns true if the owner of the event object's owner is a GitTrack
 func (p OwnersOwnerIsGitTrackPredicate) Update(e event.UpdateEvent) bool {
 	return p.ownersOwnerIsGitTrack(e.MetaNew.GetOwnerReferences())
 }
 
-// Delete returns true if the event object owner's owner is a GitTrack
+// Delete returns true if the owner of the event object's owner is a GitTrack
 func (p OwnersOwnerIsGitTrackPredicate) Delete(e event.DeleteEvent) bool {
 	return p.ownersOwnerIsGitTrack(e.Meta.GetOwnerReferences())
 }
 
-// Generic returns true if the event object owner's owner is a GitTrack
+// Generic returns true if the owner of the event object's owner is a GitTrack
 func (p OwnersOwnerIsGitTrackPredicate) Generic(e event.GenericEvent) bool {
 	return p.ownersOwnerIsGitTrack(e.Meta.GetOwnerReferences())
 }
@@ -241,14 +241,14 @@ func (p OwnersOwnerIsGitTrackPredicate) ownersOwnerIsGitTrack(ownerRefs []metav1
 	return false
 }
 
-// OwnersOwnerIsClusterGitTrackPredicate filters events to check the owner's owner of the event
-// object is a ClusterGitTrack
+// OwnersOwnerIsClusterGitTrackPredicate filters events to check that the
+// owner of the event object's owner is a ClusterGitTrack
 type OwnersOwnerIsClusterGitTrackPredicate struct {
 	client            client.Client
 	includeNamespaced bool
 }
 
-// NewOwnersOwnerIsClusterGitTrackPredicate constructs a new OwnerIsClusterGitTrackPredicate
+// NewOwnersOwnerIsClusterGitTrackPredicate constructs a new OwnersOwnerIsClusterGitTrackPredicate
 func NewOwnersOwnerIsClusterGitTrackPredicate(client client.Client, includeNamespaced bool) OwnersOwnerIsClusterGitTrackPredicate {
 	return OwnersOwnerIsClusterGitTrackPredicate{
 		client:            client,
@@ -256,22 +256,22 @@ func NewOwnersOwnerIsClusterGitTrackPredicate(client client.Client, includeNames
 	}
 }
 
-// Create returns true if the event object owner's owner is a ClusterGitTrack
+// Create returns true if the owner of the event object's owner is a ClusterGitTrack
 func (p OwnersOwnerIsClusterGitTrackPredicate) Create(e event.CreateEvent) bool {
 	return p.ownersOwnerIsClusterGitTrack(e.Meta.GetOwnerReferences())
 }
 
-// Update returns true if the event object owner's owner is a ClusterGitTrack
+// Update returns true if the owner of the event object's owner is a ClusterGitTrack
 func (p OwnersOwnerIsClusterGitTrackPredicate) Update(e event.UpdateEvent) bool {
 	return p.ownersOwnerIsClusterGitTrack(e.MetaNew.GetOwnerReferences())
 }
 
-// Delete returns true if the event object owner's owner is a ClusterGitTrack
+// Delete returns true if the owner of the event object's owner is a ClusterGitTrack
 func (p OwnersOwnerIsClusterGitTrackPredicate) Delete(e event.DeleteEvent) bool {
 	return p.ownersOwnerIsClusterGitTrack(e.Meta.GetOwnerReferences())
 }
 
-// Generic returns true if the event object owner's owner is a ClusterGitTrack
+// Generic returns true if the owner of the event object's owner is a ClusterGitTrack
 func (p OwnersOwnerIsClusterGitTrackPredicate) Generic(e event.GenericEvent) bool {
 	return p.ownersOwnerIsClusterGitTrack(e.Meta.GetOwnerReferences())
 }
@@ -294,7 +294,7 @@ func (p OwnersOwnerIsClusterGitTrackPredicate) ownersOwnerIsClusterGitTrack(owne
 		if ref.APIVersion != farosGroupVersion {
 			continue
 		}
-		// ClusterGitTrackObjects can only be owned by ClusterGitTracks, so we
+		// ClusterGitTrackObjects can only be owned by ClusterGitTracks, so
 		// if we're owned by a CGTO, then we know that our owners owner is a ClusterGitTrack
 		if ref.Kind == "ClusterGitTrackObject" {
 			return true
