@@ -61,7 +61,7 @@ var _ = Describe("Watch Suite", func() {
 		c = mgr.GetClient()
 		m = testutils.Matcher{Client: c}
 
-		recFn := newReconciler(mgr)
+		recFn, _ := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
 
 		stopInformers = r.StopChan()

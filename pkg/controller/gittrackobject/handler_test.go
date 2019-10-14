@@ -67,7 +67,7 @@ var _ = Describe("Handler Suite", func() {
 
 		m = testutils.Matcher{Client: c, FarosClient: applier}
 
-		recFn := newReconciler(mgr)
+		recFn, _ := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
 
 		stopInformers = r.StopChan()

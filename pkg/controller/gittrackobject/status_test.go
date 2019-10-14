@@ -56,7 +56,7 @@ var _ = Describe("Status Suite", func() {
 
 		m = testutils.Matcher{Client: mgr.GetClient()}
 
-		recFn := newReconciler(mgr)
+		recFn, _ := newReconciler(mgr)
 		r = recFn.(*ReconcileGitTrackObject)
 
 		stopInformers = r.StopChan()

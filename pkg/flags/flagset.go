@@ -87,6 +87,19 @@ func ParseIgnoredResources() (map[schema.GroupVersionResource]interface{}, error
 	return gvrs, nil
 }
 
+// ValidateFlags returns an error if an invalid set of options have been set in the flags.
+// It must be called after the flags have been parsed
+func ValidateFlags() error {
+	if !flag.Parsed() {
+		return fmt.Errorf("ValidateFlags called on unparsed flags")
+	}
+
+	if GitTrack == GTMEnabled && Namespace != "" && ClusterGitTrack == CGTMIncludeNamespaced {
+		return fmt.Errorf("Cannot use gittrack-mode enabled with namespace %q and clustergittrack-mode set to IncludeNamespaced", Namespace)
+	}
+	return nil
+}
+
 // ClusterGitTrackMode specifies which mode we're running ClusterGitTracks in
 type ClusterGitTrackMode int
 

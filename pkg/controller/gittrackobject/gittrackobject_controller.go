@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	rlogr "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -50,11 +51,12 @@ import (
 // and Start it when the Manager is Started.
 // USER ACTION REQUIRED: update cmd/manager/main.go to call this faros.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	rec, opts := newReconciler(mgr)
+	return add(mgr, rec, opts)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager) (reconcile.Reconciler, *reconcileGitTrackObjectOpts) {
 	// Set up informer stop channel
 	stop := make(chan struct{})
 	c := make(chan os.Signal)
@@ -74,24 +76,38 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		panic(fmt.Errorf("unable to create dry run verifier: %v", err))
 	}
 
-	return &ReconcileGitTrackObject{
-		Client:         mgr.GetClient(),
-		scheme:         mgr.GetScheme(),
-		eventStream:    make(chan event.GenericEvent),
-		cache:          mgr.GetCache(),
-		informers:      make(map[string]cache.Informer),
-		config:         mgr.GetConfig(),
-		stop:           stop,
-		recorder:       mgr.GetEventRecorderFor("gittrackobject-controller"),
-		applier:        applier,
-		dryRunVerifier: dryRunVerifier,
-		log:            rlogr.Log.WithName("gittrackobject-controller"),
-		namespace:      farosflags.Namespace,
+	rec := &ReconcileGitTrackObject{
+		Client:              mgr.GetClient(),
+		scheme:              mgr.GetScheme(),
+		eventStream:         make(chan event.GenericEvent),
+		cache:               mgr.GetCache(),
+		informers:           make(map[string]cache.Informer),
+		config:              mgr.GetConfig(),
+		stop:                stop,
+		recorder:            mgr.GetEventRecorderFor("gittrackobject-controller"),
+		applier:             applier,
+		dryRunVerifier:      dryRunVerifier,
+		log:                 rlogr.Log.WithName("gittrackobject-controller"),
+		namespace:           farosflags.Namespace,
+		gitTrackMode:        farosflags.GitTrack,
+		clusterGitTrackMode: farosflags.ClusterGitTrack,
 	}
+	opts := &reconcileGitTrackObjectOpts{
+		gitTrackMode:        farosflags.GitTrack,
+		clusterGitTrackMode: farosflags.ClusterGitTrack,
+	}
+	return rec, opts
+}
+
+// reconcileGitTrackOpts is the mode that we're running the reconciler
+// in. Being able to change these options during runtime is helpful during tests.
+type reconcileGitTrackObjectOpts struct {
+	clusterGitTrackMode farosflags.ClusterGitTrackMode
+	gitTrackMode        farosflags.GitTrackMode
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r reconcile.Reconciler, opts *reconcileGitTrackObjectOpts) error {
 	// Create a new controller
 	c, err := controller.New("gittrackobject-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -99,25 +115,50 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to GitTrackObject
-	err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
+	if opts.gitTrackMode != farosflags.GTMDisabled {
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}},
+			&handler.EnqueueRequestForObject{},
+			utils.NewOwnerIsGitTrackPredicate(mgr.GetClient()))
+		if err != nil {
+			return err
+		}
+	}
+	if opts.clusterGitTrackMode == farosflags.CGTMIncludeNamespaced {
+		err = c.Watch(&source.Kind{Type: &farosv1alpha1.GitTrackObject{}},
+			&handler.EnqueueRequestForObject{},
+			utils.NewOwnerIsClusterGitTrackPredicate(mgr.GetClient()))
+		if err != nil {
+			return err
+		}
 	}
 
-	// Watch for changes to ClusterGitTrackObject
-	err = c.Watch(
-		&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}},
-		&handler.EnqueueRequestForObject{},
-		utils.NewOwnerInNamespacePredicate(mgr.GetClient()),
-	)
-	if err != nil {
-		return err
+	if opts.clusterGitTrackMode != farosflags.CGTMDisabled {
+		// Watch for changes to ClusterGitTrackObject
+		err = c.Watch(
+			&source.Kind{Type: &farosv1alpha1.ClusterGitTrackObject{}},
+			&handler.EnqueueRequestForObject{},
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Watch for events on the reconciler's eventStream channel
 	if gtoReconciler, ok := r.(Reconciler); ok {
 		src := &source.Channel{
 			Source: gtoReconciler.EventStream(),
+		}
+
+		// usually, this would be created by multiple independent watches, but because our source is a channel
+		// we can't do that, since once one watch reads off the channel, the value isn't there for any other watches.
+		// Instead construct a predicate that will fire if any of the underlying predicates fire
+		var preds []predicate.Predicate
+		if opts.gitTrackMode == farosflags.GTMEnabled {
+			preds = append(preds, utils.NewOwnersOwnerIsGitTrackPredicate(mgr.GetClient()))
+		}
+		if opts.clusterGitTrackMode != farosflags.CGTMDisabled {
+			includeNamespaced := opts.clusterGitTrackMode == farosflags.CGTMIncludeNamespaced
+			preds = append(preds, utils.NewOwnersOwnerIsClusterGitTrackPredicate(mgr.GetClient(), includeNamespaced))
 		}
 
 		// When an event is received, queue the event's owner for reconciliation
@@ -133,7 +174,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				},
 				Log: rlogr.Log.WithName("gittrackobject-controller/enqueue-request-for-owner"),
 			},
-			utils.NewOwnersOwnerInNamespacePredicate(mgr.GetClient()),
+			utils.NewAnyPredicate(preds...),
 		)
 		if err != nil {
 			msg := fmt.Sprintf("unable to watch channel: %v", err)
@@ -165,7 +206,10 @@ type ReconcileGitTrackObject struct {
 	stop        chan struct{}
 	recorder    record.EventRecorder
 	log         logr.Logger
-	namespace   string
+
+	namespace           string
+	gitTrackMode        farosflags.GitTrackMode
+	clusterGitTrackMode farosflags.ClusterGitTrackMode
 
 	applier        farosclient.Client
 	dryRunVerifier *utils.DryRunVerifier
