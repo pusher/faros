@@ -122,11 +122,12 @@ for example to ignore all Kubernetes Jobs specify the following flag:
 --ignore-resource=jobs.batch/v1
 ```
 
-It is recommended not to manage `GitTrack` resources using Faros itself,
-so ignore those using the following flag:
+It is recommended not to manage `GitTrack` or `ClusterGitTrack` resources using Faros itself,
+so ignore those using the following flags:
 
 ```
 --ignore-resource=gittracks.faros.pusher.com/v1alpha1
+--ignore-resource=clustergittracks.faros.pusher.com/v1alpha1
 ```
 
 #### GitTracks and ClusterGitTracks
@@ -251,16 +252,15 @@ If you haven't yet got Faros running on your cluster, see
 If you would like to deploy a private Git repository, we recommend doing so
 using SSH.
 To allow Faros access to the repository, place an authorised private key within
-a `Secret` in the same namespace that you will create the `GitTrack` in.
+a `Secret`.
 
-Create a `GitTrack` resource based the example below:
+Create a `ClusterGitTrack` resource based the example below:
 
 ```yaml
 apiVersion: faros.pusher.com/v1alpha1
-kind: GitTrack
+kind: ClusterGitTrack
 metadata:
   name: foo
-  namespace: bar
 spec:
   # Repository accepts any valid Git repository reference, the most common formats
   # are:
@@ -281,6 +281,8 @@ spec:
   deployKey:
     # SecretName is the name of the secret containing the secret
     secretName: foo-k8s-manifests
+    # SecretNamespace is the namespace to look for the secret in
+    secretName: default
     # Key is the Secret's key containing the secret
     key: id_rsa
     # (Optional) Type is the type of credential. Accepted values are "SSH", "HTTPBasicAuth". Defaults to "SSH"
@@ -288,7 +290,7 @@ spec:
     type: SSH | HTTPBasicAuth
 ```
 
-Deploy the `GitTrack` to your cluster and watch its status as Faros processes
+Deploy the `ClusterGitTrack` to your cluster and watch its status as Faros processes
 it. Eventually all conditions should have status `True` and the `objectsApplied`
 and `objectsInSync` fields should be equal.
 
