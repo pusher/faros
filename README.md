@@ -129,6 +129,21 @@ so ignore those using the following flag:
 --ignore-resource=gittracks.faros.pusher.com/v1alpha1
 ```
 
+#### GitTracks and ClusterGitTracks
+
+References to git repositories are known as GitTracks. Faros has 2
+different kinds of GitTracks, regular and ClusterGitTrack. Regular
+GitTracks exist in a namespace and can only handle resources in that
+namespace. ClusterGitTracks live in the cluster scope and can handle
+all resources.
+
+This somewhat cumbersome distinction exists because Kubernetes doesn't
+allow cross-namespace ownership. For a simple setup, it's recommended
+that you use a single ClusterGitTrack to handle your entire cluster.
+
+Faros can be restricted to only handling GitTracks or ClusterGitTracks
+with the `--gittrack-mode` and `--clustergittrack-mode` flags
+
 #### Namespace restriction
 
 Faros can be run either as a cluster wide controller or per namespace.
