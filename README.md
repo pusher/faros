@@ -142,31 +142,10 @@ allow cross-namespace ownership. For a simple setup, it's recommended
 that you use a single ClusterGitTrack to handle your entire cluster.
 
 Faros can be restricted to only handling GitTracks or ClusterGitTracks
-with the `--gittrack-mode` and `--clustergittrack-mode` flags
+with the `--gittrack-mode` and `--clustergittrack-mode` flags.
 
-#### Namespace restriction
-
-Faros can be run either as a cluster wide controller or per namespace.
-
-To restrict Faros to watch GitTrack resources only in a single namespace,
-use the following flag:
-
-```
---namespace=<namespace>
-```
-
-This will restrict Faros to the namespace you provide.
-At this point, it will only read GitTrack resources within the defined namespace.
-If any GitTrack refers to any resource not in the GitTrack's namespace, the
-resource will be ignored.
-Therefore a GitTrack in the `default` namespace cannot manage a resource in the
-`kube-system` namespace if the controller is restricted to the `default`
-namespace.
-
-When restricted to a namespace, Faros **will** still manage any non-namespaced
-Kubernetes resource it finds referenced within its GitTracks. If however, the
-non-namespaced resource clashes and is defined in another GitTrack within
-another namespace, Faros will ignore the resource. First owner wins.
+Furthermore, you can restrict Faros to only handling GitTracks within
+one namespace with the `--namespace=<namespace` flag
 
 #### Leader Election
 
