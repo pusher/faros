@@ -34,7 +34,7 @@ versions 1.11, 1.12 and 1.13 respectively:
 This target is defined in [Makefile.tools](Makefile.tools) and we recommend that
 you review the Makefile before you install the tooling.
 
-## Pull Requests and Issues̨
+## Pull Requests and Issues
 
 We track bugs and issues using Github.
 
