@@ -94,8 +94,8 @@ func ValidateFlags() error {
 		return fmt.Errorf("ValidateFlags called on unparsed flags")
 	}
 
-	if GitTrack == GTMEnabled && Namespace != "" && ClusterGitTrack == CGTMIncludeNamespaced {
-		return fmt.Errorf("Cannot use gittrack-mode enabled with namespace %q and clustergittrack-mode set to IncludeNamespaced", Namespace)
+	if GitTrack == GTMEnabled && Namespace != "" && ClusterGitTrack != CGTMDisabled {
+		return fmt.Errorf("Cannot use gittrack-mode enabled with namespace %q and clustergittrack-mode enabled", Namespace)
 	}
 	return nil
 }
