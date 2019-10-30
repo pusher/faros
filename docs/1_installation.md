@@ -5,23 +5,50 @@ permalink: /installation
 nav_order: 1
 ---
 
-## Installation
+## Building
 
-1.  Choose how to deploy:
-
-    a. Download [Prebuilt Binary](https://github.com/pusher/oauth2_proxy/releases) (current release is `v3.2.0`)
-
-    b. Build with `$ go get github.com/pusher/oauth2_proxy` which will put the binary in `$GOROOT/bin`
-
-    c. Using the prebuilt docker image [quay.io/pusher/oauth2_proxy](https://quay.io/pusher/oauth2_proxy) (AMD64, ARMv6 and ARM64 tags available)
-
-Prebuilt binaries can be validated by extracting the file and verifying it against the `sha256sum.txt` checksum file provided for each release starting with version `v3.0.0`.
+To build faros locally, run
 
 ```
-sha256sum -c sha256sum.txt 2>&1 | grep OK
-oauth2_proxy-3.2.0.linux-amd64: OK
+./configure
+make build
 ```
 
-2.  [Select a Provider and Register an OAuth Application with a Provider](auth-configuration)
-3.  [Configure OAuth2 Proxy using config file, command line options, or environment variables](configuration)
-4.  [Configure SSL or Deploy behind a SSL endpoint](tls-configuration) (example provided for Nginx)
+In order to build all binaries for all supported architectures, you may
+
+```
+./configure
+make release
+```
+
+## Deploying to Kubernetes
+
+Faros is a [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) based
+project, as such we have auto-generated [CRDs](config/crds) and
+[Kustomize](https://github.com/kubernetes-sigs/kustomize) configuration as
+examples of how to install the controller in the [config](config) folder.
+To quickly install the controller and CRDs on a cluster you can run `make deploy`.
+
+You **must** manually install the [CRDs](config/crds) before the controller will
+be fully functional, it will not install them for you.
+
+A public docker image is available on [Quay](https://quay.io/repository/pusher/faros).
+
+[![Docker Repository on Quay](https://quay.io/repository/pusher/faros/status "Docker Repository on Quay")](https://quay.io/repository/pusher/faros)
+
+```
+quay.io/pusher/faros
+```
+
+### RBAC
+
+If you are using [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
+within your cluster, you must grant the service account used by your Faros
+instance a superset of all roles you expect it to deploy.
+
+The simplest way to do this is to grant Faros `cluster-admin`, however, if you
+wish to be more secure, you can concatenate all `rules` from each Role and
+ClusterRole that Faros will manage.
+
+If you do not do so, you will see errors where Faros is attempting to
+escalate its privileges.
