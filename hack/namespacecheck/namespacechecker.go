@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 // namespacecheck checks whether a given Faros setup
 // is valid within the ownership rules added in v0.7.
-// 
+//
 // To run the tool, grab 3 files off your kubernetes cluster
 //
 // # kubectl get gittracks -A -o json > gt.json
@@ -28,7 +27,7 @@ limitations under the License.
 // ./namespacecheck gt.json gto.json cgto.json
 //
 // The tool will report back if you have any cross namespace ownership
-// and write a file containing any new clustergittracks that will need to 
+// and write a file containing any new clustergittracks that will need to
 // be created
 package main
 
