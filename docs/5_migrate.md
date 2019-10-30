@@ -17,7 +17,7 @@ This document sets out how to check whether you might be vulnerable to this issu
 
 If you have any ClusterGitTrackObjects in your cluster, you are impacted. You can check this by running `kubectl get clustergittrackobjects`
 
-If you don’t have any ClusterGitTrackObjects, you might still be impacted. Run the tool [here](TODO) to check if you have any GitTrackObjects owned by GitTracks in a different namespace
+If you don’t have any ClusterGitTrackObjects, you might still be impacted. Run the tool [here](https://github.com/pusher/faros/blob/master/hack/namespacecheck/namespacechecker.go) to check if you have any GitTrackObjects owned by GitTracks in a different namespace
 
 If neither of these are applicable to your setup, you are not impacted. The only change required is to add the `--gittrack-mode=Enabled` flag to your Faros deployment when upgrading to version 0.7.0 or greater.
 
