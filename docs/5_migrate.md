@@ -17,7 +17,7 @@ This document sets out how to check whether you might be vulnerable to this issu
 
 If you have any ClusterGitTrackObjects in your cluster, you are impacted. You can check this by running `kubectl get clustergittrackobjects`
 
-If you don’t have any ClusterGitTrackObjects, you might still be impacted. Run the tool <HERE> to check if you have any GitTrackObjects owned by GitTracks in a different namespace
+If you don’t have any ClusterGitTrackObjects, you might still be impacted. Run the tool [here](TODO) to check if you have any GitTrackObjects owned by GitTracks in a different namespace
 
 If neither of these are applicable to your setup, you are not impacted. The only change required is to add the `--gittrack-mode=Enabled` flag to your Faros deployment when upgrading to version 0.7.0 or greater.
 
@@ -29,8 +29,8 @@ If you have ClusterGitTrackObjects in your setup, then you will have to migrate 
 
 
 1. Scale down your Faros deployments so that there are no active Faros pods running
-2. Remove all ownerReferences from ClusterGitTrackObjects
-3. For every GitTrack which previously owned a ClusterGitTrackObject, create a ClusterGitTrack that matches its target.
+2. Remove all `ownerReferences` from ClusterGitTrackObjects
+3. For every `GitTrack` which previously owned a `ClusterGitTrackObject`, create a `ClusterGitTrack` that matches its target.
 4. Create a new deployment of Faros with the flags `--gittrack-mode=Disabled` and `--clustergittrack-mode=ExcludeNamespaced`
 5. Check that ClusterGitTrackObjects are now owned by ClusterGitTracks
 
