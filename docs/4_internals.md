@@ -2,6 +2,7 @@
 layout: default
 title: Advanced concepts
 permalink: /advanced
+has_children: true
 nav_order: 4
 ---
 
