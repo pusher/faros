@@ -2,8 +2,7 @@
 layout: default
 title: Migration to v0.7
 permalink: /migrate
-parent: Advanced concepts
-nav_order: 1
+nav_order: 5
 ---
 
 This document is only applicable if you are upgrading from a version before
