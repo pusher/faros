@@ -65,7 +65,7 @@ references, you are good to go, just add the `--gittrack-mode=Enabled`
 to all your existing Faros deployments
 
 If you did find objects owned across namespaces, you’ll have to take steps
-to make sure that they are owned by a parent within its own namespace
+to make sure that they are owned by a parent within their own namespace
 
 1. Scale down your Faros deployments so that there are no active Faros pods
 running
