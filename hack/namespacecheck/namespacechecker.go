@@ -19,9 +19,9 @@ limitations under the License.
 //
 // To run the tool, grab 3 files off your kubernetes cluster
 //
-// # kubectl get gittracks -A -o json > gt.json
-// # kubectl get gittrackobjects -A -o json > gto.json
-// # kubectl get clustergittrackobjects -A -o json > cgto.json
+// # kubectl get gittracks --all-namespaces -o json > gt.json
+// # kubectl get gittrackobjects --all-namespaces -o json > gto.json
+// # kubectl get clustergittrackobjects -all-namespaces -o json > cgto.json
 //
 // Then run
 // ./namespacecheck gt.json gto.json cgto.json
