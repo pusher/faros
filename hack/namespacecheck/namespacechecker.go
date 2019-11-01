@@ -24,7 +24,7 @@ limitations under the License.
 // # kubectl get clustergittrackobjects -all-namespaces -o json > cgto.json
 //
 // Then run
-// ./namespacecheck gt.json gto.json cgto.json
+// ./namespacecheck --gt-file gt.json --gto-file gto.json --cgto-file cgto.json
 //
 // The tool will report back if you have any cross namespace ownership
 // and write a file containing any new clustergittracks that will need to
@@ -41,18 +41,25 @@ import (
 	faros "github.com/pusher/faros/pkg/apis/faros/v1alpha1"
 )
 
+var (
+	gtFlag     = flag.String("gt-file", "", "gittrack file to read")
+	gtoFlag    = flag.String("gto-file", "", "gittrackobject file to read")
+	cgtoFlag   = flag.String("cgto-file", "", "clustergittrackobject file to read, optional")
+	outputFlag = flag.String("output", "apply.json", "output file for clustergittracks to create")
+)
+
 func main() {
 	flag.Parse()
-	if flag.NArg() < 2 || flag.NArg() > 3 {
-		fmt.Fprintf(os.Stderr, "wrong number of flags, expected 2 or 3; got %d\n", flag.NArg())
+	if *gtFlag == "" || *gtoFlag == "" {
+		fmt.Fprintf(os.Stderr, "Must give --gt-file and --gto-file flags\n")
 		usage()
 	}
-	gtfile, err := ioutil.ReadFile(flag.Arg(0))
+	gtfile, err := ioutil.ReadFile(*gtFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		usage()
 	}
-	gtofile, err := ioutil.ReadFile(flag.Arg(1))
+	gtofile, err := ioutil.ReadFile(*gtoFlag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		usage()
@@ -88,19 +95,19 @@ func main() {
 		fmt.Println("no cross-namespace owner references detected!")
 	}
 
-	if flag.NArg() == 3 {
-		cgtfile, err := ioutil.ReadFile(flag.Arg(2))
+	if *cgtoFlag != "" {
+		cgtfile, err := ioutil.ReadFile(*cgtoFlag)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			usage()
 		}
 		output := makeCGTs(gtjson, cgtfile)
-		err = ioutil.WriteFile("apply.json", output, 0644)
+		err = ioutil.WriteFile(*outputFlag, output, 0644)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
-		fmt.Println("wrote ClusterGitTrack file to apply.json")
+		fmt.Println("wrote ClusterGitTrack file to", *outputFlag)
 	}
 }
 
@@ -153,6 +160,6 @@ func makeCGTs(gtjson faros.GitTrackList, cgtofile []byte) []byte {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "\tusage: ./namespacechecker <GitTrack.json> <GitTrackObjects.json> <ClusterGitTrackObjects.json>")
+	flag.PrintDefaults()
 	os.Exit(2)
 }
