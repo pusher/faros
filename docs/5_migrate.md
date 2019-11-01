@@ -86,7 +86,7 @@ namespaces, follow these steps
 and `--clustergittrack-mode=Disabled`, with no namespace (meaning it’ll
 handle all namespaces)
 2. For each GitTrack, inspect them for `status.ignoredFiles` saying `namespace
-<NAMESPACE> is not managed by this GitTrack`
+$NAMESPACE is not managed by this GitTrack`
 3. Move your resources in git and update your GitTracks so that each GitTrack
 manages a single namespace that the GitTrack lives in (you can have multiple
 GitTrack per namespace, but only one namespace to a GitTrack)
