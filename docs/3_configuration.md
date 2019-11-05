@@ -49,7 +49,7 @@ with the `--gittrack-mode` and `--clustergittrack-mode` flags. `--gittrack-mode`
 
 When a Faros controller is handling `gittracks`, you can restrict it to only
 handling `GitTracks` within one namespace with the `--namespace=$namespace`
-flag. If the flag is empty, all namespaces are handled.
+flag. If the namespace flag is empty, all namespaces are handled.
 
 `--clustergittrack-mode` takes the following options
 
