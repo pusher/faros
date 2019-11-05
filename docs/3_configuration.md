@@ -41,11 +41,24 @@ This somewhat cumbersome distinction exists because Kubernetes doesn't
 allow cross-namespace ownership. For a simple setup, it's recommended
 that you use a single ClusterGitTrack to handle your entire cluster.
 
-Faros can be restricted to only handling GitTracks or ClusterGitTracks
-with the `--gittrack-mode` and `--clustergittrack-mode` flags.
+A Faros controller can be restricted to only handling GitTracks or ClusterGitTracks
+with the `--gittrack-mode` and `--clustergittrack-mode` flags. `--gittrack-mode` takes the following options
 
-Furthermore, you can restrict Faros to only handling GitTracks within
-one namespace with the `--namespace=<namespace` flag
+* `Disabled`: Don't handle `gittracks`
+* `Enabled`: Handle `gittracks`
+
+When a Faros controller is handling `gittracks`, you can restrict it to only
+handling `GitTracks` within one namespace with the `--namespace=$namespace`
+flag. If the flag is empty, all namespaces are handled.
+
+`--clustergittrack-mode` takes the following options
+
+* `Disabled`: No `ClusterGitTracks` are handled
+* `ExcludeNamespaced`: Only cluster-scoped resources within a `ClusterGitTrack` are handled
+* `IncludeNamespaced`: all resources are handled by a `ClusterGitTrack`, including namespaced ones.
+
+When `--clustergittrack-mode` is enabled, you cannot restrict it to a given
+namespace because of kubernetes internals limitations
 
 ### Leader Election
 
