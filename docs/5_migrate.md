@@ -6,7 +6,7 @@ nav_order: 5
 ---
 
 This document is only applicable if you are upgrading from a version before
-v0.6.1 to a later version. You can safely ignore this document if this is
+v0.7.0 to a later version. You can safely ignore this document if this is
 not the case for you.
 
 
