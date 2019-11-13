@@ -44,9 +44,11 @@ are impacted.
 If you have ClusterGitTrackObjects in your setup, then you will have to
 migrate those to being managed by ClusterGitTracks
 
-1. Scale down your Faros deployments so that there are no active Faros pods
+1. Apply the ClusterGitTrack custom resource definition to your cluster. It'll
+be needed for running later versions of Faros
+2. Scale down your Faros deployments so that there are no active Faros pods
  running
-2. Remove all `ownerReferences` from ClusterGitTrackObjects. For small setups, this can be done manually, but bigger setups can be done programmatically, for example, using `jq`:
+3. Remove all `ownerReferences` from ClusterGitTrackObjects. For small setups, this can be done manually, but bigger setups can be done programmatically, for example, using `jq`:
 
 	```
 	# kubectl get -a clustergittrackobjects -o json > /tmp/cgtos.json
@@ -54,11 +56,11 @@ migrate those to being managed by ClusterGitTracks
 	# kubectl apply -f /tmp/newcgtos.json
 	```
 
-3. For every `GitTrack` which previously owned a `ClusterGitTrackObject`,
+4. For every `GitTrack` which previously owned a `ClusterGitTrackObject`,
 create a `ClusterGitTrack` that matches its target.
-4. Create a new deployment of Faros with the flags `--gittrack-mode=Disabled`
+5. Create a new deployment of Faros with the flags `--gittrack-mode=Disabled`
 and `--clustergittrack-mode=ExcludeNamespaced`
-5. Check that ClusterGitTrackObjects are now owned by ClusterGitTracks
+6. Check that ClusterGitTrackObjects are now owned by ClusterGitTracks
 
 A Faros deployment must handle ClusterGitTracks. If you have one faros for the entire cluster, you can add the `--clustergittrack-mode=IncludeNamespaced` flag to it.[^1]
 
