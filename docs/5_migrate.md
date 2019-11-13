@@ -30,7 +30,7 @@ If you don’t have any ClusterGitTrackObjects,
 you might still be impacted. Run the tool
 [here](https://github.com/pusher/faros/blob/master/hack/namespacecheck/namespacechecker.go)
 to check if you have any GitTrackObjects owned by GitTracks in a different
-namespace
+namespace.
 
 If neither of these are applicable to your setup, you are not impacted. The
 only change required is to add the `--gittrack-mode=Enabled` flag to your
@@ -57,7 +57,9 @@ be needed for running later versions of Faros
 	```
 
 4. For every `GitTrack` which previously owned a `ClusterGitTrackObject`,
-create a `ClusterGitTrack` that matches its target.
+create a `ClusterGitTrack` that matches its target. If you used the
+`namespacecheck` tool to check for `ClusterGitTracks`, it should have written
+a file with all the required `ClusterGitTracks` to apply.
 5. Create a new deployment of Faros with the flags `--gittrack-mode=Disabled`
 and `--clustergittrack-mode=ExcludeNamespaced`
 6. Check that ClusterGitTrackObjects are now owned by ClusterGitTracks
