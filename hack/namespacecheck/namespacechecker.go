@@ -117,9 +117,9 @@ func makeCGTs(gtjson faros.GitTrackList, cgtofile []byte) []byte {
 		}
 	}
 
-	var cgtjson faros.ClusterGitTrackList
-	cgtjson.APIVersion = "v1"
-	cgtjson.Kind = "List"
+	var cgtList faros.ClusterGitTrackList
+	cgtList.APIVersion = "v1"
+	cgtList.Kind = "List"
 	for _, v := range toCreate {
 
 		cgt := faros.ClusterGitTrack{}
@@ -135,9 +135,9 @@ func makeCGTs(gtjson faros.GitTrackList, cgtofile []byte) []byte {
 			spec.DeployKey.SecretNamespace = v.GetNamespace()
 		}
 		cgt.SetSpec(spec)
-		cgtjson.Items = append(cgtjson.Items, cgt)
+		cgtList.Items = append(cgtList.Items, cgt)
 	}
-	output, err := json.MarshalIndent(cgtjson, "", "\t")
+	output, err := json.MarshalIndent(cgtList, "", "\t")
 	if err != nil {
 		panic(err)
 	}
