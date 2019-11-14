@@ -74,7 +74,6 @@ and `--clustergittrack-mode=ExcludeNamespaced`. This should adopt all ClusterGit
 	# kubectl get clustergittrackobject -o json | jq '.items[].metadata | select(.ownerReferences != null and .ownerReferences[].kind != "ClusterGitTrack") | .name' -r
 	```
 
-
 A Faros deployment must handle ClusterGitTracks. If you have one faros for the entire cluster, you can add the `--clustergittrack-mode=IncludeNamespaced` flag to it.[^1]
 
 ## Migrating GitTrackObjects
@@ -88,7 +87,7 @@ to make sure that they are owned by a parent within their own namespace
 
 1. Scale down your Faros deployments so that there are no active Faros pods
 running
-2. Remove all ownerReferences from GitTrackObjects
+2. Remove all ownerReferences from GitTrackObjects. You can use the shell snippet from the ClusterGitTrack section to do this.
 
 If you have a setup where all your GitTracks live in one namespace, follow
 these steps
@@ -102,7 +101,7 @@ If you have a setup where GitTracks are distributed amongst multiple
 namespaces, follow these steps
 
 1. Create a new deployment of Faros with the flags `--gittrack-mode=Enabled`
-and `--clustergittrack-mode=Disabled`, with no namespace (meaning it’ll
+and `--clustergittrack-mode=Disabled`, with no namespace (meaning it will
 handle all namespaces)
 2. For each GitTrack, inspect them for `status.ignoredFiles` saying `namespace
 $NAMESPACE is not managed by this GitTrack`
@@ -111,5 +110,7 @@ manages a single namespace that the GitTrack lives in (you can have multiple
 GitTrack per namespace, but only one namespace to a GitTrack)
 4. Turn off the new deployment of Faros and scale up your old Faros deployments
 with `--gittrack-mode=Enabled`
+
+Once these steps are done, you can run the namespacecheck tool again to verify that there are no cross-namespace references.
 
 [^1]: For Kubernetes internals reasons, a Faros controller cannot both handle a single namespace and `ClusterGitTracks`. If you only have namespaced Faros controllers, you will need to add a new deployment handling only `ClusterGitTracks`.
