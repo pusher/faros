@@ -2,6 +2,7 @@
 
 namespacecheck checks whether a given Faros setup
 is valid within the ownership rules added in v0.7.
+See the [migration to v7.0](https://pusher.github.io/faros/migrate) docs for more information
 
 To run the tool, grab 3 files off your kubernetes cluster
 
