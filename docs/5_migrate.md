@@ -28,7 +28,7 @@ can check this by running `kubectl get clustergittrackobjects`
 
 If you don’t have any ClusterGitTrackObjects,
 you might still be impacted. Run the tool
-[here](https://github.com/pusher/faros/blob/master/hack/namespacecheck/namespacechecker.go)
+[here](https://github.com/pusher/faros/tree/master/hack/namespacecheck)
 to check if you have any GitTrackObjects owned by GitTracks in a different
 namespace.
 
