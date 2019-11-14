@@ -13,7 +13,7 @@ To run the tool, grab 3 files off your kubernetes cluster
 
 Then run
 ```
-./namespacecheck --gt-file gt.json --gto-file gto.json --cgto-file cgto.json
+go run github.com/pusher/faros/hack/namespacecheck --gt-file gt.json --gto-file gto.json --cgto-file cgto.json
 ```
 
 The tool will report back if you have any cross namespace ownership
