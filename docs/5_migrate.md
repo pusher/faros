@@ -56,13 +56,24 @@ be needed for running later versions of Faros
 	# kubectl apply -f /tmp/newcgtos.json
 	```
 
+	You can check that all ClusterGitTrackObjects are unowned with the following jq expression
+
+	```
+	# kubectl get clustergittrackobject -o json | jq '.items[].metadata | select(.ownerReferences == null) | .name' -r
+	```
+
 4. For every `GitTrack` which previously owned a `ClusterGitTrackObject`,
 create a `ClusterGitTrack` that matches its target. If you used the
 `namespacecheck` tool to check for `ClusterGitTracks`, it should have written
 a file with all the required `ClusterGitTracks` to apply.
 5. Create a new deployment of Faros with the flags `--gittrack-mode=Disabled`
-and `--clustergittrack-mode=ExcludeNamespaced`
-6. Check that ClusterGitTrackObjects are now owned by ClusterGitTracks
+and `--clustergittrack-mode=ExcludeNamespaced`. This should adopt all ClusterGitTrackObjects so they are owned by ClusterGitTracks
+6. Check that ClusterGitTrackObjects are now owned by ClusterGitTracks. This can be done with the following jq expression
+
+	```
+	# kubectl get clustergittrackobject -o json | jq '.items[].metadata | select(.ownerReferences != null and .ownerReferences[].kind != "ClusterGitTrack") | .name' -r
+	```
+
 
 A Faros deployment must handle ClusterGitTracks. If you have one faros for the entire cluster, you can add the `--clustergittrack-mode=IncludeNamespaced` flag to it.[^1]
 
