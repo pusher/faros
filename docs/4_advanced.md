@@ -30,7 +30,7 @@ If you wish to remove Faros entirely, we recommend deleting all `GitTrack` and
 then `GitTrackObject` and `ClusterGitTrackObject` resources using the
 `--cascade=false` flag.
 
-### Three Way Merge
+## Three Way Merge
 
 Faros uses a three-way merging strategy to determine the patch to apply when
 updating resources. In a similar way to `kubectl apply`, Faros applies a
