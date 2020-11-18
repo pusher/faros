@@ -4,6 +4,9 @@
 
 > Faros - Greek for Lighthouse
 
+> NOTE: this repository is currently **UNMAINTAINED** and is looking for new owner(s).
+> See [#190](/../../issues/190) for more information.
+
 Faros is a GitOps controller that takes a Git repository reference from a
 Custom Resource Definition (CRD) and applies resources within the repository to
 a Kubernetes cluster.
